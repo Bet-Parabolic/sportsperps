@@ -24,7 +24,7 @@ const B = {
 };
 
 /* ─── Backend API ─── */
-const API_URL = "http://localhost:3001/api";
+const API_URL = "https://perpdictions-backend-production.up.railway.app/api";
 
 const fd = "'Plus Jakarta Sans',sans-serif";
 const fb = "'DM Sans',sans-serif";
