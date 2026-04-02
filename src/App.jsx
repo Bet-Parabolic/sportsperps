@@ -1087,6 +1087,120 @@ function Grid({ children }) {
   return <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12,marginBottom:32}}>{children}</div>;
 }
 
+/* ─── NFL PAGE ─── */
+function NFLPage() {
+  const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard");
+  const games = raw.map(parseESPNEvent);
+  const live  = games.filter(g => g.isLive);
+  const final = games.filter(g => g.isFinal);
+  const sched = games.filter(g => g.isScheduled);
+  return (
+    <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={loading} error={error}>
+      {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏈</div><div style={{fontSize:14,color:"#555"}}>No NFL games scheduled today.</div></div>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
+      {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
+      {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
+    </SportPageShell>
+  );
+}
+
+/* ─── TRENDING PAGE — all live games across every sport ─── */
+const TRENDING_SOURCES = [
+  { key:"nfl",   url:"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",        emoji:"🏈", label:"NFL"  },
+  { key:"mlb",   url:"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard",        emoji:"⚾", label:"MLB"  },
+  { key:"nhl",   url:"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard",          emoji:"🏒", label:"NHL"  },
+  { key:"ucl",   url:"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard",emoji:"⚽", label:"UCL"  },
+];
+
+function TrendingPage({ liveGames }) {
+  const [allGames, setAllGames] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  const fetchAll = useCallback(async () => {
+    const results = await Promise.allSettled(
+      TRENDING_SOURCES.map(s =>
+        fetch(s.url).then(r => r.json()).then(d => ({ key: s.key, emoji: s.emoji, label: s.label, events: (d.events||[]).map(parseESPNEvent) }))
+      )
+    );
+    const merged = {};
+    results.forEach(r => { if(r.status==="fulfilled") merged[r.value.key] = r.value; });
+    setAllGames(merged);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); const iv = setInterval(fetchAll, 20000); return () => clearInterval(iv); }, [fetchAll]);
+
+  // Normalise backend basketball games into MatchCard-compatible shape
+  const basketballLive = liveGames
+    .filter(g => g.status==="live" || g.status==="halftime")
+    .map(g => ({
+      id: g.id,
+      isLive: true, isFinal: false, isScheduled: false, isHalf: g.status==="halftime", isDelayed: false,
+      detail: g.clock && g.period ? `${g.clock} · Q${g.period}` : "",
+      home: { name: g.home.name||"", abbr: g.home.abbreviation||"", logo: g.home.logo||"", score: g.home.score??null },
+      away: { name: g.away.name||"", abbr: g.away.abbreviation||"", logo: g.away.logo||"", score: g.away.score??null },
+    }));
+
+  // Collect all live games from ESPN sources
+  const espnLive = Object.values(allGames).flatMap(src =>
+    src.events.filter(g => g.isLive).map(g => ({ ...g, _emoji: src.emoji, _label: src.label }))
+  );
+
+  const totalLive = espnLive.length + basketballLive.length;
+
+  return (
+    <div style={{flex:1,overflow:"auto",background:"#0a0a0a",padding:"32px 40px"}}>
+      {/* Header */}
+      <div style={{marginBottom:32}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+          <div style={{fontSize:11,fontWeight:700,color:B.primary,letterSpacing:"0.12em",fontFamily:fm}}>TRENDING</div>
+          {totalLive>0&&<span style={{fontSize:10,fontWeight:700,color:B.green,fontFamily:fm,padding:"2px 8px",background:B.green+"15",borderRadius:6,letterSpacing:"0.06em",animation:"pulse 2s infinite"}}>{totalLive} LIVE</span>}
+        </div>
+        <h2 style={{fontFamily:fd,fontSize:28,fontWeight:800,letterSpacing:"-0.03em",color:"#fff",marginBottom:8}}>Live Right Now</h2>
+        <p style={{fontSize:13,color:"#666",lineHeight:1.6}}>
+          {loading?"Fetching live games…":`All live action across NFL, NBA, MLB, NHL, and Champions League`}
+        </p>
+      </div>
+
+      {loading&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>📡</div><div style={{fontSize:13,color:"#555"}}>Loading live games…</div></div>}
+
+      {!loading&&totalLive===0&&(
+        <div style={{textAlign:"center",padding:"60px 0"}}>
+          <div style={{fontSize:36,marginBottom:12}}>📡</div>
+          <div style={{fontSize:15,color:"#888",fontWeight:600,marginBottom:8}}>Nothing live right now</div>
+          <div style={{fontSize:13,color:"#555"}}>Check individual sport tabs for upcoming schedules.</div>
+        </div>
+      )}
+
+      {/* Basketball live (from backend) */}
+      {basketballLive.length>0&&(
+        <div style={{marginBottom:32}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+            <span style={{fontSize:18}}>🏀</span>
+            <SectionHeader label="BASKETBALL" color={B.green}/>
+          </div>
+          <Grid>{basketballLive.map(g=><MatchCard key={g.id} g={g} emoji="🏀"/>)}</Grid>
+        </div>
+      )}
+
+      {/* ESPN live games by sport */}
+      {Object.values(allGames).map(src => {
+        const live = src.events.filter(g => g.isLive);
+        if(live.length===0) return null;
+        return (
+          <div key={src.key} style={{marginBottom:32}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+              <span style={{fontSize:18}}>{src.emoji}</span>
+              <SectionHeader label={src.label} color={B.green}/>
+            </div>
+            <Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji={src.emoji}/>)}</Grid>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ─── SOCCER PAGE ─── */
 function SoccerPage() {
   const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard");
@@ -1757,7 +1871,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
         {/* Center — sport tabs */}
         <div style={{display:"flex",gap:4,background:"#111",borderRadius:10,padding:3}}>
           {["Demos","Trending","Basketball","Football","Baseball","Soccer","Hockey","MMA"].map((sport)=>{
-            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":terminalPage==="game"&&sportTab===sport;
+            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Trending"?terminalPage==="trending":terminalPage==="game"&&sportTab===sport;
             return (
             <button key={sport} onClick={()=>{
               if(sport==="Demos"){setTerminalPage("demos");}
@@ -1766,6 +1880,8 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
               else if(sport==="Soccer"){setTerminalPage("soccer");}
               else if(sport==="Hockey"){setTerminalPage("hockey");}
               else if(sport==="MMA"){setTerminalPage("mma");}
+              else if(sport==="Football"){setTerminalPage("nfl");}
+              else if(sport==="Trending"){setTerminalPage("trending");}
               else{setTerminalPage("game");setSportTab(sport);}
             }} style={{padding:"6px 14px",fontSize:12,fontWeight:isActive?600:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
               background:isActive?B.primary+"20":"transparent",color:isActive?"#fff":"#666"}}>
@@ -1793,6 +1909,8 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
         :terminalPage==="soccer"?<SoccerPage/>
         :terminalPage==="hockey"?<HockeyPage/>
         :terminalPage==="mma"?<MMAPage/>
+        :terminalPage==="nfl"?<NFLPage/>
+        :terminalPage==="trending"?<TrendingPage liveGames={liveGames}/>
         :<>
 
         {/* LEFT SIDEBAR — other games */}
