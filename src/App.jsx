@@ -1014,6 +1014,7 @@ function parseESPNEvent(ev) {
   const isDelayed = stype.includes("DELAY") || stype.includes("POSTPONE");
   return {
     id: ev.id, name: ev.name,
+    date: ev.date || comp?.date || null,
     isLive: isLive || isHalf, isHalf, isFinal, isDelayed,
     isScheduled: !isLive && !isHalf && !isFinal && !isDelayed,
     detail: ev.status?.type?.detail || ev.status?.type?.shortDetail || "",
@@ -1021,6 +1022,14 @@ function parseESPNEvent(ev) {
     away: { name: away?.team?.displayName||"", abbr: away?.team?.abbreviation||"", logo: away?.team?.logo||"", score: away?.score??null, record: away?.records?.[0]?.summary||"" },
   };
 }
+
+/* Returns true if a game's scheduled start was within the last N hours */
+const isRecent = (dateStr, hours=6) => {
+  if(!dateStr) return true; // no date = show it
+  return (Date.now() - new Date(dateStr).getTime()) < hours * 60 * 60 * 1000;
+};
+/* Sort upcoming games soonest first */
+const byDate = (a,b) => new Date(a.date||0) - new Date(b.date||0);
 
 /* shared card used by Soccer and Hockey */
 function MatchCard({ g, emoji, showRecord }) {
@@ -1092,8 +1101,8 @@ function NFLPage() {
   const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard");
   const games = raw.map(parseESPNEvent);
   const live  = games.filter(g => g.isLive);
-  const final = games.filter(g => g.isFinal);
-  const sched = games.filter(g => g.isScheduled);
+  const final = games.filter(g => g.isFinal && isRecent(g.date));
+  const sched = games.filter(g => g.isScheduled).sort(byDate);
   return (
     <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={loading} error={error}>
       {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏈</div><div style={{fontSize:14,color:"#555"}}>No NFL games scheduled today.</div></div>}
@@ -1206,8 +1215,8 @@ function SoccerPage() {
   const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard");
   const games = raw.map(parseESPNEvent);
   const live = games.filter(g=>g.isLive);
-  const final = games.filter(g=>g.isFinal);
-  const sched = games.filter(g=>g.isScheduled);
+  const final = games.filter(g=>g.isFinal && isRecent(g.date));
+  const sched = games.filter(g=>g.isScheduled).sort(byDate);
   return (
     <SportPageShell title="UEFA Champions League" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={loading} error={error}>
       {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No Champions League fixtures today.</div></div>}
@@ -1223,8 +1232,8 @@ function HockeyPage() {
   const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard");
   const games = raw.map(parseESPNEvent);
   const live = games.filter(g=>g.isLive);
-  const final = games.filter(g=>g.isFinal);
-  const sched = games.filter(g=>g.isScheduled);
+  const final = games.filter(g=>g.isFinal && isRecent(g.date));
+  const sched = games.filter(g=>g.isScheduled).sort(byDate);
   return (
     <SportPageShell title="NHL" subtitle="HOCKEY" emoji="🏒" liveCount={live.length} loading={loading} error={error}>
       {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏒</div><div style={{fontSize:14,color:"#555"}}>No NHL games scheduled today.</div></div>}
@@ -1356,6 +1365,7 @@ function BaseballPage() {
         return {
           id: ev.id,
           name: ev.name,
+          date: ev.date || comp?.date || null,
           isLive, isFinal, isDelayed, isScheduled,
           detail,
           home: {
@@ -1387,8 +1397,8 @@ function BaseballPage() {
   }, [fetchGames]);
 
   const live    = games.filter(g => g.isLive);
-  const final   = games.filter(g => g.isFinal);
-  const sched   = games.filter(g => g.isScheduled);
+  const final   = games.filter(g => g.isFinal && isRecent(g.date));
+  const sched   = games.filter(g => g.isScheduled).sort(byDate);
   const delayed = games.filter(g => g.isDelayed);
 
   const GameCard = ({ g }) => {
@@ -1525,9 +1535,9 @@ function BaseballPage() {
    ═══════════════════════════════════════════════════════════ */
 function BasketballPage({ liveGames }) {
   const live    = liveGames.filter(g => g.status === "live" || g.status === "halftime");
-  const final   = liveGames.filter(g => g.status === "final" || g.status === "completed");
-  const sched   = liveGames.filter(g => g.status === "scheduled");
-  const hasGames = liveGames.length > 0;
+  const final   = liveGames.filter(g => (g.status === "final" || g.status === "completed") && isRecent(g.date || g.startTime));
+  const sched   = liveGames.filter(g => g.status === "scheduled").sort((a,b) => new Date(a.date||a.startTime||0) - new Date(b.date||b.startTime||0));
+  const hasGames = live.length > 0 || sched.length > 0 || final.length > 0;
 
   const GameCard = ({ g }) => {
     const isLive = g.status === "live";
@@ -1634,7 +1644,7 @@ function BasketballPage({ liveGames }) {
         </h2>
         <p style={{fontSize:13,color:"#666",lineHeight:1.6}}>
           {hasGames
-            ? `${liveGames.length} game${liveGames.length!==1?"s":""} — live data from ESPN via Perpdictions backend`
+            ? `${live.length + sched.length + final.length} game${live.length + sched.length + final.length !== 1 ? "s" : ""} — live data from ESPN via Perpdictions backend`
             : "Connecting to backend…"}
         </p>
       </div>
@@ -1656,22 +1666,22 @@ function BasketballPage({ liveGames }) {
         </div>
       )}
 
-      {/* Final */}
-      {final.length > 0 && (
-        <div style={{marginBottom:32}}>
-          <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>FINAL</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
-            {final.map(g => <GameCard key={g.id} g={g}/>)}
-          </div>
-        </div>
-      )}
-
       {/* Scheduled */}
       {sched.length > 0 && (
         <div style={{marginBottom:32}}>
           <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>UPCOMING</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
             {sched.map(g => <GameCard key={g.id} g={g}/>)}
+          </div>
+        </div>
+      )}
+
+      {/* Final — only shown within 6 hours of game start */}
+      {final.length > 0 && (
+        <div style={{marginBottom:32}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>FINAL</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
+            {final.map(g => <GameCard key={g.id} g={g}/>)}
           </div>
         </div>
       )}
@@ -1781,7 +1791,7 @@ function DemosPage({ onSelectGame, currentGameId }) {
 function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }) {
   const G=game,HOME=G.home,AWAY=G.away,PLAYS=G.plays,SCORING_PLAYS=G.scoringPlays,initProb=PLAYS[0].p;
   const [gameTime,setGameTime]=useState(0);const [playing,setPlaying]=useState(false);const [speed,setSpeed]=useState(10);
-  const [sportTab,setSportTab]=useState("Trending");
+  const [sportTab,setSportTab]=useState("Live");
   const [terminalPage,setTerminalPage]=useState("game"); // "game" | "demos"
   const [chartData,setChartData]=useState([{t:0,ph:initProb,pa:1-initProb,floor:clamp(initProb-.2,.01,.99),ceil:clamp(initProb+.2,.01,.99)}]);
   const [oracle,setOracle]=useState({price:initProb,sources:makeSources(initProb),floor:clamp(initProb-.2,.01,.99),ceil:clamp(initProb+.2,.01,.99)});
@@ -1870,8 +1880,8 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
 
         {/* Center — sport tabs */}
         <div style={{display:"flex",gap:4,background:"#111",borderRadius:10,padding:3}}>
-          {["Demos","Trending","Basketball","Football","Baseball","Soccer","Hockey","MMA"].map((sport)=>{
-            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Trending"?terminalPage==="trending":terminalPage==="game"&&sportTab===sport;
+          {["Demos","Live","Basketball","Football","Baseball","Soccer","Hockey","MMA"].map((sport)=>{
+            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Live"?terminalPage==="trending":terminalPage==="game"&&sportTab===sport;
             return (
             <button key={sport} onClick={()=>{
               if(sport==="Demos"){setTerminalPage("demos");}
@@ -1881,11 +1891,16 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
               else if(sport==="Hockey"){setTerminalPage("hockey");}
               else if(sport==="MMA"){setTerminalPage("mma");}
               else if(sport==="Football"){setTerminalPage("nfl");}
-              else if(sport==="Trending"){setTerminalPage("trending");}
+              else if(sport==="Live"){setTerminalPage("trending");}
               else{setTerminalPage("game");setSportTab(sport);}
             }} style={{padding:"6px 14px",fontSize:12,fontWeight:isActive?600:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
               background:isActive?B.primary+"20":"transparent",color:isActive?"#fff":"#666"}}>
-              {sport}{sport==="Basketball"&&liveGames.length>0?` (${liveGames.length})`:""}</button>
+              {sport==="Live"
+                ? <span style={{display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite",flexShrink:0}}/>
+                    Live
+                  </span>
+                : sport}{sport==="Basketball"&&liveGames.length>0?` (${liveGames.length})`:""}</button>
           );})}
         </div>
 
