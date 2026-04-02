@@ -983,6 +983,240 @@ function GameSelector({ onSelect, onBack }) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   SHARED ESPN FETCH HOOK
+   ═══════════════════════════════════════════════════════════ */
+function useESPN(url) {
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const fetch_ = useCallback(async () => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setGames(data.events || []);
+      setLoading(false);
+    } catch { setError(true); setLoading(false); }
+  }, [url]);
+  useEffect(() => { fetch_(); const iv = setInterval(fetch_, 30000); return () => clearInterval(iv); }, [fetch_]);
+  return { games, loading, error };
+}
+
+/* helper — parse a standard ESPN event into a simple shape */
+function parseESPNEvent(ev) {
+  const comp = ev.competitions?.[0];
+  const home = comp?.competitors?.find(c => c.homeAway === "home");
+  const away = comp?.competitors?.find(c => c.homeAway === "away");
+  const stype = ev.status?.type?.name || "";
+  const isLive = stype === "STATUS_IN_PROGRESS" || stype === "STATUS_FIRST_HALF" || stype === "STATUS_SECOND_HALF" || stype === "STATUS_EXTRA_TIME" || stype === "STATUS_OVERTIME";
+  const isFinal = stype.includes("FINAL") || stype === "STATUS_FULL_TIME";
+  const isHalf = stype === "STATUS_HALFTIME";
+  const isDelayed = stype.includes("DELAY") || stype.includes("POSTPONE");
+  return {
+    id: ev.id, name: ev.name,
+    isLive: isLive || isHalf, isHalf, isFinal, isDelayed,
+    isScheduled: !isLive && !isHalf && !isFinal && !isDelayed,
+    detail: ev.status?.type?.detail || ev.status?.type?.shortDetail || "",
+    home: { name: home?.team?.displayName||"", abbr: home?.team?.abbreviation||"", logo: home?.team?.logo||"", score: home?.score??null, record: home?.records?.[0]?.summary||"" },
+    away: { name: away?.team?.displayName||"", abbr: away?.team?.abbreviation||"", logo: away?.team?.logo||"", score: away?.score??null, record: away?.records?.[0]?.summary||"" },
+  };
+}
+
+/* shared card used by Soccer and Hockey */
+function MatchCard({ g, emoji, showRecord }) {
+  const homeScore = parseFloat(g.home.score) || 0;
+  const awayScore = parseFloat(g.away.score) || 0;
+  const homeWinning = homeScore > awayScore;
+  const tied = homeScore === awayScore;
+  const statusColor = g.isLive ? B.green : g.isHalf ? "#ff9f1c" : g.isDelayed ? "#ff9f1c" : "#555";
+  const statusLabel = g.isLive && !g.isHalf ? "LIVE" : g.isHalf ? "HALF" : g.isFinal ? "FINAL" : g.isDelayed ? "DELAYED" : "UPCOMING";
+  return (
+    <div style={{background:"#111",border:"1px solid #1f1f1f",borderRadius:16,padding:"20px 24px"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {g.isLive&&!g.isHalf&&<span style={{width:7,height:7,borderRadius:"50%",background:B.green,display:"inline-block",animation:"pulse 2s infinite",flexShrink:0}}/>}
+          <span style={{fontSize:11,fontWeight:700,color:statusColor,fontFamily:fm,letterSpacing:"0.08em"}}>{statusLabel}</span>
+          {g.detail&&<span style={{fontSize:11,color:"#555",fontFamily:fm}}>{g.detail}</span>}
+        </div>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {[{t:g.home,w:homeWinning&&!tied},{t:g.away,w:!homeWinning&&!tied}].map(({t,w},i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              {t.logo?<img src={t.logo} style={{width:28,height:28,borderRadius:6,objectFit:"contain"}} alt=""/>
+                :<div style={{width:28,height:28,borderRadius:6,background:"#222",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>{emoji}</div>}
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:(g.isLive||g.isFinal)&&w?"#fff":"#aaa"}}>{t.name}</div>
+                {showRecord&&t.record&&<div style={{fontSize:10,color:"#555",fontFamily:fm}}>{t.record}</div>}
+              </div>
+            </div>
+            <span style={{fontSize:28,fontWeight:800,fontFamily:fm,color:(g.isLive||g.isFinal)&&w?"#fff":g.isScheduled?"#444":"#777",minWidth:44,textAlign:"right"}}>
+              {g.isScheduled?"–":t.score??0}
+            </span>
+          </div>
+        ))}
+      </div>
+      {g.isScheduled&&g.detail&&<div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:10}}>{g.detail}</div>}
+    </div>
+  );
+}
+
+function SportPageShell({ title, subtitle, emoji, liveCount, loading, error, noGamesMsg, children }) {
+  return (
+    <div style={{flex:1,overflow:"auto",background:"#0a0a0a",padding:"32px 40px"}}>
+      <div style={{marginBottom:32}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+          <div style={{fontSize:11,fontWeight:700,color:B.primary,letterSpacing:"0.12em",fontFamily:fm}}>{subtitle}</div>
+          {liveCount>0&&<span style={{fontSize:10,fontWeight:700,color:B.green,fontFamily:fm,padding:"2px 8px",background:B.green+"15",borderRadius:6,letterSpacing:"0.06em",animation:"pulse 2s infinite"}}>{liveCount} LIVE</span>}
+        </div>
+        <h2 style={{fontFamily:fd,fontSize:28,fontWeight:800,letterSpacing:"-0.03em",color:"#fff",marginBottom:8}}>{title}</h2>
+        {loading&&<p style={{fontSize:13,color:"#666"}}>Loading…</p>}
+        {error&&<p style={{fontSize:13,color:"#ef4444"}}>Could not reach ESPN — try again shortly.</p>}
+      </div>
+      {loading&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>{emoji}</div><div style={{fontSize:13,color:"#555"}}>Loading…</div></div>}
+      {!loading&&!error&&children}
+    </div>
+  );
+}
+
+function SectionHeader({ label, color }) {
+  return <div style={{fontSize:11,fontWeight:700,color:color||"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>{label}</div>;
+}
+
+function Grid({ children }) {
+  return <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12,marginBottom:32}}>{children}</div>;
+}
+
+/* ─── SOCCER PAGE ─── */
+function SoccerPage() {
+  const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard");
+  const games = raw.map(parseESPNEvent);
+  const live = games.filter(g=>g.isLive);
+  const final = games.filter(g=>g.isFinal);
+  const sched = games.filter(g=>g.isScheduled);
+  return (
+    <SportPageShell title="UEFA Champions League" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={loading} error={error}>
+      {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No Champions League fixtures today.</div></div>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
+      {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
+      {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
+    </SportPageShell>
+  );
+}
+
+/* ─── HOCKEY PAGE ─── */
+function HockeyPage() {
+  const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard");
+  const games = raw.map(parseESPNEvent);
+  const live = games.filter(g=>g.isLive);
+  const final = games.filter(g=>g.isFinal);
+  const sched = games.filter(g=>g.isScheduled);
+  return (
+    <SportPageShell title="NHL" subtitle="HOCKEY" emoji="🏒" liveCount={live.length} loading={loading} error={error}>
+      {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏒</div><div style={{fontSize:14,color:"#555"}}>No NHL games scheduled today.</div></div>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
+      {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
+      {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
+    </SportPageShell>
+  );
+}
+
+/* ─── MMA PAGE ─── */
+function MMAPage() {
+  const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard");
+  // UFC events: each "event" is a fight card; competitors are fighters
+  const events = raw.map(ev => {
+    const stype = ev.status?.type?.name || "";
+    const isLive = stype === "STATUS_IN_PROGRESS";
+    const isFinal = stype.includes("FINAL");
+    const isScheduled = !isLive && !isFinal;
+    const bouts = (ev.competitions || []).map(bout => {
+      const f1 = bout.competitors?.[0];
+      const f2 = bout.competitors?.[1];
+      const bStatus = bout.status?.type?.name || "";
+      return {
+        id: bout.id,
+        isMain: bout.type?.text === "Main Event" || bout.order === 0,
+        isFinal: bStatus.includes("FINAL"),
+        isLive: bStatus === "STATUS_IN_PROGRESS",
+        detail: bout.status?.type?.detail || "",
+        weightclass: bout.type?.text || "",
+        f1: { name: f1?.athlete?.displayName || f1?.team?.displayName || "TBD", logo: f1?.athlete?.headshot?.href || f1?.team?.logo || "", record: f1?.records?.[0]?.summary || f1?.athlete?.record || "", winner: f1?.winner },
+        f2: { name: f2?.athlete?.displayName || f2?.team?.displayName || "TBD", logo: f2?.athlete?.headshot?.href || f2?.team?.logo || "", record: f2?.records?.[0]?.summary || f2?.athlete?.record || "", winner: f2?.winner },
+        result: bout.status?.type?.description || "",
+      };
+    });
+    return { id: ev.id, name: ev.name, date: ev.date, isLive, isFinal, isScheduled, bouts };
+  });
+
+  const liveCount = events.filter(e=>e.isLive).length;
+
+  return (
+    <SportPageShell title="UFC" subtitle="MMA" emoji="🥊" liveCount={liveCount} loading={loading} error={error}>
+      {!loading&&!error&&events.length===0&&(
+        <div style={{textAlign:"center",padding:"60px 0"}}>
+          <div style={{fontSize:36,marginBottom:12}}>🥊</div>
+          <div style={{fontSize:14,color:"#555"}}>No UFC events scheduled.</div>
+        </div>
+      )}
+      {events.map(ev=>(
+        <div key={ev.id} style={{marginBottom:40}}>
+          {/* Event header */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <div>
+              <div style={{fontSize:18,fontWeight:800,color:"#fff",fontFamily:fd,letterSpacing:"-0.02em"}}>{ev.name}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
+                {ev.isLive&&<span style={{width:7,height:7,borderRadius:"50%",background:B.green,display:"inline-block",animation:"pulse 2s infinite"}}/>}
+                <span style={{fontSize:11,fontWeight:700,color:ev.isLive?B.green:ev.isFinal?"#555":"#666",fontFamily:fm,letterSpacing:"0.08em"}}>
+                  {ev.isLive?"LIVE":ev.isFinal?"FINAL":"UPCOMING"}
+                </span>
+              </div>
+            </div>
+          </div>
+          {/* Bouts */}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {ev.bouts.length===0&&(
+              <div style={{background:"#111",border:"1px solid #1f1f1f",borderRadius:16,padding:"24px",textAlign:"center",color:"#444",fontSize:13}}>
+                Fight card details not yet available
+              </div>
+            )}
+            {ev.bouts.map((bout,bi)=>(
+              <div key={bout.id||bi} style={{background:bout.isMain?"#1a1a0a":"#111",border:"1px solid "+(bout.isMain?B.primary+"30":"#1f1f1f"),borderRadius:16,padding:"18px 24px"}}>
+                {bout.weightclass&&<div style={{fontSize:10,fontWeight:700,color:bout.isMain?B.primary:"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:10}}>{bout.weightclass}{bout.isMain?" · MAIN EVENT":""}</div>}
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  {/* Fighter 1 */}
+                  <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                    {bout.f1.logo?<img src={bout.f1.logo} style={{width:48,height:48,borderRadius:8,objectFit:"cover"}} alt=""/>
+                      :<div style={{width:48,height:48,borderRadius:8,background:"#222",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🥊</div>}
+                    <div style={{fontSize:13,fontWeight:700,color:bout.f1.winner?"#fff":"#aaa",textAlign:"center"}}>{bout.f1.name}</div>
+                    {bout.f1.record&&<div style={{fontSize:10,color:"#555",fontFamily:fm}}>{bout.f1.record}</div>}
+                    {bout.f1.winner&&<div style={{fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>WIN</div>}
+                  </div>
+                  {/* VS */}
+                  <div style={{flexShrink:0,textAlign:"center"}}>
+                    <div style={{fontSize:14,fontWeight:800,color:"#444",fontFamily:fm}}>VS</div>
+                    {bout.detail&&<div style={{fontSize:10,color:"#555",fontFamily:fm,marginTop:4}}>{bout.detail}</div>}
+                    {bout.result&&bout.isFinal&&<div style={{fontSize:10,color:"#666",fontFamily:fm,marginTop:2}}>{bout.result}</div>}
+                  </div>
+                  {/* Fighter 2 */}
+                  <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                    {bout.f2.logo?<img src={bout.f2.logo} style={{width:48,height:48,borderRadius:8,objectFit:"cover"}} alt=""/>
+                      :<div style={{width:48,height:48,borderRadius:8,background:"#222",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🥊</div>}
+                    <div style={{fontSize:13,fontWeight:700,color:bout.f2.winner?"#fff":"#aaa",textAlign:"center"}}>{bout.f2.name}</div>
+                    {bout.f2.record&&<div style={{fontSize:10,color:"#555",fontFamily:fm}}>{bout.f2.record}</div>}
+                    {bout.f2.winner&&<div style={{fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>WIN</div>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </SportPageShell>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
    BASEBALL PAGE — live/upcoming MLB games via ESPN public API
    ═══════════════════════════════════════════════════════════ */
 function BaseballPage() {
@@ -1523,12 +1757,15 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
         {/* Center — sport tabs */}
         <div style={{display:"flex",gap:4,background:"#111",borderRadius:10,padding:3}}>
           {["Demos","Trending","Basketball","Football","Baseball","Soccer","Hockey","MMA"].map((sport)=>{
-            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":terminalPage==="game"&&sportTab===sport;
+            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":terminalPage==="game"&&sportTab===sport;
             return (
             <button key={sport} onClick={()=>{
               if(sport==="Demos"){setTerminalPage("demos");}
               else if(sport==="Basketball"){setTerminalPage("basketball");}
               else if(sport==="Baseball"){setTerminalPage("baseball");}
+              else if(sport==="Soccer"){setTerminalPage("soccer");}
+              else if(sport==="Hockey"){setTerminalPage("hockey");}
+              else if(sport==="MMA"){setTerminalPage("mma");}
               else{setTerminalPage("game");setSportTab(sport);}
             }} style={{padding:"6px 14px",fontSize:12,fontWeight:isActive?600:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
               background:isActive?B.primary+"20":"transparent",color:isActive?"#fff":"#666"}}>
@@ -1553,6 +1790,9 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
         {terminalPage==="demos"?<DemosPage onSelectGame={(g)=>{onSwitchGame(g);setTerminalPage("game");}} currentGameId={G.id}/>
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames}/>
         :terminalPage==="baseball"?<BaseballPage/>
+        :terminalPage==="soccer"?<SoccerPage/>
+        :terminalPage==="hockey"?<HockeyPage/>
+        :terminalPage==="mma"?<MMAPage/>
         :<>
 
         {/* LEFT SIDEBAR — other games */}
