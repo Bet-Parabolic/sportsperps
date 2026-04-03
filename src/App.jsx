@@ -985,22 +985,14 @@ function GameSelector({ onSelect, onBack }) {
 /* ═══════════════════════════════════════════════════════════
    SHARED ESPN FETCH HOOK
    ═══════════════════════════════════════════════════════════ */
-function useESPN(url) {
-  const [games, setGames] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const fetch_ = useCallback(async () => {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setGames(data.events || []);
-      setLoading(false);
-    } catch { setError(true); setLoading(false); }
-  }, [url]);
-  useEffect(() => { fetch_(); const iv = setInterval(fetch_, 30000); return () => clearInterval(iv); }, [fetch_]);
-  return { games, loading, error };
-}
+/* ─── Shared ESPN source registry ─── */
+const ESPN_SOURCES = [
+  {key:"nfl", url:"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",          emoji:"🏈", label:"NFL"},
+  {key:"mlb", url:"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard",          emoji:"⚾", label:"MLB"},
+  {key:"nhl", url:"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard",            emoji:"🏒", label:"NHL"},
+  {key:"ucl", url:"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard", emoji:"⚽", label:"UCL"},
+  {key:"ufc", url:"https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard",               emoji:"🥊", label:"UFC"},
+];
 
 /* helper — parse a standard ESPN event into a simple shape */
 function parseESPNEvent(ev) {
@@ -1097,15 +1089,14 @@ function Grid({ children }) {
 }
 
 /* ─── NFL PAGE ─── */
-function NFLPage() {
-  const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard");
-  const games = raw.map(parseESPNEvent);
+function NFLPage({ data={events:[],loading:true,error:false} }) {
+  const games = data.events.map(parseESPNEvent);
   const live  = games.filter(g => g.isLive);
   const final = games.filter(g => g.isFinal && isRecent(g.date));
   const sched = games.filter(g => g.isScheduled).sort(byDate);
   return (
-    <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={loading} error={error}>
-      {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏈</div><div style={{fontSize:14,color:"#555"}}>No NFL games scheduled today.</div></div>}
+    <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={data.loading} error={data.error}>
+      {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏈</div><div style={{fontSize:14,color:"#555"}}>No NFL games scheduled today.</div></div>}
       {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
@@ -1114,32 +1105,9 @@ function NFLPage() {
 }
 
 /* ─── TRENDING PAGE — all live games across every sport ─── */
-const TRENDING_SOURCES = [
-  { key:"nfl",   url:"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",        emoji:"🏈", label:"NFL"  },
-  { key:"mlb",   url:"https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard",        emoji:"⚾", label:"MLB"  },
-  { key:"nhl",   url:"https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard",          emoji:"🏒", label:"NHL"  },
-  { key:"ucl",   url:"https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard",emoji:"⚽", label:"UCL"  },
-];
+function TrendingPage({ liveGames, espnData={} }) {
+  const loading = ESPN_SOURCES.some(s => espnData[s.key]?.loading !== false);
 
-function TrendingPage({ liveGames }) {
-  const [allGames, setAllGames] = useState({});
-  const [loading, setLoading] = useState(true);
-
-  const fetchAll = useCallback(async () => {
-    const results = await Promise.allSettled(
-      TRENDING_SOURCES.map(s =>
-        fetch(s.url).then(r => r.json()).then(d => ({ key: s.key, emoji: s.emoji, label: s.label, events: (d.events||[]).map(parseESPNEvent) }))
-      )
-    );
-    const merged = {};
-    results.forEach(r => { if(r.status==="fulfilled") merged[r.value.key] = r.value; });
-    setAllGames(merged);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { fetchAll(); const iv = setInterval(fetchAll, 20000); return () => clearInterval(iv); }, [fetchAll]);
-
-  // Normalise backend basketball games into MatchCard-compatible shape
   const basketballLive = liveGames
     .filter(g => g.status==="live" || g.status==="halftime")
     .map(g => ({
@@ -1150,10 +1118,10 @@ function TrendingPage({ liveGames }) {
       away: { name: g.away.name||"", abbr: g.away.abbreviation||"", logo: g.away.logo||"", score: g.away.score??null },
     }));
 
-  // Collect all live games from ESPN sources
-  const espnLive = Object.values(allGames).flatMap(src =>
-    src.events.filter(g => g.isLive).map(g => ({ ...g, _emoji: src.emoji, _label: src.label }))
-  );
+  const espnLive = ESPN_SOURCES.flatMap(s => {
+    const events = (espnData[s.key]?.events||[]).map(parseESPNEvent).filter(g => g.isLive);
+    return events.map(g => ({...g, _emoji: s.emoji, _label: s.label, _key: s.key}));
+  });
 
   const totalLive = espnLive.length + basketballLive.length;
 
@@ -1162,7 +1130,7 @@ function TrendingPage({ liveGames }) {
       {/* Header */}
       <div style={{marginBottom:32}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-          <div style={{fontSize:11,fontWeight:700,color:B.primary,letterSpacing:"0.12em",fontFamily:fm}}>TRENDING</div>
+          <div style={{fontSize:11,fontWeight:700,color:B.primary,letterSpacing:"0.12em",fontFamily:fm}}>LIVE</div>
           {totalLive>0&&<span style={{fontSize:10,fontWeight:700,color:B.green,fontFamily:fm,padding:"2px 8px",background:B.green+"15",borderRadius:6,letterSpacing:"0.06em",animation:"pulse 2s infinite"}}>{totalLive} LIVE</span>}
         </div>
         <h2 style={{fontFamily:fd,fontSize:28,fontWeight:800,letterSpacing:"-0.03em",color:"#fff",marginBottom:8}}>Live Right Now</h2>
@@ -1193,16 +1161,16 @@ function TrendingPage({ liveGames }) {
       )}
 
       {/* ESPN live games by sport */}
-      {Object.values(allGames).map(src => {
-        const live = src.events.filter(g => g.isLive);
+      {ESPN_SOURCES.filter(s=>s.key!=="ufc").map(s => {
+        const live = (espnData[s.key]?.events||[]).map(parseESPNEvent).filter(g => g.isLive);
         if(live.length===0) return null;
         return (
-          <div key={src.key} style={{marginBottom:32}}>
+          <div key={s.key} style={{marginBottom:32}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <span style={{fontSize:18}}>{src.emoji}</span>
-              <SectionHeader label={src.label} color={B.green}/>
+              <span style={{fontSize:18}}>{s.emoji}</span>
+              <SectionHeader label={s.label} color={B.green}/>
             </div>
-            <Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji={src.emoji}/>)}</Grid>
+            <Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji={s.emoji}/>)}</Grid>
           </div>
         );
       })}
@@ -1211,15 +1179,14 @@ function TrendingPage({ liveGames }) {
 }
 
 /* ─── SOCCER PAGE ─── */
-function SoccerPage() {
-  const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard");
-  const games = raw.map(parseESPNEvent);
+function SoccerPage({ data={events:[],loading:true,error:false} }) {
+  const games = data.events.map(parseESPNEvent);
   const live = games.filter(g=>g.isLive);
   const final = games.filter(g=>g.isFinal && isRecent(g.date));
   const sched = games.filter(g=>g.isScheduled).sort(byDate);
   return (
-    <SportPageShell title="UEFA Champions League" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={loading} error={error}>
-      {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No Champions League fixtures today.</div></div>}
+    <SportPageShell title="UEFA Champions League" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={data.loading} error={data.error}>
+      {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No Champions League fixtures today.</div></div>}
       {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
@@ -1228,15 +1195,14 @@ function SoccerPage() {
 }
 
 /* ─── HOCKEY PAGE ─── */
-function HockeyPage() {
-  const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard");
-  const games = raw.map(parseESPNEvent);
+function HockeyPage({ data={events:[],loading:true,error:false} }) {
+  const games = data.events.map(parseESPNEvent);
   const live = games.filter(g=>g.isLive);
   const final = games.filter(g=>g.isFinal && isRecent(g.date));
   const sched = games.filter(g=>g.isScheduled).sort(byDate);
   return (
-    <SportPageShell title="NHL" subtitle="HOCKEY" emoji="🏒" liveCount={live.length} loading={loading} error={error}>
-      {!loading&&!error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏒</div><div style={{fontSize:14,color:"#555"}}>No NHL games scheduled today.</div></div>}
+    <SportPageShell title="NHL" subtitle="HOCKEY" emoji="🏒" liveCount={live.length} loading={data.loading} error={data.error}>
+      {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏒</div><div style={{fontSize:14,color:"#555"}}>No NHL games scheduled today.</div></div>}
       {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
@@ -1245,10 +1211,9 @@ function HockeyPage() {
 }
 
 /* ─── MMA PAGE ─── */
-function MMAPage() {
-  const { games: raw, loading, error } = useESPN("https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard");
+function MMAPage({ data={events:[],loading:true,error:false} }) {
   // UFC events: each "event" is a fight card; competitors are fighters
-  const events = raw.map(ev => {
+  const events = data.events.map(ev => {
     const stype = ev.status?.type?.name || "";
     const isLive = stype === "STATUS_IN_PROGRESS";
     const isFinal = stype.includes("FINAL");
@@ -1275,8 +1240,8 @@ function MMAPage() {
   const liveCount = events.filter(e=>e.isLive).length;
 
   return (
-    <SportPageShell title="UFC" subtitle="MMA" emoji="🥊" liveCount={liveCount} loading={loading} error={error}>
-      {!loading&&!error&&events.length===0&&(
+    <SportPageShell title="UFC" subtitle="MMA" emoji="🥊" liveCount={liveCount} loading={data.loading} error={data.error}>
+      {!data.loading&&!data.error&&events.length===0&&(
         <div style={{textAlign:"center",padding:"60px 0"}}>
           <div style={{fontSize:36,marginBottom:12}}>🥊</div>
           <div style={{fontSize:14,color:"#555"}}>No UFC events scheduled.</div>
@@ -1342,60 +1307,8 @@ function MMAPage() {
 /* ═══════════════════════════════════════════════════════════
    BASEBALL PAGE — live/upcoming MLB games via ESPN public API
    ═══════════════════════════════════════════════════════════ */
-function BaseballPage() {
-  const [games, setGames] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const fetchGames = useCallback(async () => {
-    try {
-      const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
-      if (!res.ok) throw new Error("ESPN API error");
-      const data = await res.json();
-      const parsed = (data.events || []).map(ev => {
-        const comp = ev.competitions?.[0];
-        const home = comp?.competitors?.find(c => c.homeAway === "home");
-        const away = comp?.competitors?.find(c => c.homeAway === "away");
-        const status = ev.status?.type;
-        const detail = ev.status?.type?.detail || "";
-        const isLive = status?.name === "STATUS_IN_PROGRESS";
-        const isFinal = status?.name === "STATUS_FINAL";
-        const isDelayed = status?.name === "STATUS_DELAYED" || status?.name === "STATUS_RAIN_DELAY";
-        const isScheduled = !isLive && !isFinal && !isDelayed;
-        return {
-          id: ev.id,
-          name: ev.name,
-          date: ev.date || comp?.date || null,
-          isLive, isFinal, isDelayed, isScheduled,
-          detail,
-          home: {
-            name: home?.team?.displayName || "",
-            abbr: home?.team?.abbreviation || "",
-            logo: home?.team?.logo || "",
-            score: home?.score ?? null,
-          },
-          away: {
-            name: away?.team?.displayName || "",
-            abbr: away?.team?.abbreviation || "",
-            logo: away?.team?.logo || "",
-            score: away?.score ?? null,
-          },
-        };
-      });
-      setGames(parsed);
-      setLoading(false);
-    } catch(e) {
-      setError(true);
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchGames();
-    const iv = setInterval(fetchGames, 30000);
-    return () => clearInterval(iv);
-  }, [fetchGames]);
-
+function BaseballPage({ data={events:[],loading:true,error:false} }) {
+  const games  = data.events.map(parseESPNEvent);
   const live    = games.filter(g => g.isLive);
   const final   = games.filter(g => g.isFinal && isRecent(g.date));
   const sched   = games.filter(g => g.isScheduled).sort(byDate);
@@ -1469,18 +1382,18 @@ function BaseballPage() {
           MLB
         </h2>
         <p style={{fontSize:13,color:"#666",lineHeight:1.6}}>
-          {loading ? "Loading games…" : error ? "Could not reach ESPN — try again shortly." : `${games.length} game${games.length!==1?"s":""} today · live data from ESPN`}
+          {data.loading ? "Loading games…" : data.error ? "Could not reach ESPN — try again shortly." : `${games.length} game${games.length!==1?"s":""} today · live data from ESPN`}
         </p>
       </div>
 
-      {loading && (
+      {data.loading && (
         <div style={{textAlign:"center",padding:"60px 0"}}>
           <div style={{fontSize:32,marginBottom:16}}>⚾</div>
           <div style={{fontSize:13,color:"#555"}}>Loading MLB schedule…</div>
         </div>
       )}
 
-      {!loading && !error && games.length === 0 && (
+      {!data.loading && !data.error && games.length === 0 && (
         <div style={{textAlign:"center",padding:"60px 0",color:"#444"}}>
           <div style={{fontSize:32,marginBottom:16}}>⚾</div>
           <div style={{fontSize:14,color:"#555"}}>No MLB games scheduled today.</div>
@@ -1793,6 +1706,42 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
   const [gameTime,setGameTime]=useState(0);const [playing,setPlaying]=useState(false);const [speed,setSpeed]=useState(10);
   const [sportTab,setSportTab]=useState("Live");
   const [terminalPage,setTerminalPage]=useState("game"); // "game" | "demos"
+  // Single ESPN fetch — all sport data, one 30s interval, shared across all pages
+  const [espnData, setEspnData] = useState(() =>
+    Object.fromEntries(ESPN_SOURCES.map(s => [s.key, {events:[], loading:true, error:false}]))
+  );
+  useEffect(() => {
+    const fetchAll = async () => {
+      const results = await Promise.allSettled(
+        ESPN_SOURCES.map(s => fetch(s.url).then(r=>r.json()).then(d=>({key:s.key, events:d.events||[], error:false})))
+      );
+      setEspnData(prev => {
+        const next = {...prev};
+        results.forEach(r => {
+          if(r.status==="fulfilled") next[r.value.key] = {events:r.value.events, loading:false, error:false};
+          else if(r.reason?._key) next[r.reason._key] = {...prev[r.reason._key], loading:false, error:true};
+        });
+        return next;
+      });
+    };
+    fetchAll();
+    const iv = setInterval(fetchAll, 30000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // sportCounts derived from espnData — zero extra fetches
+  const LIVE_STATUS = ["STATUS_IN_PROGRESS","STATUS_FIRST_HALF","STATUS_SECOND_HALF","STATUS_HALFTIME","STATUS_EXTRA_TIME","STATUS_OVERTIME"];
+  const sportCounts = useMemo(() => {
+    const countLive = evts => (evts||[]).filter(ev => LIVE_STATUS.includes(ev.status?.type?.name)).length;
+    return {
+      nba: liveGames.filter(g => g.status==="live"||g.status==="halftime").length,
+      nfl: countLive(espnData.nfl?.events),
+      mlb: countLive(espnData.mlb?.events),
+      nhl: countLive(espnData.nhl?.events),
+      ucl: countLive(espnData.ucl?.events),
+      ufc: countLive(espnData.ufc?.events),
+    };
+  }, [espnData, liveGames]);
   const [chartData,setChartData]=useState([{t:0,ph:initProb,pa:1-initProb,floor:clamp(initProb-.2,.01,.99),ceil:clamp(initProb+.2,.01,.99)}]);
   const [oracle,setOracle]=useState({price:initProb,sources:makeSources(initProb),floor:clamp(initProb-.2,.01,.99),ceil:clamp(initProb+.2,.01,.99)});
   const [book,setBook]=useState(makeBook(initProb));const [gs,setGs]=useState(PLAYS[0]);const [settled,setSettled]=useState(false);
@@ -1800,8 +1749,15 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
   const [closedPnL,setClosedPnL]=useState(0);const [orderSide,setOrderSide]=useState("home");const [orderMargin,setOrderMargin]=useState(500);
   const [orderLev,setOrderLev]=useState(5);const [notifs,setNotifs]=useState([]);const [markers,setMarkers]=useState([]);const [visScoring,setVisScoring]=useState([]);
   const [bottomTab,setBottomTab]=useState("gamecast");
+  const [orderType,setOrderType]=useState("market"); // "market"|"limit"
+  const [limitCents,setLimitCents]=useState(58);     // limit price in cents (1-99)
+  const [tpCents,setTpCents]=useState("");            // take profit cents, ""=off
+  const [slCents,setSlCents]=useState("");            // stop loss cents, ""=off
+  const [limitOrders,setLimitOrders]=useState([]);   // pending limit orders
+  const [rightTab,setRightTab]=useState("order");    // "order"|"book"
   const lastCT=useRef(0);const lastEv=useRef("");const posR=useRef([]);posR.current=positions;
   const oR=useRef(oracle);oR.current=oracle;const gtR=useRef(0);gtR.current=gameTime;
+  const limR=useRef([]);limR.current=limitOrders;
   const notify=useCallback((msg,type)=>{const id=Date.now()+Math.random();setNotifs(p=>[...p.slice(-3),{id,msg,type:type||"info"}]);setTimeout(()=>setNotifs(p=>p.filter(n=>n.id!==id)),5000);},[]);
   const addMark=useCallback((t,p,mt,line)=>{setMarkers(prev=>[...prev,{t:+t.toFixed(2),p,markerType:mt,line:line||"home"}]);},[]);
   const liqLines=useMemo(()=>positions.map(pos=>({id:pos.id,side:pos.side,liq:pos.liq,liqOnChart:pos.side==="home"?pos.liq:1-pos.liq})),[positions]);
@@ -1825,15 +1781,50 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
     const cp=posR.current;if(cp.length>0){let changed=false;const upd=cp.filter(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,op);
     if(pnl<=-pos.margin*0.95){changed=true;addMark(next,op,"liquidated",pos.side);setClosedPos(pr=>[{...pos,closedAt:op,pnl:-pos.margin,closeType:"LIQ",closeTime:next},...pr]);
     notify("☠ LIQUIDATED","red");setClosedPnL(p=>p-pos.margin);return false;}return true;});if(changed)setPositions(upd);}
+    // Limit order fills
+    const lo=limR.current;if(lo.length>0){let filled=false;const remLO=lo.filter(lim=>{
+      const fills=lim.side==="home"?op<=lim.limitPrice:op>=(1-lim.limitPrice);
+      if(fills){filled=true;const fillEntry=lim.side==="home"?op:1-op;const liq2=liqPrice(lim.side,op,lim.leverage);
+      setPositions(prev=>[...prev,{id:lim.id+1,side:lim.side,margin:lim.margin,leverage:lim.leverage,exposure:lim.exposure,entry:op,liq:liq2,openTime:next,tp:lim.tp,sl:lim.sl}]);
+      addMark(next,op,"entry",lim.side);
+      const loTeam=lim.side==="home"?HOME:AWAY;notify("✅ FILLED: "+loTeam.logo+" "+loTeam.short+" @ "+(fillEntry*100).toFixed(1)+"¢","green");return false;}return true;});
+      if(filled)setLimitOrders(remLO);}
+    // TP/SL auto-close
+    const cp2=posR.current;if(cp2.some(p=>p.tp||p.sl)){let triggered=false;const rem2=cp2.filter(pos=>{
+      const tpHit=pos.tp&&(pos.side==="home"?op>=pos.tp:op<=pos.tp);
+      const slHit=pos.sl&&(pos.side==="home"?op<=pos.sl:op>=pos.sl);
+      if(tpHit||slHit){triggered=true;const pnl2=calcPnL(pos.side,pos.exposure,pos.entry,op);
+      setBalance(b=>b+pos.margin+pnl2);setClosedPnL(p=>p+pnl2);
+      const closeType=tpHit?"TP":"SL";addMark(next,op,tpHit?"exit-win":"exit-loss",pos.side);
+      setClosedPos(pr=>[{...pos,closedAt:op,pnl:pnl2,closeType,closeTime:next},...pr]);
+      const tn2=pos.side==="home"?HOME:AWAY;
+      notify((tpHit?"🎯 TP HIT":"🛑 SL HIT")+" "+tn2.name+" "+fmtUsd(pnl2),tpHit?"green":"red");return false;}return true;});
+      if(triggered)setPositions(rem2);}
     if(next>=60){setSettled(true);setPlaying(false);addMark(60,1.0,"settle","home");const fp=posR.current;let sp2=0;const nc=[];
     fp.forEach(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,1.0);sp2+=pnl;nc.push({...pos,closedAt:1.0,pnl,closeType:"SETTLED",closeTime:60});});
     if(fp.length>0){setClosedPos(pr=>[...nc,...pr]);setBalance(b=>b+fp.reduce((s,p)=>s+p.margin,0)+sp2);setClosedPnL(p=>p+sp2);setPositions([]);notify("🏆 SETTLED — "+HOME.name+" win! "+fmtUsd(sp2),"green");}
     else notify("🏆 "+HOME.name+" win!","green");} return next;});},100);return()=>clearInterval(iv);},[playing,speed,settled,notify,addMark,PLAYS,SCORING_PLAYS,HOME,AWAY]);
 
-  const placeOrder=useCallback(()=>{if(settled)return;const o=oR.current,gt=gtR.current,ml2=maxLev(o.price),lev=Math.min(orderLev,ml2),margin=Math.min(orderMargin,balance);
-  if(margin<10){notify("Insufficient margin","red");return;}const exposure=margin*lev,entry=o.price,liq=liqPrice(orderSide,entry,lev);
-  setPositions(p=>[...p,{id:Date.now(),side:orderSide,margin,leverage:lev,exposure,entry,liq,openTime:gt}]);setBalance(b=>b-margin);addMark(gt,entry,"entry",orderSide);
-  const tn=orderSide==="home"?HOME:AWAY;notify(tn.logo+" "+tn.name+" "+lev+"x @ "+fmt3(entry),orderSide==="home"?"green":"red");},[oracle.price,orderSide,orderMargin,orderLev,balance,settled,gameTime,notify,addMark,HOME,AWAY]);
+  const placeOrder=useCallback(()=>{
+    if(settled)return;const o=oR.current,gt=gtR.current,ml2=maxLev(o.price),lev=Math.min(orderLev,ml2),margin=Math.min(orderMargin,balance);
+    if(margin<10){notify("Insufficient margin","red");return;}
+    const exposure=margin*lev;
+    // Parse TP/SL — stored as oracle.price (home prob) thresholds
+    const tp=tpCents!==""&&+tpCents>0?(orderSide==="home"?+tpCents/100:1-+tpCents/100):null;
+    const sl=slCents!==""&&+slCents>0?(orderSide==="home"?+slCents/100:1-+slCents/100):null;
+    if(orderType==="limit"){
+      const lp=limitCents/100; // limit price as side's probability
+      setLimitOrders(p=>[...p,{id:Date.now(),side:orderSide,margin,leverage:lev,exposure,limitPrice:lp,tp,sl,openTime:gt}]);
+      setBalance(b=>b-margin);
+      const tn=orderSide==="home"?HOME:AWAY;
+      notify(tn.logo+" "+tn.name+" limit @ "+limitCents+"¢","info");
+    } else {
+      const entry=o.price,liq=liqPrice(orderSide,entry,lev);
+      setPositions(p=>[...p,{id:Date.now(),side:orderSide,margin,leverage:lev,exposure,entry,liq,openTime:gt,tp,sl}]);
+      setBalance(b=>b-margin);addMark(gt,entry,"entry",orderSide);
+      const tn=orderSide==="home"?HOME:AWAY;notify(tn.logo+" "+tn.name+" "+lev+"x @ "+fmt3(entry),orderSide==="home"?"green":"red");
+    }
+  },[oracle.price,orderSide,orderMargin,orderLev,balance,settled,gameTime,notify,addMark,HOME,AWAY,orderType,limitCents,tpCents,slCents]);
 
   const closePosition=useCallback((id)=>{setPositions(prev=>{const pos=prev.find(p=>p.id===id);if(!pos)return prev;const o=oR.current,gt=gtR.current;
   const pnl=calcPnL(pos.side,pos.exposure,pos.entry,o.price);setBalance(b=>b+pos.margin+pnl);setClosedPnL(p=>p+pnl);
@@ -1844,12 +1835,14 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
   setChartData([{t:0,ph:initProb,pa:1-initProb,floor:clamp(initProb-.2,.01,.99),ceil:clamp(initProb+.2,.01,.99)}]);
   setOracle({price:initProb,sources:makeSources(initProb),floor:clamp(initProb-.2,.01,.99),ceil:clamp(initProb+.2,.01,.99)});
   setBook(makeBook(initProb));setGs(PLAYS[0]);setPositions([]);setClosedPos([]);setBalance(10000);setClosedPnL(0);
-  setMarkers([]);setVisScoring([]);lastCT.current=0;lastEv.current="";setNotifs([]);},[initProb,PLAYS]);
+  setMarkers([]);setVisScoring([]);setLimitOrders([]);lastCT.current=0;lastEv.current="";setNotifs([]);},[initProb,PLAYS]);
 
   const totalUPnL=positions.reduce((s,p)=>s+calcPnL(p.side,p.exposure,p.entry,oracle.price),0);
   const totalEq=balance+positions.reduce((s,p)=>s+p.margin,0)+totalUPnL;
   const ml=maxLev(oracle.price),eL=Math.min(orderLev,ml),eM=Math.min(orderMargin,balance);
   const team=orderSide==="home"?HOME:AWAY,expo=eM*eL,liqP=liqPrice(orderSide,oracle.price,eL);
+  const entryP=orderSide==="home"?oracle.price:(1-oracle.price);
+  const shareCount=Math.max(1,Math.round((eM*eL)/entryP));
   const awayProb=1-oracle.price,prevProb=merged.length>40?merged[merged.length-40].ph:merged[0].ph,momentum=oracle.price-prevProb;
 
 
@@ -1900,7 +1893,10 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
                     <span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite",flexShrink:0}}/>
                     Live
                   </span>
-                : sport}{sport==="Basketball"&&liveGames.length>0?` (${liveGames.length})`:""}</button>
+                : sport}{(() => {
+                  const c = sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.ucl:sport==="MMA"?sportCounts.ufc:null;
+                  return c>0?<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({c})</span>:null;
+                })()}</button>
           );})}
         </div>
 
@@ -1920,12 +1916,12 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
 
         {terminalPage==="demos"?<DemosPage onSelectGame={(g)=>{onSwitchGame(g);setTerminalPage("game");}} currentGameId={G.id}/>
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames}/>
-        :terminalPage==="baseball"?<BaseballPage/>
-        :terminalPage==="soccer"?<SoccerPage/>
-        :terminalPage==="hockey"?<HockeyPage/>
-        :terminalPage==="mma"?<MMAPage/>
-        :terminalPage==="nfl"?<NFLPage/>
-        :terminalPage==="trending"?<TrendingPage liveGames={liveGames}/>
+        :terminalPage==="baseball"?<BaseballPage data={espnData.mlb}/>
+        :terminalPage==="soccer"?<SoccerPage data={espnData.ucl}/>
+        :terminalPage==="hockey"?<HockeyPage data={espnData.nhl}/>
+        :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
+        :terminalPage==="nfl"?<NFLPage data={espnData.nfl}/>
+        :terminalPage==="trending"?<TrendingPage liveGames={liveGames} espnData={espnData}/>
         :<>
 
         {/* LEFT SIDEBAR — other games */}
@@ -1967,12 +1963,12 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
           </div>
 
           {/* LIVE BASKETBALL — from backend */}
-          {liveGames.length > 0 && (
+          {liveGames.filter(g=>g.status==="live"||g.status==="halftime").length > 0 && (
             <div style={{padding:"16px 16px 0"}}>
               <div style={{fontSize:11,fontWeight:700,color:B.primary,marginBottom:10,fontFamily:fm,letterSpacing:"0.04em"}}>
-                🏀 LIVE BASKETBALL ({liveGames.length})
+                🏀 LIVE BASKETBALL ({liveGames.filter(g=>g.status==="live"||g.status==="halftime").length})
               </div>
-              {liveGames.map(lg=>(
+              {liveGames.filter(g=>g.status==="live"||g.status==="halftime").map(lg=>(
                 <div key={lg.id} style={{padding:"12px 14px",marginBottom:8,background:"#111",borderRadius:12,border:"1px solid #1f1f1f",transition:"all .15s"}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -2076,6 +2072,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
                   <Tooltip content={<ChartTip/>} cursor={{stroke:"#ffffff06"}}/>
                   <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
                   {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3"/>))}
+                  {limitOrders.map(lo=>{const ly=lo.side==="home"?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==="home"?HOME.light:AWAY.light;return(<ReferenceLine key={"lo-"+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+"¢ LIMIT",position:"insideTopLeft",fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                   <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#hg)" dot={false} animationDuration={0} baseValue={0}/>
                   <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#ag)" dot={false} animationDuration={0} baseValue={0}/>
                   <Scatter dataKey="mh_val" shape={<HomeMarkerDot/>} isAnimationActive={false}/>
@@ -2092,45 +2089,76 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
             </div>
           </div>
 
-          {/* POSITIONS — own section */}
+          {/* POSITIONS */}
           <div style={{margin:"16px 24px 0",background:"#111",borderRadius:16,border:"1px solid #1f1f1f",overflow:"hidden"}}>
             <div style={{padding:"10px 20px",borderBottom:"1px solid #1f1f1f",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <span style={{fontSize:13,fontWeight:600,color:"#fff"}}>Positions {(positions.length+closedPos.length)>0&&<span style={{color:B.primary,marginLeft:4,fontSize:11}}>{positions.length+closedPos.length}</span>}</span>
-              {closedPnL!==0&&<span style={{fontSize:12,fontFamily:fm,color:pctClr(closedPnL),fontWeight:700}}>Net: {fmtUsd(closedPnL)}</span>}
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:13,fontWeight:600,color:"#fff"}}>Positions</span>
+                {positions.length>0&&<span style={{background:B.primary+"20",color:B.primary,fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:6}}>{positions.length} OPEN</span>}
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                {totalUPnL!==0&&<span style={{fontSize:12,fontFamily:fm,color:pctClr(totalUPnL),fontWeight:700}}>uPnL {fmtUsd(totalUPnL)}</span>}
+                {closedPnL!==0&&<span style={{fontSize:12,fontFamily:fm,color:pctClr(closedPnL),fontWeight:700}}>Realized {fmtUsd(closedPnL)}</span>}
+              </div>
             </div>
             <div style={{padding:"10px 16px"}}>
               {positions.length===0&&closedPos.length===0?(
                 <div style={{textAlign:"center",fontSize:13,color:"#555",padding:"20px 0"}}>{settled?"All positions settled":"No open positions yet"}</div>
               ):(
-                <div>
-                  {positions.length>0&&(
-                    <table style={{width:"100%",borderCollapse:"collapse",fontFamily:fm,fontSize:12}}>
-                      <thead><tr style={{color:"#555",fontSize:11}}>
-                        <th style={{textAlign:"left",padding:"6px 8px"}}>Side</th><th style={{textAlign:"right",padding:"6px 8px"}}>Size</th><th style={{textAlign:"right",padding:"6px 8px"}}>Entry</th>
-                        <th style={{textAlign:"right",padding:"6px 8px"}}>Mark</th><th style={{textAlign:"right",padding:"6px 8px"}}>Liq</th><th style={{textAlign:"right",padding:"6px 8px"}}>PnL</th><th></th>
-                      </tr></thead>
-                      <tbody>{positions.map(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,oracle.price);const tm=pos.side==="home"?HOME:AWAY;return(
-                        <tr key={pos.id} style={{borderTop:"1px solid #1f1f1f"}}>
-                          <td style={{padding:"8px",color:pos.side==="home"?HOME.light:AWAY.light,fontWeight:700}}>{tm.logo} {tm.short} {pos.leverage}x</td>
-                          <td style={{padding:"8px",textAlign:"right"}}>{fmtUsd(pos.exposure)}</td>
-                          <td style={{padding:"8px",textAlign:"right"}}>{(pos.entry*100).toFixed(1)}%</td>
-                          <td style={{padding:"8px",textAlign:"right",color:"#60a5fa"}}>{(oracle.price*100).toFixed(1)}%</td>
-                          <td style={{padding:"8px",textAlign:"right",color:B.red}}>{(pos.liq*100).toFixed(1)}%</td>
-                          <td style={{padding:"8px",textAlign:"right",color:pctClr(pnl),fontWeight:700}}>{fmtUsd(pnl)}</td>
-                          <td style={{padding:"8px"}}><button onClick={()=>closePosition(pos.id)} style={{background:"#ef4444",border:"none",padding:"5px 14px",borderRadius:8,cursor:"pointer",color:"#fff",fontWeight:700,fontSize:11}}>Close</button></td>
-                        </tr>)})}</tbody>
-                    </table>
-                  )}
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {positions.map(pos=>{
+                    const pnl=calcPnL(pos.side,pos.exposure,pos.entry,oracle.price);
+                    const pnlPct=(pnl/pos.margin)*100;
+                    const tm=pos.side==="home"?HOME:AWAY;
+                    const markP=pos.side==="home"?oracle.price:1-oracle.price;
+                    const posShares=Math.round(pos.exposure/pos.entry);
+                    const posEntryP=pos.side==="home"?pos.entry:1-pos.entry;
+                    return(
+                      <div key={pos.id} style={{borderRadius:12,border:"1px solid #1f1f1f",overflow:"hidden",background:"#0a0a0a"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderLeft:"3px solid "+(pos.side==="home"?HOME.light:AWAY.light)}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                            <span style={{fontSize:13,fontWeight:800,color:pos.side==="home"?HOME.light:AWAY.light}}>{tm.logo} {tm.short}</span>
+                            <span style={{fontSize:10,fontWeight:700,color:B.primary,background:B.primary+"15",padding:"2px 6px",borderRadius:5,fontFamily:fm}}>{pos.leverage}x</span>
+                            {pos.tp&&<span style={{fontSize:10,color:B.green,fontFamily:fm,background:B.green+"10",padding:"2px 5px",borderRadius:4}}>TP {(pos.side==="home"?pos.tp:1-pos.tp)*100|0}¢</span>}
+                            {pos.sl&&<span style={{fontSize:10,color:B.red,fontFamily:fm,background:B.red+"10",padding:"2px 5px",borderRadius:4}}>SL {(pos.side==="home"?pos.sl:1-pos.sl)*100|0}¢</span>}
+                          </div>
+                          <div style={{textAlign:"right"}}>
+                            <div style={{fontSize:16,fontWeight:800,color:pctClr(pnl),fontFamily:fm}}>{fmtUsd(pnl)}</div>
+                            <div style={{fontSize:11,color:pctClr(pnl),fontFamily:fm}}>{fmtPct(pnlPct)}</div>
+                          </div>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",padding:"8px 14px",borderTop:"1px solid #1a1a1a"}}>
+                          {[["Entry",(posEntryP*100).toFixed(1)+"¢","#888"],["Mark",(markP*100).toFixed(1)+"¢",B.primaryLight],["Liq",(pos.side==="home"?pos.liq:1-pos.liq)*100|0+"¢",B.red],["Size",fmtUsd(pos.exposure),"#888"]].map(([label,value,color])=>(
+                            <div key={label} style={{textAlign:"center"}}>
+                              <div style={{fontSize:10,color:"#444",marginBottom:2}}>{label}</div>
+                              <div style={{fontSize:12,fontWeight:700,fontFamily:fm,color}}>{value}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{padding:"8px 14px",borderTop:"1px solid #1a1a1a",display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:11,color:"#555",flex:1,fontFamily:fm}}>{posShares.toLocaleString()} shares · margin {fmtUsd(pos.margin)}</span>
+                          <button onClick={()=>closePosition(pos.id)} style={{padding:"5px 14px",background:"#ef444415",border:"1px solid #ef444430",borderRadius:8,cursor:"pointer",color:"#ef4444",fontWeight:700,fontSize:11,fontFamily:fb}}>Close</button>
+                        </div>
+                      </div>
+                    );
+                  })}
                   {closedPos.length>0&&(
-                    <div style={{marginTop:positions.length>0?8:0}}>
-                      {positions.length>0&&<div style={{fontSize:11,color:"#555",fontWeight:600,padding:"8px 0 4px"}}>Closed</div>}
-                      {closedPos.map((cp,i)=>{const tm=cp.side==="home"?HOME:AWAY;return(
-                        <div key={cp.id+"-"+i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"5px 8px",borderTop:"1px solid #1a1a1a",opacity:0.5,fontFamily:fm,fontSize:11}}>
-                          <span style={{color:cp.side==="home"?HOME.light:AWAY.light,fontWeight:700}}>{tm.logo} {tm.short} {cp.leverage}x</span>
-                          <span style={{color:"#666"}}>{(cp.entry*100).toFixed(1)}→{(cp.closedAt*100).toFixed(1)}%</span>
-                          <span style={{color:pctClr(cp.pnl),fontWeight:700}}>{fmtUsd(cp.pnl)}</span>
-                          <span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:cp.closeType==="LIQ"?"#ef444420":cp.pnl>=0?"#22c55e15":"#1a1a1a",color:cp.closeType==="LIQ"?"#f87171":cp.pnl>=0?"#4ade80":"#666"}}>{cp.closeType}</span>
-                        </div>)})}
+                    <div style={{marginTop:positions.length>0?4:0}}>
+                      {positions.length>0&&<div style={{fontSize:11,color:"#555",fontWeight:600,padding:"4px 0 6px"}}>Closed</div>}
+                      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                        {closedPos.map((cp,i)=>{
+                          const cptm=cp.side==="home"?HOME:AWAY;
+                          const typeC=cp.closeType==="LIQ"?"#f87171":cp.closeType==="TP"?"#4ade80":cp.closeType==="SL"?"#ef4444":"#666";
+                          return(
+                            <div key={cp.id+"-"+i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",background:"#0a0a0a",borderRadius:8,fontFamily:fm,fontSize:11,borderLeft:"2px solid "+(cp.side==="home"?HOME.light+"40":AWAY.light+"40")}}>
+                              <span style={{color:cp.side==="home"?HOME.light:AWAY.light,fontWeight:700,minWidth:56}}>{cptm.logo} {cptm.short} {cp.leverage}x</span>
+                              <span style={{color:"#555",flex:1}}>{((cp.side==="home"?cp.entry:1-cp.entry)*100).toFixed(1)}¢ → {((cp.side==="home"?cp.closedAt:1-cp.closedAt)*100).toFixed(1)}¢</span>
+                              <span style={{color:pctClr(cp.pnl),fontWeight:700}}>{fmtUsd(cp.pnl)}</span>
+                              <span style={{fontSize:10,padding:"2px 7px",borderRadius:5,background:typeC+"15",color:typeC,fontWeight:700}}>{cp.closeType}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2138,7 +2166,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
             </div>
           </div>
 
-          {/* GAMECAST / BOX SCORE — separate section */}
+                    {/* GAMECAST / BOX SCORE — separate section */}
           <div style={{margin:"12px 24px 0",background:"#111",borderRadius:16,border:"1px solid #1f1f1f",display:"flex",flexDirection:"column",minHeight:400,overflow:"hidden"}}>
             <div style={{display:"flex",gap:0,borderBottom:"1px solid #1f1f1f",flexShrink:0}}>
               {[["gamecast","Gamecast",PLAYS.filter(p=>p.t<=gameTime).length],["boxscore","Box Score",0]].map(([id,label,count])=>(
@@ -2274,90 +2302,168 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR — bet box */}
-        <div style={{width:340,overflow:"auto",flexShrink:0,padding:16}}>
-          <div style={{background:"#111",borderRadius:16,border:"1px solid #1f1f1f",padding:20}}>
+        {/* RIGHT SIDEBAR — unified trading panel */}
+        <div style={{width:360,overflow:"auto",flexShrink:0,padding:"12px 10px",display:"flex",flexDirection:"column",gap:8}}>
 
-            {/* Outcome selector */}
-            <div style={{display:"flex",gap:0,marginBottom:20,background:"#1a1a1a",borderRadius:12,padding:3}}>
-              <button onClick={()=>setOrderSide("home")} style={{flex:1,padding:"12px 0",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:fb,borderRadius:10,
-                background:orderSide==="home"?HOME.light:"transparent",color:orderSide==="home"?"#000":"#666",
-                border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .15s"}}>
-                {HOME.logo} {HOME.name}
-                <span style={{fontSize:12,opacity:0.6}}>{(oracle.price*100).toFixed(0)}¢</span>
+          {/* Tab strip */}
+          <div style={{display:"flex",background:"#111",borderRadius:12,border:"1px solid #1f1f1f",padding:3,gap:2}}>
+            {[["order","Order"],["book","Book"]].map(([id,label])=>(
+              <button key={id} onClick={()=>setRightTab(id)} style={{flex:1,padding:"7px 0",fontSize:12,fontWeight:rightTab===id?700:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:9,
+                background:rightTab===id?B.primary+"20":"transparent",color:rightTab===id?"#fff":"#666"}}>
+                {label}{id==="order"&&limitOrders.length>0&&<span style={{color:B.primary,marginLeft:4,fontSize:10,fontWeight:700}}>({limitOrders.length})</span>}
               </button>
-              <button onClick={()=>setOrderSide("away")} style={{flex:1,padding:"12px 0",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:fb,borderRadius:10,
-                background:orderSide==="away"?AWAY.light:"transparent",color:orderSide==="away"?"#000":"#666",
-                border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all .15s"}}>
-                {AWAY.logo} {AWAY.name}
-                <span style={{fontSize:12,opacity:0.6}}>{(awayProb*100).toFixed(0)}¢</span>
+            ))}
+          </div>
+
+          {rightTab==="order"&&(<div style={{background:"#111",borderRadius:16,border:"1px solid #1f1f1f",padding:18}}>
+
+            {/* Team selector */}
+            <div style={{display:"flex",gap:0,marginBottom:14,background:"#1a1a1a",borderRadius:12,padding:3}}>
+              <button onClick={()=>{setOrderSide("home");if(orderType==="limit")setLimitCents(Math.round(oracle.price*100));}} style={{flex:1,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:fb,borderRadius:10,border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:5,transition:"all .15s",
+                background:orderSide==="home"?HOME.light:"transparent",color:orderSide==="home"?"#000":"#666"}}>
+                {HOME.logo} {HOME.name} <span style={{fontSize:11,fontWeight:600,opacity:0.7}}>{(oracle.price*100).toFixed(0)}¢</span>
+              </button>
+              <button onClick={()=>{setOrderSide("away");if(orderType==="limit")setLimitCents(Math.round((1-oracle.price)*100));}} style={{flex:1,padding:"10px 0",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:fb,borderRadius:10,border:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:5,transition:"all .15s",
+                background:orderSide==="away"?AWAY.light:"transparent",color:orderSide==="away"?"#000":"#666"}}>
+                {AWAY.logo} {AWAY.name} <span style={{fontSize:11,fontWeight:600,opacity:0.7}}>{((1-oracle.price)*100).toFixed(0)}¢</span>
               </button>
             </div>
 
-            {/* Amount */}
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:13,color:"#888",marginBottom:8,fontWeight:600}}>Amount</div>
-              <div style={{display:"flex",alignItems:"center",background:"#1a1a1a",border:"1px solid #2a2a2a",borderRadius:12,overflow:"hidden"}}>
-                <span style={{paddingLeft:16,color:"#666",fontSize:16,fontWeight:600}}>$</span>
-                <input type="number" value={orderMargin} onChange={e=>setOrderMargin(Math.max(0,+e.target.value))} style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:18,padding:"14px 8px",fontWeight:600,fontFamily:fb,width:"100%",minWidth:0}}/>
+            {/* Order type */}
+            <div style={{display:"flex",gap:3,marginBottom:14,background:"#1a1a1a",borderRadius:10,padding:3}}>
+              {[["market","Market"],["limit","Limit"]].map(([t,l])=>(
+                <button key={t} onClick={()=>{setOrderType(t);if(t==="limit")setLimitCents(Math.round(entryP*100));}} style={{flex:1,padding:"7px 0",fontSize:12,fontWeight:orderType===t?700:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
+                  background:orderType===t?"#2a2a2a":"transparent",color:orderType===t?"#fff":"#666"}}>{l}</button>
+              ))}
+            </div>
+
+            {/* Unified shares ⇄ margin input */}
+            <div style={{marginBottom:12}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr auto 1fr",gap:6,alignItems:"end",marginBottom:6}}>
+                <div>
+                  <div style={{fontSize:10,color:"#555",fontWeight:600,marginBottom:4}}>Shares</div>
+                  <div style={{background:"#1a1a1a",border:"1px solid #2a2a2a",borderRadius:10,padding:"9px 10px"}}>
+                    <input type="number" value={shareCount} min={0}
+                      onChange={e=>{const s=Math.max(0,+e.target.value);setOrderMargin(Math.min(Math.max(0,(s*entryP)/eL),balance));}}
+                      style={{width:"100%",background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:15,fontWeight:700,fontFamily:fm}}/>
+                  </div>
+                </div>
+                <div style={{color:"#333",fontSize:14,fontWeight:700,paddingBottom:11,textAlign:"center"}}>⇄</div>
+                <div>
+                  <div style={{fontSize:10,color:"#555",fontWeight:600,marginBottom:4}}>Margin</div>
+                  <div style={{background:"#1a1a1a",border:"1px solid #2a2a2a",borderRadius:10,padding:"9px 10px",display:"flex",alignItems:"center",gap:3}}>
+                    <span style={{color:"#555",fontSize:12,fontWeight:600}}>$</span>
+                    <input type="number" value={Math.round(eM)} min={0}
+                      onChange={e=>setOrderMargin(Math.min(Math.max(0,+e.target.value),balance))}
+                      style={{width:"100%",background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:15,fontWeight:700,fontFamily:fm}}/>
+                  </div>
+                </div>
               </div>
-              <div style={{display:"flex",gap:6,marginTop:8}}>
-                {[100,250,500,1000,2500].map(v=>(<button key={v} onClick={()=>setOrderMargin(v)} style={{flex:1,padding:"7px 0",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
-                  background:orderMargin===v?"#2a2a2a":"#1a1a1a",color:orderMargin===v?"#fff":"#666"}}>{v>=1000?"$"+(v/1000)+"k":"$"+v}</button>))}
+              <div style={{fontSize:10,color:"#555",textAlign:"center",marginBottom:12}}>@ {(entryP*100).toFixed(1)}¢ per share</div>
+
+              {/* Leverage slider */}
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                  <span style={{fontSize:10,color:"#555",fontWeight:600}}>Leverage</span>
+                  <span style={{fontSize:14,fontWeight:800,color:B.primaryLight,fontFamily:fm}}>{eL}x</span>
+                  <span style={{fontSize:10,color:"#444"}}>{ml}x max</span>
+                </div>
+                <input type="range" min={1} max={ml} step={1} value={eL} onChange={e=>setOrderLev(+e.target.value)}
+                  style={{width:"100%",accentColor:B.primary,cursor:"pointer",height:4}}/>
+                <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
+                  <span style={{fontSize:9,color:"#333",fontFamily:fm}}>1x</span>
+                  <span style={{fontSize:9,color:"#333",fontFamily:fm}}>{ml}x</span>
+                </div>
               </div>
             </div>
 
-            {/* Leverage */}
-            <div style={{marginBottom:20}}>
-              <div style={{fontSize:13,color:"#888",marginBottom:8,fontWeight:600,display:"flex",justifyContent:"space-between"}}>
-                <span>Leverage</span><span style={{color:B.primary,fontSize:12}}>{ml}x max</span>
+            {/* Limit price */}
+            {orderType==="limit"&&(
+              <div style={{marginBottom:12,padding:"10px 12px",background:"#0a0a0a",borderRadius:10,border:"1px solid #2a2a2a"}}>
+                <div style={{fontSize:10,color:"#555",fontWeight:600,marginBottom:6}}>Limit Price</div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <input type="number" min={1} max={99} value={limitCents} onChange={e=>setLimitCents(Math.min(99,Math.max(1,+e.target.value)))}
+                    style={{flex:1,background:"#1a1a1a",border:"1px solid #2a2a2a",borderRadius:8,padding:"7px 10px",color:B.primaryLight,fontSize:15,fontWeight:700,fontFamily:fm,outline:"none"}}/>
+                  <span style={{fontSize:13,color:"#555",fontWeight:600}}>¢</span>
+                </div>
+                <div style={{fontSize:10,color:"#555",marginTop:4}}>
+                  {orderSide==="home"?"Fills when "+HOME.name+" ≤ "+limitCents+"¢":"Fills when "+AWAY.name+" ≤ "+limitCents+"¢"}
+                </div>
               </div>
-              <div style={{display:"flex",gap:4,background:"#1a1a1a",borderRadius:12,padding:3}}>
-                {[1,2,3,5,10].map(l=>(<button key={l} onClick={()=>setOrderLev(l)} disabled={l>ml} style={{flex:1,padding:"9px 0",fontSize:14,fontWeight:700,border:"none",cursor:l>ml?"not-allowed":"pointer",fontFamily:fm,borderRadius:9,
-                  background:l>ml?"transparent":orderLev===l?B.primary+"25":"transparent",color:l>ml?"#2a2a2a":orderLev===l?B.primaryLight:"#666"}}>{l}x</button>))}
+            )}
+
+            {/* TP / SL */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,color:"#555",fontWeight:600,marginBottom:6}}>Risk Tools <span style={{color:"#383838"}}>optional</span></div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                <div>
+                  <div style={{fontSize:10,color:B.green,fontWeight:600,marginBottom:4}}>Take Profit ¢</div>
+                  <input type="number" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="—"
+                    style={{width:"100%",background:"#1a1a1a",border:"1px solid "+B.green+"22",borderRadius:8,padding:"7px 10px",color:B.green,fontSize:13,fontWeight:700,fontFamily:fm,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:10,color:B.red,fontWeight:600,marginBottom:4}}>Stop Loss ¢</div>
+                  <input type="number" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="—"
+                    style={{width:"100%",background:"#1a1a1a",border:"1px solid "+B.red+"22",borderRadius:8,padding:"7px 10px",color:B.red,fontSize:13,fontWeight:700,fontFamily:fm,outline:"none",boxSizing:"border-box"}}/>
+                </div>
               </div>
             </div>
 
             {/* Summary */}
-            <div style={{background:"#0a0a0a",borderRadius:12,padding:14,marginBottom:16}}>
-              {[["Exposure",fmtUsd(expo),"#fff"],["Liquidation",(liqP*100).toFixed(1)+"%",B.red]].map(([l,v,c])=>(
-                <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",fontSize:13}}>
-                  <span style={{color:"#666"}}>{l}</span><span style={{color:c,fontWeight:600}}>{v}</span>
+            <div style={{background:"#0a0a0a",borderRadius:12,padding:"10px 12px",marginBottom:14,fontSize:12}}>
+              {[["Entry",(entryP*100).toFixed(1)+"¢","#fff"],["Exposure",fmtUsd(expo),"#fff"],["Liquidation",(liqP*100).toFixed(1)+"¢",B.red]].map(([l,v,c])=>(
+                <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
+                  <span style={{color:"#555"}}>{l}</span><span style={{color:c,fontWeight:600,fontFamily:fm}}>{v}</span>
                 </div>
               ))}
-              <div style={{height:1,background:"#1a1a1a",margin:"8px 0"}}/>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:14}}>
-                <span style={{color:"#888",fontWeight:600}}>Potential return</span>
-                <span style={{color:B.green,fontWeight:800}}>+{fmtUsd(orderSide==="home"?expo*(1-oracle.price)/oracle.price:expo*oracle.price/(1-oracle.price))}</span>
+              <div style={{height:1,background:"#1f1f1f",margin:"7px 0"}}/>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
+                <span style={{color:"#555"}}>If {team.name} wins</span>
+                <span style={{color:B.green,fontWeight:800,fontFamily:fm}}>+{fmtUsd(orderSide==="home"?expo*(1-oracle.price)/oracle.price:expo*oracle.price/(1-oracle.price))}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
+                <span style={{color:"#555"}}>Max loss</span>
+                <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>-{fmtUsd(eM)}</span>
               </div>
             </div>
 
-            {/* Bet button */}
-            <button onClick={placeOrder} disabled={settled||eM<10} style={{width:"100%",padding:"16px 0",fontWeight:700,fontSize:16,border:"none",cursor:settled?"not-allowed":"pointer",fontFamily:fb,borderRadius:12,
-              background:settled?"#222":B.green,color:settled?"#666":"#fff",opacity:settled||eM<10?0.3:1}}>
-              {settled?"Market Settled":"Bet "+team.name+" — "+fmtUsd(eM)}
+            {/* Submit */}
+            <button onClick={placeOrder} disabled={settled||eM<10} style={{width:"100%",padding:"14px 0",fontWeight:700,fontSize:14,border:"none",
+              cursor:settled||eM<10?"not-allowed":"pointer",fontFamily:fb,borderRadius:12,transition:"all .15s",
+              background:settled?"#222":orderSide==="home"?HOME.light:AWAY.light,
+              color:settled?"#666":"#000",opacity:settled||eM<10?0.4:1}}>
+              {settled?"Market Settled":orderType==="limit"?`Limit ${team.name} @ ${limitCents}¢ · ${shareCount} shares`:`Long ${team.name} · ${shareCount} shares`}
             </button>
 
-            {/* Account summary */}
-            <div style={{marginTop:16,padding:"12px 0",borderTop:"1px solid #1f1f1f"}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#555",marginBottom:4}}>
-                <span>Balance</span><span style={{color:"#fff",fontWeight:600,fontFamily:fm}}>{fmtUsd(balance)}</span>
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#555"}}>
-                <span>Portfolio</span><span style={{color:pctClr(totalEq-10000),fontWeight:600,fontFamily:fm}}>{fmtUsd(totalEq)} ({fmtPct((totalEq-10000)/100)})</span>
-              </div>
+            {/* Account */}
+            <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #1f1f1f",display:"flex",justifyContent:"space-between",fontSize:11}}>
+              <div><div style={{color:"#444",marginBottom:2}}>Balance</div><div style={{color:"#fff",fontWeight:700,fontFamily:fm}}>{fmtUsd(balance)}</div></div>
+              <div style={{textAlign:"right"}}><div style={{color:"#444",marginBottom:2}}>Portfolio</div><div style={{color:pctClr(totalEq-10000),fontWeight:700,fontFamily:fm}}>{fmtUsd(totalEq)} <span style={{fontSize:10}}>({fmtPct((totalEq-10000)/100)})</span></div></div>
             </div>
-          </div>
 
-          {/* ORDER BOOK */}
-          <div style={{marginTop:12,background:"#111",borderRadius:16,border:"1px solid #1f1f1f",padding:16}}>
+            {/* Pending limit orders */}
+            {limitOrders.length>0&&(
+              <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #1f1f1f"}}>
+                <div style={{fontSize:10,color:"#555",fontWeight:600,marginBottom:6}}>Pending ({limitOrders.length})</div>
+                {limitOrders.map(lo=>{const loTm=lo.side==="home"?HOME:AWAY;return(
+                  <div key={lo.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 10px",background:"#1a1a1a",borderRadius:8,marginBottom:4,fontSize:11}}>
+                    <span style={{color:lo.side==="home"?HOME.light:AWAY.light,fontWeight:700}}>{loTm.logo} {loTm.short} {lo.leverage}x</span>
+                    <span style={{color:B.primary,fontFamily:fm}}>@ {(lo.limitPrice*100).toFixed(0)}¢</span>
+                    <span style={{color:"#888"}}>{fmtUsd(lo.margin)}</span>
+                    <button onClick={()=>{setLimitOrders(p=>p.filter(l=>l.id!==lo.id));setBalance(b=>b+lo.margin);notify("Order cancelled","info");}}
+                      style={{background:"#ef444420",border:"none",borderRadius:6,padding:"3px 8px",cursor:"pointer",color:"#ef4444",fontSize:11,fontWeight:700}}>✕</button>
+                  </div>
+                );})}
+              </div>
+            )}
+
+          </div>)}
+
+          {rightTab==="book"&&(<div style={{background:"#111",borderRadius:16,border:"1px solid #1f1f1f",padding:16}}>
             <div style={{fontSize:13,fontWeight:600,color:"#888",marginBottom:10}}>Order Book</div>
-
-            {/* Asks (sell side) */}
             <div style={{marginBottom:4}}>
               <div style={{display:"flex",justifyContent:"space-between",padding:"0 6px 4px",fontSize:10,fontWeight:700}}>
-                <span style={{color:AWAY.light}}>{AWAY.logo} {AWAY.name}</span>
-                <span style={{color:"#444"}}>Size</span>
+                <span style={{color:AWAY.light}}>{AWAY.logo} {AWAY.name}</span><span style={{color:"#444"}}>Size</span>
               </div>
               {book.asks.slice(-6).map((a,i)=>{const mx=Math.max(...book.asks.map(x=>x.size));return(
                 <div key={"a"+i} style={{display:"flex",justifyContent:"space-between",fontSize:12,height:26,alignItems:"center",position:"relative",fontFamily:fm,padding:"0 6px",borderRadius:4}}>
@@ -2366,18 +2472,13 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
                   <span style={{color:"#555",position:"relative",zIndex:1,fontSize:11}}>{a.size}</span>
                 </div>);})}
             </div>
-
-            {/* Spread */}
             <div style={{padding:"6px",borderTop:"1px solid #1f1f1f",borderBottom:"1px solid #1f1f1f",marginBottom:4,display:"flex",justifyContent:"space-between",fontSize:12}}>
               <span style={{color:"#666"}}>Spread</span>
               <span style={{color:"#fff",fontWeight:700,fontFamily:fm}}>{((book.asks[book.asks.length-1].price-book.bids[0].price)*100).toFixed(1)}¢</span>
             </div>
-
-            {/* Bids (buy side) */}
             <div>
               <div style={{display:"flex",justifyContent:"space-between",padding:"0 6px 4px",fontSize:10,fontWeight:700}}>
-                <span style={{color:HOME.light}}>{HOME.logo} {HOME.name}</span>
-                <span style={{color:"#444"}}>Size</span>
+                <span style={{color:HOME.light}}>{HOME.logo} {HOME.name}</span><span style={{color:"#444"}}>Size</span>
               </div>
               {book.bids.slice(0,6).map((b,i)=>{const mx=Math.max(...book.bids.map(x=>x.size));return(
                 <div key={"b"+i} style={{display:"flex",justifyContent:"space-between",fontSize:12,height:26,alignItems:"center",position:"relative",fontFamily:fm,padding:"0 6px",borderRadius:4}}>
@@ -2386,7 +2487,8 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
                   <span style={{color:"#555",position:"relative",zIndex:1,fontSize:11}}>{b.size}</span>
                 </div>);})}
             </div>
-          </div>
+          </div>)}
+
         </div>
       </>}
       </div>
