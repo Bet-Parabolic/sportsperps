@@ -1460,7 +1460,7 @@ function BaseballPage({ data={events:[],loading:true,error:false} }) {
 /* ═══════════════════════════════════════════════════════════
    BASKETBALL PAGE — live NBA/NCAAM games from backend
    ═══════════════════════════════════════════════════════════ */
-function BasketballPage({ liveGames }) {
+function BasketballPage({ liveGames, onTrade }) {
   const live    = liveGames.filter(g => g.status === "live" || g.status === "halftime");
   const final   = liveGames.filter(g => (g.status === "final" || g.status === "completed") && isRecent(g.date || g.startTime));
   const sched   = liveGames.filter(g => g.status === "scheduled").sort((a,b) => new Date(a.date||a.startTime||0) - new Date(b.date||b.startTime||0));
@@ -1544,6 +1544,15 @@ function BasketballPage({ liveGames }) {
               <div style={{height:"100%",width:winProb+"%",background:`linear-gradient(90deg, ${B.primary}, ${B.primaryLight})`,borderRadius:4,transition:"width .5s ease"}}/>
             </div>
           </div>
+        )}
+
+        {/* Trade Live button */}
+        {onTrade && (isLive || isHalf) && (
+          <button onClick={()=>onTrade(g)} style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
+            background:"linear-gradient(135deg, "+B.primary+", "+B.primaryLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <span style={{width:7,height:7,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
+            Trade Live
+          </button>
         )}
 
         {/* Scheduled time */}
@@ -1715,7 +1724,833 @@ function DemosPage({ onSelectGame, currentGameId }) {
 /* ═══════════════════════════════════════════════════════════
    TRADING APP
    ═══════════════════════════════════════════════════════════ */
-function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }) {
+
+/* ═══════════════════════════════════════════════════════════
+   LIVE TRADING APP — real NBA games via backend oracle
+   ═══════════════════════════════════════════════════════════ */
+function LiveTradingApp({ game: initGame, onBack, liveGames = [] }) {
+  // ── normalise team colors from backend ──────────────────────────────────
+  const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
+
+  // ── state ───────────────────────────────────────────────────────────────
+  const [g, setG]           = useState(initGame);
+  const [oPrice, setOPrice] = useState(initGame.oracle?.indexPrice ?? 0.5);
+  const [oMark,  setOMark]  = useState(initGame.oracle?.markPrice  ?? 0.5);
+  const [oSrcs,  setOSrcs]  = useState(initGame.oracle?.sources    ?? []);
+  const [oConf,  setOConf]  = useState(initGame.oracle?.confidence ?? 0.5);
+  const [chartData, setChartData]   = useState([]);
+  const [chartT0,   setChartT0]     = useState(null);
+  const [book, setBook]             = useState(makeBook(initGame.oracle?.indexPrice ?? 0.5));
+  const [playLog,   setPlayLog]     = useState([]);
+
+  const [positions,  setPositions]  = useState([]);
+  const [closedPos,  setClosedPos]  = useState([]);
+  const [balance,    setBalance]    = useState(10000);
+  const [closedPnL,  setClosedPnL]  = useState(0);
+  const [settled,    setSettled]    = useState(false);
+  const [settledWinner, setSettledWinner] = useState(null);
+
+  const [orderSide,  setOrderSide]  = useState('home');
+  const [orderMargin,setOrderMargin]= useState(500);
+  const [orderLev,   setOrderLev]   = useState(3);
+  const [orderType,  setOrderType]  = useState('market');
+  const [limitCents, setLimitCents] = useState(Math.round((initGame.oracle?.indexPrice??0.5)*100));
+  const [tpCents,    setTpCents]    = useState('');
+  const [slCents,    setSlCents]    = useState('');
+  const [limitOrders,setLimitOrders]= useState([]);
+  const [reduceOnly, setReduceOnly] = useState(false);
+  const [rightTab,   setRightTab]   = useState('order');
+  const [bottomTab,  setBottomTab]  = useState('gamecast');
+  const [notifs,     setNotifs]     = useState([]);
+  const [markers,    setMarkers]    = useState([]);
+
+  // refs for closures
+  const oR   = useRef(oPrice);   oR.current   = oPrice;
+  const mR   = useRef(oMark);    mR.current   = oMark;
+  const posR = useRef(positions); posR.current = positions;
+  const limR = useRef(limitOrders); limR.current = limitOrders;
+
+  // ── derived team objects ────────────────────────────────────────────────
+  const HOME = useMemo(() => ({
+    name:    g.home.name,
+    short:   g.home.abbreviation,
+    logoUrl: g.home.logo,
+    light:   nc(g.home.color) || B.primary,
+  }), [g.home]);
+  const AWAY = useMemo(() => ({
+    name:    g.away.name,
+    short:   g.away.abbreviation,
+    logoUrl: g.away.logo,
+    light:   nc(g.away.altColor || g.away.color) || '#ef4444',
+  }), [g.away]);
+
+  // ── helpers ─────────────────────────────────────────────────────────────
+  const notify = useCallback((msg, type) => {
+    const id = Date.now() + Math.random();
+    setNotifs(p => [...p.slice(-3), {id, msg, type: type||'info'}]);
+    setTimeout(() => setNotifs(p => p.filter(n => n.id !== id)), 5000);
+  }, []);
+
+  const addMark = useCallback((chartT, p, mt, side) => {
+    setMarkers(prev => [...prev, {t: +chartT.toFixed(2), p, markerType: mt, line: side||'home'}]);
+  }, []);
+
+  // ── fetch oracle history on mount ───────────────────────────────────────
+  useEffect(() => {
+    fetch(`${API_URL}/oracle/${initGame.id}/history`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.history?.length) return;
+        const t0 = data.history[0].t;
+        setChartT0(t0);
+        setChartData(data.history.map(h => ({
+          t:    +((h.t - t0) / 60000).toFixed(2),
+          ph:   h.ip,
+          pa:   1 - h.ip,
+          mp:   h.mp,
+          floor: clamp(h.ip - 0.2, 0.01, 0.99),
+          ceil:  clamp(h.ip + 0.2, 0.01, 0.99),
+          mh_val: null, mh_marker: null, ma_val: null, ma_marker: null,
+        })));
+      }).catch(() => {});
+  }, [initGame.id]);
+
+  // ── poll game + oracle every 5s ─────────────────────────────────────────
+  useEffect(() => {
+    let t0Local = null;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_URL}/games/${initGame.id}`);
+        if (!res.ok) return;
+        const raw = await res.json();
+        const upd = raw.game || raw;
+        setG(upd);
+
+        // append latest play to log
+        if (upd.latestPlay) {
+          setPlayLog(prev => {
+            if (!prev.length || prev[0].id !== upd.latestPlay.id)
+              return [upd.latestPlay, ...prev].slice(0, 80);
+            return prev;
+          });
+        }
+
+        if (upd.oracle) {
+          const op = upd.oracle.indexPrice;
+          const mp = upd.oracle.markPrice || op;
+          setOPrice(op); setOMark(mp);
+          setOSrcs(upd.oracle.sources || []);
+          setOConf(upd.oracle.confidence || 0.5);
+          setBook(makeBook(op));
+
+          // append chart point
+          setChartT0(prev => {
+            const ref = prev || Date.now();
+            if (!prev) { t0Local = ref; }
+            const tRef = prev || t0Local || Date.now();
+            const t = +((Date.now() - tRef) / 60000).toFixed(2);
+            setChartData(cd => [...cd, {
+              t, ph: op, pa: 1-op, mp,
+              floor: clamp(op-0.2,0.01,0.99), ceil: clamp(op+0.2,0.01,0.99),
+              mh_val:null, mh_marker:null, ma_val:null, ma_marker:null,
+            }]);
+            return prev || ref;
+          });
+
+          // liquidation check (against markPrice)
+          const cp = posR.current;
+          if (cp.length) {
+            let changed = false;
+            const upd2 = cp.filter(pos => {
+              const pnl = calcPnL(pos.side, pos.exposure, pos.entry, mp);
+              if (pnl <= -pos.margin * 0.95) {
+                changed = true;
+                setClosedPos(pr => [{...pos, closedAt:op, pnl:-pos.margin, closeType:'LIQ'}, ...pr]);
+                setClosedPnL(p => p - pos.margin);
+                notify('☠ LIQUIDATED', 'red');
+                return false;
+              }
+              return true;
+            });
+            if (changed) setPositions(upd2);
+          }
+
+          // TP/SL
+          const cp2 = posR.current;
+          if (cp2.some(p => p.tp || p.sl)) {
+            let hit = false;
+            const rem = cp2.filter(pos => {
+              const tpHit = pos.tp && (pos.side==='home' ? op>=pos.tp : op<=pos.tp);
+              const slHit = pos.sl && (pos.side==='home' ? op<=pos.sl : op>=pos.sl);
+              if (tpHit || slHit) {
+                hit = true;
+                const pnl2 = calcPnL(pos.side, pos.exposure, pos.entry, op);
+                setBalance(b => b + pos.margin + pnl2);
+                setClosedPnL(p => p + pnl2);
+                setClosedPos(pr => [{...pos, closedAt:op, pnl:pnl2, closeType:tpHit?'TP':'SL'}, ...pr]);
+                const tn = pos.side==='home' ? HOME : AWAY;
+                notify((tpHit?'🎯 TP HIT':'🛑 SL HIT')+' '+tn.name+' '+fmtUsd(pnl2), tpHit?'green':'red');
+                return false;
+              }
+              return true;
+            });
+            if (hit) setPositions(rem);
+          }
+
+          // limit order fills
+          const lo = limR.current;
+          if (lo.length) {
+            let filled = false;
+            const remLO = lo.filter(lim => {
+              const fills = lim.side==='home' ? op<=lim.limitPrice : op>=(1-lim.limitPrice);
+              if (fills) {
+                filled = true;
+                const liq2 = liqPrice(lim.side, op, lim.leverage);
+                setPositions(prev => [...prev, {id:lim.id+1,side:lim.side,margin:lim.margin,leverage:lim.leverage,exposure:lim.exposure,entry:op,liq:liq2,tp:lim.tp,sl:lim.sl}]);
+                const loTm = lim.side==='home' ? HOME : AWAY;
+                notify('✅ FILLED: '+loTm.name+' @ '+(op*100).toFixed(1)+'¢', 'green');
+                return false;
+              }
+              return true;
+            });
+            if (filled) setLimitOrders(remLO);
+          }
+        }
+
+        // settlement
+        if ((upd.status==='final'||upd.status==='completed') && !settled) {
+          setSettled(true);
+          const homeWins = (upd.home.score||0) > (upd.away.score||0);
+          const finalP = homeWins ? 1.0 : 0.0;
+          setSettledWinner(homeWins ? HOME.name : AWAY.name);
+          const fp = posR.current;
+          if (fp.length) {
+            let sp = 0;
+            const nc2 = fp.map(pos => { const pnl=calcPnL(pos.side,pos.exposure,pos.entry,finalP); sp+=pnl; return {...pos,closedAt:finalP,pnl,closeType:'SETTLED'}; });
+            setClosedPos(pr => [...nc2, ...pr]);
+            setBalance(b => b + fp.reduce((s,p)=>s+p.margin,0) + sp);
+            setClosedPnL(p => p + sp);
+            setPositions([]);
+            notify('🏆 FINAL — '+fmtUsd(sp), 'green');
+          }
+        }
+      } catch(e) {}
+    };
+
+    poll();
+    const iv = setInterval(poll, 5000);
+    return () => clearInterval(iv);
+  }, [initGame.id, settled]);
+
+  // ── placeOrder ──────────────────────────────────────────────────────────
+  const placeOrder = useCallback(() => {
+    if (settled) return;
+    const op = oR.current;
+    const ml2 = maxLev(op), lev = Math.min(orderLev, ml2);
+    const margin = Math.min(orderMargin, balance);
+    if (margin < 10) { notify('Insufficient margin', 'red'); return; }
+    if (reduceOnly && !posR.current.some(p => p.side===orderSide)) { notify('No position to reduce', 'red'); return; }
+    const exposure = margin * lev;
+    const tp = tpCents!==''&&+tpCents>0 ? (orderSide==='home'?+tpCents/100:1-+tpCents/100) : null;
+    const sl = slCents!==''&&+slCents>0 ? (orderSide==='home'?+slCents/100:1-+slCents/100) : null;
+    const chartNow = chartData.length ? chartData[chartData.length-1].t : 0;
+    if (orderType==='limit') {
+      setLimitOrders(p => [...p, {id:Date.now(), side:orderSide, margin, leverage:lev, exposure, limitPrice:limitCents/100, tp, sl}]);
+      setBalance(b => b - margin);
+      const tn = orderSide==='home' ? HOME : AWAY;
+      notify(tn.logo+' Limit '+tn.name+' @ '+limitCents+'¢', 'info');
+    } else {
+      const entry = op, liq = liqPrice(orderSide, entry, lev);
+      setPositions(p => [...p, {id:Date.now(), side:orderSide, margin, leverage:lev, exposure, entry, liq, tp, sl}]);
+      setBalance(b => b - margin);
+      addMark(chartNow, entry, 'entry', orderSide);
+      setBottomTab('positions');
+      const tn = orderSide==='home' ? HOME : AWAY;
+      notify(tn.name+' '+lev+'x @ '+(entry*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
+    }
+  }, [oPrice, orderSide, orderMargin, orderLev, balance, settled, orderType, limitCents, tpCents, slCents, reduceOnly, chartData, HOME, AWAY, notify, addMark]);
+
+  const closePosition = useCallback((id) => {
+    setPositions(prev => {
+      const pos = prev.find(p => p.id===id);
+      if (!pos) return prev;
+      const op = oR.current, chartNow = chartData.length ? chartData[chartData.length-1].t : 0;
+      const pnl = calcPnL(pos.side, pos.exposure, pos.entry, op);
+      setBalance(b => b + pos.margin + pnl);
+      setClosedPnL(p => p + pnl);
+      addMark(chartNow, op, pnl>=0?'exit-win':'exit-loss', pos.side);
+      setClosedPos(pr => [{...pos,closedAt:op,pnl,closeType:'CLOSED'}, ...pr]);
+      notify('Closed '+(pos.side==='home'?HOME:AWAY).name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
+      return prev.filter(p => p.id!==id);
+    });
+  }, [oPrice, chartData, HOME, AWAY, notify, addMark]);
+
+  // ── derived ─────────────────────────────────────────────────────────────
+  const totalUPnL = positions.reduce((s,p) => s + calcPnL(p.side,p.exposure,p.entry,oPrice), 0);
+  const totalEq   = balance + positions.reduce((s,p)=>s+p.margin,0) + totalUPnL;
+  const ml  = maxLev(oPrice), eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
+  const team = orderSide==='home' ? HOME : AWAY;
+  const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL);
+  const entryP = orderSide==='home' ? oPrice : 1-oPrice;
+  const shareCount = Math.max(1, Math.round(expo/entryP));
+  const awayProb = 1 - oPrice;
+  const momentum = chartData.length>20 ? oPrice - chartData[chartData.length-20].ph : 0;
+  const simVol = Math.floor(9200 + chartData.length*60 + positions.reduce((s,p)=>s+p.exposure,0) + closedPos.reduce((s,p)=>s+p.exposure,0));
+  const simOI  = positions.reduce((s,p)=>s+p.exposure,0) + Math.floor(chartData.length*40);
+  const fundingRate = ((oPrice-0.5)*0.08).toFixed(3);
+
+  // merged chart data with markers
+  const merged = useMemo(() => {
+    const data = chartData.map(d => ({...d}));
+    for (const m of markers) {
+      let best = 0;
+      for (let i=1; i<data.length; i++) if (Math.abs(data[i].t-m.t)<Math.abs(data[best].t-m.t)) best=i;
+      if (data[best]) {
+        if (m.line==='away') { data[best].ma_val=1-m.p; data[best].ma_marker=m.markerType; }
+        else                 { data[best].mh_val=m.p;   data[best].mh_marker=m.markerType; }
+      }
+    }
+    return data;
+  }, [chartData, markers]);
+
+  const liqLines = useMemo(() => positions.map(pos => ({
+    id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
+  })), [positions]);
+
+  // ── render ──────────────────────────────────────────────────────────────
+  return (
+    <div style={{background:'#0a0a0a', fontFamily:fb, minHeight:'100vh', color:'#fff'}}>
+
+      {/* Notifications */}
+      <div style={{position:'fixed',top:16,right:16,zIndex:50,display:'flex',flexDirection:'column',gap:8,maxWidth:360}}>
+        {notifs.map(n=>(
+          <div key={n.id} style={{padding:'10px 16px',borderRadius:12,fontWeight:600,fontSize:13,animation:'slideIn .25s',
+            background:n.type==='green'?B.green+'22':n.type==='red'?B.red+'22':'#1a1a1a',
+            border:`1px solid ${n.type==='green'?B.green:n.type==='red'?B.red:'#2a2a2a'}33`,
+            color:n.type==='green'?B.green:n.type==='red'?B.red:'#aaa'}}>
+            {n.msg}
+          </div>
+        ))}
+      </div>
+
+      {/* HEADER */}
+      <div style={{padding:'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:16}}>
+          <button onClick={onBack} style={{width:32,height:32,borderRadius:8,border:'1px solid #2a2a2a',background:'#111',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#888'}}>
+            <ChevronRight size={16} style={{transform:'rotate(180deg)'}}/>
+          </button>
+          <img src={LOGO_NAV} style={{height:26,width:'auto'}} alt="pd"/>
+          <span style={{fontFamily:fd,fontWeight:800,fontSize:18}}>Perpdictions</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 12px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
+            LIVE
+          </span>
+          <span style={{fontSize:11,color:'#555',padding:'4px 10px',background:'#111',borderRadius:8,fontFamily:fm}}>NBA</span>
+          <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ff5028,#14b8a6)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
+          <div style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14}}>👤</div>
+        </div>
+      </div>
+
+      {/* BODY */}
+      <div style={{display:'flex',height:'calc(100vh - 56px)'}}>
+
+        {/* LEFT SIDEBAR */}
+        <div style={{width:260,borderRight:'1px solid #1a1a1a',overflow:'auto',flexShrink:0,padding:'16px 0'}}>
+          {/* Viewing Now */}
+          <div style={{margin:'0 16px 16px',padding:'12px 14px',background:B.primary+'12',borderRadius:12,border:'1px solid '+B.primary+'25'}}>
+            <div style={{fontSize:10,color:B.primary,fontWeight:700,marginBottom:6,fontFamily:fm,letterSpacing:'0.08em'}}>LIVE NOW</div>
+            <div style={{fontSize:13,fontWeight:700,color:'#fff',marginBottom:2}}>{HOME.name}</div>
+            <div style={{fontSize:11,color:'#666',marginBottom:8}}>vs {AWAY.name}</div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:22,fontWeight:900,fontFamily:fm,color:'#fff'}}>{g.home.score ?? '–'} <span style={{color:'#333',fontSize:14}}>–</span> {g.away.score ?? '–'}</span>
+              <span style={{fontSize:10,color:B.green,fontWeight:700,fontFamily:fm}}>
+                {g.status==='halftime'?'HALF':g.period?'Q'+g.period+' '+g.clock:g.statusDetail||''}
+              </span>
+            </div>
+          </div>
+
+          {/* Other live games */}
+          {liveGames.filter(lg => lg.id!==initGame.id && (lg.status==='live'||lg.status==='halftime')).length > 0 && (
+            <div style={{padding:'0 16px'}}>
+              <div style={{fontSize:10,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,marginBottom:8}}>OTHER LIVE</div>
+              {liveGames.filter(lg=>lg.id!==initGame.id&&(lg.status==='live'||lg.status==='halftime')).map(lg=>(
+                <div key={lg.id} style={{padding:'10px 12px',marginBottom:6,background:'#111',borderRadius:10,border:'1px solid #1f1f1f',fontSize:11,fontFamily:fm}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                    <span style={{color:'#fff',fontWeight:600}}>{lg.home.abbreviation} <span style={{color:'#555'}}>vs</span> {lg.away.abbreviation}</span>
+                    <span style={{color:B.green,fontSize:10}}>Q{lg.period} {lg.clock}</span>
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between'}}>
+                    <span style={{color:'#888'}}>{lg.home.score} – {lg.away.score}</span>
+                    {lg.oracle?.indexPrice && <span style={{color:B.primary,fontWeight:700}}>{(lg.oracle.indexPrice*100).toFixed(0)}%</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* MAIN CONTENT */}
+        <div style={{flex:1,minWidth:0,overflow:'auto'}}>
+
+          {/* LIVE SCOREBOARD */}
+          <div style={{padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div style={{display:'flex',alignItems:'center',gap:32,padding:'20px 40px',background:'#111',borderRadius:16,border:'1px solid #1f1f1f'}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                {HOME.logoUrl ? <img src={HOME.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/> : <span style={{fontSize:32}}>🏀</span>}
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{HOME.name}</div>
+                  <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{HOME.short}</div>
+                </div>
+              </div>
+              <div style={{textAlign:'center',minWidth:160}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16}}>
+                  <span style={{fontSize:48,fontWeight:900,fontFamily:fm,color:'#fff',lineHeight:1}}>{g.home.score ?? '–'}</span>
+                  <span style={{fontSize:20,color:'#333'}}>—</span>
+                  <span style={{fontSize:48,fontWeight:900,fontFamily:fm,color:'#fff',lineHeight:1}}>{g.away.score ?? '–'}</span>
+                </div>
+                <div style={{marginTop:8}}>
+                  <span style={{fontSize:12,fontWeight:600,padding:'4px 16px',borderRadius:20,
+                    background: g.status==='final'?'#22c55e18': g.status==='halftime'?'#ff9f1c18':'#1a1a1a',
+                    color: g.status==='final'?'#4ade80': g.status==='halftime'?'#ff9f1c':B.green}}>
+                    {g.status==='final'?'Final': g.status==='halftime'?'Halftime': g.period?'Q'+g.period+' · '+g.clock: g.statusDetail||'Live'}
+                  </span>
+                </div>
+                <div style={{fontSize:11,color:'#555',marginTop:6}}>{g.shortName||g.name}</div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{AWAY.name}</div>
+                  <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{AWAY.short}</div>
+                </div>
+                {AWAY.logoUrl ? <img src={AWAY.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/> : <span style={{fontSize:32}}>🏀</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* STATS BAR */}
+          <div style={{margin:'0 24px 0',padding:'8px 20px',background:'#0a0a0a',borderRadius:12,border:'1px solid #1a1a1a',display:'grid',gridTemplateColumns:'repeat(5,1fr)'}}>
+            {[
+              {label:'Mark',  value:(oPrice*100).toFixed(1)+'¢', color:B.primaryLight},
+              {label:'Volume',value:'$'+simVol.toLocaleString(), color:'#fff'},
+              {label:'Open Interest',value:'$'+simOI.toLocaleString(), color:'#fff'},
+              {label:'Funding/hr',value:(+fundingRate>=0?'+':'')+fundingRate+'%', color:+fundingRate>=0?B.green:B.red},
+              {label:'Confidence',value:(oConf*100).toFixed(0)+'%', color:oConf>0.7?B.green:oConf>0.4?'#ff9f1c':'#888'},
+            ].map(({label,value,color},i)=>(
+              <div key={label} style={{textAlign:'center',borderRight:i<4?'1px solid #1a1a1a':'none',padding:'4px 0'}}>
+                <div style={{fontSize:9,color:'#444',fontWeight:600,marginBottom:2,letterSpacing:'0.04em'}}>{label}</div>
+                <div style={{fontSize:11,fontWeight:700,color,fontFamily:fm}}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* CHART */}
+          <div style={{margin:'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
+            <div style={{padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid #1f1f1f'}}>
+              <span style={{fontSize:13,fontWeight:600,color:'#888'}}>Win Probability</span>
+              <div style={{display:'flex',gap:16}}>
+                <span style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>
+                  <span style={{width:12,height:3,borderRadius:2,background:HOME.light,display:'inline-block'}}/>
+                  <span style={{color:HOME.light,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(1)}%</span>
+                  <span style={{color:'#666'}}>{HOME.short}</span>
+                </span>
+                <span style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>
+                  <span style={{width:12,height:3,borderRadius:2,background:AWAY.light,display:'inline-block'}}/>
+                  <span style={{color:AWAY.light,fontWeight:700,fontFamily:fm}}>{(awayProb*100).toFixed(1)}%</span>
+                  <span style={{color:'#666'}}>{AWAY.short}</span>
+                </span>
+              </div>
+            </div>
+            <div style={{height:220,padding:'4px 8px 0'}}>
+              {merged.length > 1 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={merged} margin={{top:8,right:8,bottom:4,left:8}}>
+                    <defs>
+                      <linearGradient id="lhg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={HOME.light} stopOpacity={0.12}/><stop offset="100%" stopColor={HOME.light} stopOpacity={0.01}/></linearGradient>
+                      <linearGradient id="lag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={AWAY.light} stopOpacity={0.08}/><stop offset="100%" stopColor={AWAY.light} stopOpacity={0.01}/></linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="2 6" stroke="#ffffff04" vertical={false}/>
+                    <XAxis dataKey="t" tick={{fill:'#555',fontSize:10}} tickFormatter={v=>v.toFixed(0)+'m'} axisLine={{stroke:'#1f1f1f'}} tickLine={false}/>
+                    <YAxis domain={[0,1]} tick={{fill:'#555',fontSize:10}} tickFormatter={v=>(v*100)+'%'} axisLine={false} tickLine={false} width={32} orientation="right"/>
+                    <Tooltip content={<ChartTip/>} cursor={{stroke:'#ffffff06'}}/>
+                    <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
+                    {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3"/>))}
+                    {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?HOME.light:AWAY.light;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
+                    <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#lhg)" dot={false} animationDuration={0} baseValue={0}/>
+                    <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
+                    <Scatter dataKey="mh_val" shape={<HomeMarkerDot/>} isAnimationActive={false}/>
+                    <Scatter dataKey="ma_val" shape={<AwayMarkerDot/>} isAnimationActive={false}/>
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#444',fontSize:13}}>
+                  Loading price history…
+                </div>
+              )}
+            </div>
+            {/* Oracle sources strip */}
+            <div style={{borderTop:'1px solid #1a1a1a'}}>
+              <div style={{display:'flex',gap:8,padding:'6px 16px 8px',alignItems:'center'}}>
+                <span style={{fontSize:9,color:'#333',fontWeight:600}}>Oracle</span>
+                {oSrcs.map(s=>(
+                  <span key={s.name} style={{fontSize:9,color:'#555',display:'flex',alignItems:'center',gap:3}}>
+                    <span style={{width:3,height:3,borderRadius:2,background:s.color||B.primary,display:'inline-block'}}/>
+                    {s.name} <span style={{color:s.color||B.primary,fontWeight:700}}>{((s.price||s.v||0)*100).toFixed(1)}%</span>
+                  </span>
+                ))}
+                {!oSrcs.length && <span style={{fontSize:9,color:'#333'}}>Awaiting sources…</span>}
+              </div>
+            </div>
+          </div>
+
+          {/* POSITIONS */}
+          <div style={{margin:'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
+            <div style={{padding:'10px 20px',borderBottom:'1px solid #1f1f1f',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:13,fontWeight:600,color:'#fff'}}>Positions</span>
+                {positions.length>0&&<span style={{background:B.primary+'20',color:B.primary,fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:6}}>{positions.length} OPEN</span>}
+              </div>
+              <div style={{display:'flex',gap:12}}>
+                {totalUPnL!==0&&<span style={{fontSize:12,fontFamily:fm,color:pctClr(totalUPnL),fontWeight:700}}>uPnL {fmtUsd(totalUPnL)}</span>}
+                {closedPnL!==0&&<span style={{fontSize:12,fontFamily:fm,color:pctClr(closedPnL),fontWeight:700}}>Realized {fmtUsd(closedPnL)}</span>}
+              </div>
+            </div>
+            <div style={{padding:'10px 16px'}}>
+              {positions.length===0&&closedPos.length===0 ? (
+                <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'20px 0'}}>{settled?'Game settled':'No open positions yet'}</div>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {positions.map(pos=>{
+                    const pnl=calcPnL(pos.side,pos.exposure,pos.entry,oPrice);
+                    const pnlPct=(pnl/pos.margin)*100;
+                    const tm=pos.side==='home'?HOME:AWAY;
+                    const markP=pos.side==='home'?oPrice:1-oPrice;
+                    const posEntryP=pos.side==='home'?pos.entry:1-pos.entry;
+                    const posShares=Math.round(pos.exposure/pos.entry);
+                    return (
+                      <div key={pos.id} style={{borderRadius:12,border:'1px solid #1f1f1f',overflow:'hidden',background:'#0a0a0a'}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',borderLeft:'3px solid '+(pos.side==='home'?HOME.light:AWAY.light)}}>
+                          <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                            <span style={{fontSize:13,fontWeight:800,color:pos.side==='home'?HOME.light:AWAY.light}}>{tm.name}</span>
+                            <span style={{fontSize:10,fontWeight:700,color:B.primary,background:B.primary+'15',padding:'2px 6px',borderRadius:5,fontFamily:fm}}>{pos.leverage}x</span>
+                            {pos.tp&&<span style={{fontSize:10,color:B.green,fontFamily:fm,background:B.green+'10',padding:'2px 5px',borderRadius:4}}>TP {(pos.side==='home'?pos.tp:1-pos.tp)*100|0}¢</span>}
+                            {pos.sl&&<span style={{fontSize:10,color:B.red,fontFamily:fm,background:B.red+'10',padding:'2px 5px',borderRadius:4}}>SL {(pos.side==='home'?pos.sl:1-pos.sl)*100|0}¢</span>}
+                          </div>
+                          <div style={{textAlign:'right'}}>
+                            <div style={{fontSize:16,fontWeight:800,color:pctClr(pnl),fontFamily:fm}}>{fmtUsd(pnl)}</div>
+                            <div style={{fontSize:11,color:pctClr(pnl),fontFamily:fm}}>{fmtPct(pnlPct)}</div>
+                          </div>
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',padding:'8px 14px',borderTop:'1px solid #1a1a1a'}}>
+                          {[['Entry',(posEntryP*100).toFixed(1)+'¢','#888'],['Mark',(markP*100).toFixed(1)+'¢',B.primaryLight],['Liq',(pos.side==='home'?pos.liq:1-pos.liq)*100|0+'¢',B.red],['Size',fmtUsd(pos.exposure),'#888']].map(([label,value,color])=>(
+                            <div key={label} style={{textAlign:'center'}}>
+                              <div style={{fontSize:10,color:'#444',marginBottom:2}}>{label}</div>
+                              <div style={{fontSize:12,fontWeight:700,fontFamily:fm,color}}>{value}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{padding:'8px 14px',borderTop:'1px solid #1a1a1a',display:'flex',alignItems:'center',gap:6}}>
+                          <span style={{fontSize:11,color:'#555',flex:1,fontFamily:fm}}>{posShares.toLocaleString()} shares · margin {fmtUsd(pos.margin)}</span>
+                          <button onClick={()=>closePosition(pos.id)} style={{padding:'5px 14px',background:'#ef444415',border:'1px solid #ef444430',borderRadius:8,cursor:'pointer',color:'#ef4444',fontWeight:700,fontSize:11,fontFamily:fb}}>Close</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {closedPos.length>0&&(
+                    <div style={{marginTop:4}}>
+                      {positions.length>0&&<div style={{fontSize:11,color:'#555',fontWeight:600,padding:'4px 0 6px'}}>Closed</div>}
+                      {closedPos.map((cp,i)=>{
+                        const cptm=cp.side==='home'?HOME:AWAY;
+                        const typeC=cp.closeType==='LIQ'?'#f87171':cp.closeType==='TP'?'#4ade80':cp.closeType==='SL'?'#ef4444':'#666';
+                        return(
+                          <div key={cp.id+'-'+i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:'#0a0a0a',borderRadius:8,fontFamily:fm,fontSize:11,borderLeft:'2px solid '+(cp.side==='home'?HOME.light+'40':AWAY.light+'40'),marginBottom:2}}>
+                            <span style={{color:cp.side==='home'?HOME.light:AWAY.light,fontWeight:700,minWidth:60}}>{cptm.short} {cp.leverage}x</span>
+                            <span style={{color:'#555',flex:1}}>{((cp.side==='home'?cp.entry:1-cp.entry)*100).toFixed(1)}¢ → {((cp.side==='home'?cp.closedAt:1-cp.closedAt)*100).toFixed(1)}¢</span>
+                            <span style={{color:pctClr(cp.pnl),fontWeight:700}}>{fmtUsd(cp.pnl)}</span>
+                            <span style={{fontSize:10,padding:'2px 7px',borderRadius:5,background:typeC+'15',color:typeC,fontWeight:700}}>{cp.closeType}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* GAMECAST */}
+          <div style={{margin:'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden',marginBottom:0}}>
+            <div style={{display:'flex',borderBottom:'1px solid #1f1f1f'}}>
+              {[['gamecast','Gamecast',playLog.length],['boxscore','Box Score',0]].map(([id,label,count])=>(
+                <button key={id} onClick={()=>setBottomTab(id)} style={{padding:'10px 20px',fontSize:13,fontWeight:600,border:'none',cursor:'pointer',fontFamily:fb,
+                  background:'transparent',color:bottomTab===id?'#fff':'#666',borderBottom:bottomTab===id?'2px solid '+B.primary:'2px solid transparent'}}>
+                  {label}{id==='gamecast'&&count>0&&<span style={{color:B.primary,marginLeft:4,fontSize:11}}>{count}</span>}
+                </button>
+              ))}
+            </div>
+            <div style={{minHeight:200,padding:'10px 16px',maxHeight:320,overflow:'auto'}}>
+              {bottomTab==='gamecast' && (playLog.length===0 ? (
+                <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>🏀 Waiting for plays…</div>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                  {playLog.map((play,i)=>(
+                    <div key={play.id||i} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px',borderRadius:10,
+                      background:play.scoringPlay?HOME.light+'0a':'transparent',animation:i===0?'slideIn .3s':'none'}}>
+                      <div style={{flexShrink:0,width:50,textAlign:'center'}}>
+                        <div style={{fontSize:10,color:'#555',fontWeight:600}}>{play.periodDisplay||('Q'+(play.period||''))}</div>
+                        <div style={{fontSize:11,color:'#777',fontFamily:fm}}>{play.clock}</div>
+                      </div>
+                      <div style={{flexShrink:0,width:44,textAlign:'center',fontFamily:fm,fontSize:12,fontWeight:700}}>
+                        <span style={{color:HOME.light}}>{play.homeScore}</span>
+                        <span style={{color:'#333'}}>-</span>
+                        <span style={{color:AWAY.light}}>{play.awayScore}</span>
+                      </div>
+                      <div style={{flex:1,fontSize:13,fontWeight:play.scoringPlay?700:400,color:play.scoringPlay?HOME.light:'#777'}}>
+                        {play.scoringPlay?'🔥 ':''}{play.text}
+                      </div>
+                      {play.homeWinPct&&<div style={{flexShrink:0,fontFamily:fm,fontSize:11,color:B.primary,fontWeight:700}}>{(play.homeWinPct*100).toFixed(0)}%</div>}
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {bottomTab==='boxscore'&&(
+                <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>Box score available after game ends</div>
+              )}
+            </div>
+          </div>
+
+          <div style={{height:24}}/>
+        </div>
+
+        {/* RIGHT SIDEBAR — Wager + Order Book */}
+        <div style={{width:360,overflow:'auto',flexShrink:0,padding:'12px 10px',display:'flex',flexDirection:'column',gap:8}}>
+
+          {/* Tab strip */}
+          <div style={{display:'flex',background:'#111',borderRadius:12,border:'1px solid #1f1f1f',padding:3,gap:2}}>
+            {[['order','Wager'],['book','Order Book']].map(([id,label])=>(
+              <button key={id} onClick={()=>setRightTab(id)} style={{flex:1,padding:'7px 0',fontSize:12,fontWeight:rightTab===id?700:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:9,
+                background:rightTab===id?B.primary+'20':'transparent',color:rightTab===id?'#fff':'#666'}}>
+                {label}{id==='order'&&limitOrders.length>0&&<span style={{color:B.primary,marginLeft:4,fontSize:10,fontWeight:700}}>({limitOrders.length})</span>}
+              </button>
+            ))}
+          </div>
+
+          {rightTab==='order'&&(<div style={{background:'#111',borderRadius:16,border:'1px solid #1f1f1f',padding:18}}>
+            {/* Team selector */}
+            <div style={{display:'flex',gap:0,marginBottom:14,background:'#1a1a1a',borderRadius:12,padding:3}}>
+              <button onClick={()=>{setOrderSide('home');if(orderType==='limit')setLimitCents(Math.round(oPrice*100));}} style={{flex:1,padding:'10px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .15s',
+                background:orderSide==='home'?HOME.light:'transparent',color:orderSide==='home'?'#000':'#666'}}>
+                {HOME.logoUrl&&<img src={HOME.logoUrl} style={{width:18,height:18,objectFit:'contain',borderRadius:4}} alt=""/>}
+                {HOME.short} <span style={{fontSize:11,fontWeight:600,opacity:0.7}}>{(oPrice*100).toFixed(0)}¢</span>
+              </button>
+              <button onClick={()=>{setOrderSide('away');if(orderType==='limit')setLimitCents(Math.round(awayProb*100));}} style={{flex:1,padding:'10px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .15s',
+                background:orderSide==='away'?AWAY.light:'transparent',color:orderSide==='away'?'#000':'#666'}}>
+                {AWAY.logoUrl&&<img src={AWAY.logoUrl} style={{width:18,height:18,objectFit:'contain',borderRadius:4}} alt=""/>}
+                {AWAY.short} <span style={{fontSize:11,fontWeight:600,opacity:0.7}}>{(awayProb*100).toFixed(0)}¢</span>
+              </button>
+            </div>
+            {/* Order type */}
+            <div style={{display:'flex',gap:3,marginBottom:14,background:'#1a1a1a',borderRadius:10,padding:3}}>
+              {[['market','Market'],['limit','Limit']].map(([t,l])=>(
+                <button key={t} onClick={()=>{setOrderType(t);if(t==='limit')setLimitCents(Math.round(entryP*100));}} style={{flex:1,padding:'7px 0',fontSize:12,fontWeight:orderType===t?700:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,
+                  background:orderType===t?'#2a2a2a':'transparent',color:orderType===t?'#fff':'#666'}}>{l}</button>
+              ))}
+            </div>
+            {/* Shares ⇄ Margin */}
+            <div style={{marginBottom:12}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:6,alignItems:'end',marginBottom:6}}>
+                <div>
+                  <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Shares</div>
+                  <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:10,padding:'9px 10px'}}>
+                    <input type="number" value={shareCount} min={0} onChange={e=>{const s=Math.max(0,+e.target.value);setOrderMargin(Math.min(Math.max(0,(s*entryP)/eL),balance));}}
+                      style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:15,fontWeight:700,fontFamily:fm}}/>
+                  </div>
+                </div>
+                <div style={{color:'#333',fontSize:14,fontWeight:700,paddingBottom:11,textAlign:'center'}}>⇄</div>
+                <div>
+                  <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Margin</div>
+                  <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:10,padding:'9px 10px',display:'flex',alignItems:'center',gap:3}}>
+                    <span style={{color:'#555',fontSize:12,fontWeight:600}}>$</span>
+                    <input type="number" value={Math.round(eM)} min={0} onChange={e=>setOrderMargin(Math.min(Math.max(0,+e.target.value),balance))}
+                      style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:15,fontWeight:700,fontFamily:fm}}/>
+                  </div>
+                </div>
+              </div>
+              <div style={{fontSize:10,color:'#555',textAlign:'center',marginBottom:12}}>@ {(entryP*100).toFixed(1)}¢ per share</div>
+              {/* Leverage slider */}
+              <div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                  <span style={{fontSize:10,color:'#555',fontWeight:600}}>Leverage</span>
+                  <div style={{display:'flex',gap:3}}>
+                    {[2,3,5].filter(l=>l<=ml).map(l=>(
+                      <button key={l} onClick={()=>setOrderLev(l)} style={{padding:'2px 8px',fontSize:10,fontWeight:700,border:'none',cursor:'pointer',fontFamily:fm,borderRadius:6,
+                        background:eL===l?B.primary+'30':'#1a1a1a',color:eL===l?B.primaryLight:'#555'}}>{l}x</button>
+                    ))}
+                    <span style={{fontSize:10,fontWeight:800,color:B.primaryLight,fontFamily:fm,padding:'2px 8px'}}>{eL}x</span>
+                  </div>
+                  <span style={{fontSize:10,color:'#444'}}>{ml}x max</span>
+                </div>
+                <input type="range" min={1} max={ml} step={1} value={eL} onChange={e=>setOrderLev(+e.target.value)}
+                  style={{width:'100%',accentColor:B.primary,cursor:'pointer',height:4}}/>
+              </div>
+            </div>
+            {/* Limit price */}
+            {orderType==='limit'&&(
+              <div style={{marginBottom:12,padding:'10px 12px',background:'#0a0a0a',borderRadius:10,border:'1px solid #2a2a2a'}}>
+                <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:6}}>Limit Price</div>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <input type="number" min={1} max={99} value={limitCents} onChange={e=>setLimitCents(Math.min(99,Math.max(1,+e.target.value)))}
+                    style={{flex:1,background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:8,padding:'7px 10px',color:B.primaryLight,fontSize:15,fontWeight:700,fontFamily:fm,outline:'none'}}/>
+                  <span style={{fontSize:13,color:'#555',fontWeight:600}}>¢</span>
+                </div>
+              </div>
+            )}
+            {/* Risk tools */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:6}}>Risk Tools <span style={{color:'#383838'}}>optional</span></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                <div>
+                  <div style={{fontSize:10,color:B.green,fontWeight:600,marginBottom:4}}>Take Profit ¢</div>
+                  <input type="number" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="—"
+                    style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:8,padding:'7px 10px',color:B.green,fontSize:13,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:10,color:B.red,fontWeight:600,marginBottom:4}}>Stop Loss ¢</div>
+                  <input type="number" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="—"
+                    style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:8,padding:'7px 10px',color:B.red,fontSize:13,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                </div>
+              </div>
+            </div>
+            {/* Summary */}
+            <div style={{background:'#0a0a0a',borderRadius:12,padding:'10px 12px',marginBottom:14,fontSize:12}}>
+              {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Liquidation',(liqP*100).toFixed(1)+'¢',B.red]].map(([l,v,c])=>(
+                <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'3px 0'}}>
+                  <span style={{color:'#555'}}>{l}</span><span style={{color:c,fontWeight:600,fontFamily:fm}}>{v}</span>
+                </div>
+              ))}
+              <div style={{height:1,background:'#1f1f1f',margin:'7px 0'}}/>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0'}}>
+                <span style={{color:'#555'}}>If {team.name} wins</span>
+                <span style={{color:B.green,fontWeight:800,fontFamily:fm}}>+{fmtUsd(orderSide==='home'?expo*(1-oPrice)/oPrice:expo*oPrice/(1-oPrice))}</span>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0'}}>
+                <span style={{color:'#555'}}>Max loss</span>
+                <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>-{fmtUsd(eM)}</span>
+              </div>
+            </div>
+            {/* Reduce Only */}
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,padding:'8px 10px',background:reduceOnly?B.primary+'10':'#0a0a0a',borderRadius:10,border:'1px solid '+(reduceOnly?B.primary+'30':'#1a1a1a'),cursor:'pointer'}} onClick={()=>setReduceOnly(r=>!r)}>
+              <div style={{width:16,height:16,borderRadius:4,border:'1.5px solid '+(reduceOnly?B.primary:'#333'),background:reduceOnly?B.primary:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .15s'}}>
+                {reduceOnly&&<span style={{fontSize:10,color:'#000',fontWeight:900,lineHeight:1}}>✓</span>}
+              </div>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:reduceOnly?B.primaryLight:'#888'}}>Reduce Only</div>
+                <div style={{fontSize:10,color:'#444'}}>Order can only reduce an existing position</div>
+              </div>
+            </div>
+            {/* Submit */}
+            <button onClick={placeOrder} disabled={settled||eM<10} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,border:'none',
+              cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
+              background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,
+              color:settled?'#666':'#000',opacity:settled||eM<10?0.4:1}}>
+              {settled?'Game Settled':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${shareCount} shares`:`Buy ${team.name} · ${shareCount} shares`}
+            </button>
+            {/* Account */}
+            <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid #1f1f1f',display:'flex',justifyContent:'space-between',fontSize:11}}>
+              <div><div style={{color:'#444',marginBottom:2}}>Balance</div><div style={{color:'#fff',fontWeight:700,fontFamily:fm}}>{fmtUsd(balance)}</div></div>
+              <div style={{textAlign:'right'}}><div style={{color:'#444',marginBottom:2}}>Portfolio</div><div style={{color:pctClr(totalEq-10000),fontWeight:700,fontFamily:fm}}>{fmtUsd(totalEq)} <span style={{fontSize:10}}>({fmtPct((totalEq-10000)/100)})</span></div></div>
+            </div>
+            {/* Pending limits */}
+            {limitOrders.length>0&&(
+              <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid #1f1f1f'}}>
+                <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:6}}>Pending ({limitOrders.length})</div>
+                {limitOrders.map(lo=>{const loTm=lo.side==='home'?HOME:AWAY;return(
+                  <div key={lo.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 10px',background:'#1a1a1a',borderRadius:8,marginBottom:4,fontSize:11}}>
+                    <span style={{color:lo.side==='home'?HOME.light:AWAY.light,fontWeight:700}}>{loTm.short} {lo.leverage}x</span>
+                    <span style={{color:B.primary,fontFamily:fm}}>@ {(lo.limitPrice*100).toFixed(0)}¢</span>
+                    <span style={{color:'#888'}}>{fmtUsd(lo.margin)}</span>
+                    <button onClick={()=>{setLimitOrders(p=>p.filter(l=>l.id!==lo.id));setBalance(b=>b+lo.margin);notify('Order cancelled','info');}}
+                      style={{background:'#ef444420',border:'none',borderRadius:6,padding:'3px 8px',cursor:'pointer',color:'#ef4444',fontSize:11,fontWeight:700}}>✕</button>
+                  </div>
+                );})}
+              </div>
+            )}
+          </div>)}
+
+          {rightTab==='book'&&(()=>{
+            const spread=((book.asks[0].price-book.bids[0].price)*100).toFixed(1);
+            const maxCum=Math.max(book.asks[book.asks.length-1].cum,book.bids[book.bids.length-1].cum);
+            const displayAsks=[...book.asks].reverse().slice(0,6);
+            const displayBids=book.bids.slice(0,6);
+            return(
+            <div style={{background:'#111',borderRadius:16,border:'1px solid #1f1f1f',padding:'14px 12px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                <span style={{fontSize:13,fontWeight:600,color:'#888'}}>Order Book</span>
+                <span style={{fontSize:10,color:'#555'}}>Spread <span style={{color:'#fff',fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',padding:'0 4px 6px',fontSize:9,fontWeight:700,color:'#444',letterSpacing:'0.06em'}}>
+                <span>PRICE (Eagles%)</span><span style={{textAlign:'center'}}>{AWAY.short} equiv</span><span style={{textAlign:'right'}}>SIZE</span>
+              </div>
+              <div style={{marginBottom:2}}>
+                <div style={{fontSize:9,fontWeight:700,color:AWAY.light,letterSpacing:'0.08em',padding:'2px 4px 4px',opacity:0.7}}>SELL {HOME.short.toUpperCase()} · BUY {AWAY.short.toUpperCase()}</div>
+                {displayAsks.map((a,i)=>{const dp=(a.cum/maxCum)*100;const ce=((1-a.price)*100).toFixed(1);return(
+                  <div key={'a'+i} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',fontSize:11,height:24,alignItems:'center',position:'relative',fontFamily:fm,padding:'0 4px',borderRadius:3,cursor:'pointer'}}
+                    onClick={()=>{setOrderSide('away');setLimitCents(Math.round((1-a.price)*100));setOrderType('limit');setRightTab('order');}}>
+                    <div style={{position:'absolute',right:0,top:0,bottom:0,borderRadius:3,background:AWAY.light+'12',width:dp+'%',transition:'width .3s'}}/>
+                    <span style={{color:AWAY.light,position:'relative',zIndex:1,fontWeight:600}}>{(a.price*100).toFixed(1)}¢</span>
+                    <span style={{color:'#444',position:'relative',zIndex:1,textAlign:'center',fontSize:10}}>{ce}¢</span>
+                    <span style={{color:'#555',position:'relative',zIndex:1,textAlign:'right',fontSize:10}}>{a.size}</span>
+                  </div>);})}
+              </div>
+              <div style={{margin:'6px 0',padding:'6px 4px',borderTop:'1px solid #1f1f1f',borderBottom:'1px solid #1f1f1f',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',alignItems:'center'}}>
+                <span style={{fontSize:13,fontWeight:800,color:'#fff',fontFamily:fm}}>{(oPrice*100).toFixed(1)}¢</span>
+                <span style={{fontSize:10,color:'#444',textAlign:'center'}}>mid · {spread}¢</span>
+                <span style={{fontSize:10,color:'#444',textAlign:'right'}}>{((1-oPrice)*100).toFixed(1)}¢</span>
+              </div>
+              <div style={{marginTop:2}}>
+                {displayBids.map((b,i)=>{const dp=(b.cum/maxCum)*100;const ce=((1-b.price)*100).toFixed(1);return(
+                  <div key={'b'+i} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',fontSize:11,height:24,alignItems:'center',position:'relative',fontFamily:fm,padding:'0 4px',borderRadius:3,cursor:'pointer'}}
+                    onClick={()=>{setOrderSide('home');setLimitCents(Math.round(b.price*100));setOrderType('limit');setRightTab('order');}}>
+                    <div style={{position:'absolute',left:0,top:0,bottom:0,borderRadius:3,background:HOME.light+'12',width:dp+'%',transition:'width .3s'}}/>
+                    <span style={{color:HOME.light,position:'relative',zIndex:1,fontWeight:600}}>{(b.price*100).toFixed(1)}¢</span>
+                    <span style={{color:'#444',position:'relative',zIndex:1,textAlign:'center',fontSize:10}}>{ce}¢</span>
+                    <span style={{color:'#555',position:'relative',zIndex:1,textAlign:'right',fontSize:10}}>{b.size}</span>
+                  </div>);})}
+                <div style={{fontSize:9,fontWeight:700,color:HOME.light,letterSpacing:'0.08em',padding:'4px 4px 0',opacity:0.7}}>BUY {HOME.short.toUpperCase()} · SELL {AWAY.short.toUpperCase()}</div>
+              </div>
+              <div style={{marginTop:10,paddingTop:8,borderTop:'1px solid #1a1a1a',fontSize:10,color:'#444',lineHeight:1.6}}>
+                Buy {HOME.short} at P¢ matches Sell {AWAY.short} at (100−P)¢
+                <div style={{marginTop:2,color:'#333'}}>Click any level to set a limit order</div>
+              </div>
+            </div>
+          );})()}
+
+        </div>
+      </div>
+
+      {/* Settlement overlay */}
+      {settled&&(
+        <div style={{position:'fixed',inset:0,zIndex:40,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,.85)',backdropFilter:'blur(20px)'}}>
+          <div style={{textAlign:'center',padding:'48px 56px',maxWidth:440,background:'#111',borderRadius:24,border:'1px solid #2a2a2a'}}>
+            <div style={{fontSize:56,marginBottom:16}}>🏆</div>
+            <div style={{fontSize:28,fontWeight:800,color:HOME.light,marginBottom:6}}>{settledWinner||HOME.name} Win</div>
+            <div style={{fontSize:18,color:'#888',fontFamily:fm,marginBottom:4}}>{g.home.score} – {g.away.score}</div>
+            <div style={{fontSize:13,color:'#555',marginBottom:24}}>{g.shortName||g.name}</div>
+            <div style={{fontSize:40,fontWeight:800,color:totalEq>=10000?B.green:'#ef4444',fontFamily:fm,marginBottom:4}}>{fmtUsd(totalEq)}</div>
+            <div style={{fontSize:15,marginBottom:36}}>
+              <span style={{color:'#666'}}>Return </span><span style={{fontWeight:700,color:pctClr(totalEq-10000)}}>{fmtPct((totalEq-10000)/100)}</span>
+            </div>
+            <button onClick={onBack} style={{padding:'14px 32px',fontWeight:700,fontSize:15,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:12,background:'linear-gradient(135deg,#ff5028,#14b8a6)',color:'#fff'}}>Back to Games</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], onTrade }) {
   const G=game,HOME=G.home,AWAY=G.away,PLAYS=G.plays,SCORING_PLAYS=G.scoringPlays,initProb=PLAYS[0].p;
   const [gameTime,setGameTime]=useState(0);const [playing,setPlaying]=useState(false);const [speed,setSpeed]=useState(10);
   const [sportTab,setSportTab]=useState("Live");
@@ -1958,7 +2793,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [] }
       <div style={{display:"flex",height:"calc(100vh - 56px)"}}>
 
         {terminalPage==="demos"?<DemosPage onSelectGame={(g)=>{onSwitchGame(g);setTerminalPage("game");}} currentGameId={G.id}/>
-        :terminalPage==="basketball"?<BasketballPage liveGames={liveGames}/>
+        :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="baseball"?<BaseballPage data={espnData.mlb}/>
         :terminalPage==="soccer"?<SoccerPage data={espnData.ucl}/>
         :terminalPage==="hockey"?<HockeyPage data={espnData.nhl}/>
@@ -2664,7 +3499,9 @@ export default function App() {
   const [page, setPage] = useState("landing");
   const [sel, setSel] = useState(PROC_GAMES[0]);
   const [liveGames, setLiveGames] = useState([]);
+  const [liveGame, setLiveGame] = useState(null);
   const pick = (g) => { setSel(g); setPage("trading"); };
+  const tradeLive = (g) => { setLiveGame(g); setPage("live-trading"); };
 
   // Fetch basketball games from backend
   useEffect(() => {
@@ -2697,7 +3534,8 @@ export default function App() {
       `}</style>
       {page==="landing"?<LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>setPage("docs")}/>
       :page==="docs"?<DocsPage onBack={()=>setPage("landing")} onLaunch={()=>setPage("trading")}/>
-      :sel?<TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames}/>:null}
+      :page==="live-trading"&&liveGame?<LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames}/>
+      :sel?<TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive}/>:null}
     </div>
   );
 }
