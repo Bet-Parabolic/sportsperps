@@ -1026,6 +1026,68 @@ function parseESPNEvent(ev) {
     detail: ev.status?.type?.detail || ev.status?.type?.shortDetail || "",
     home: { name: home?.team?.displayName||"", abbr: home?.team?.abbreviation||"", logo: home?.team?.logo||"", score: home?.score??null, record: home?.records?.[0]?.summary||"" },
     away: { name: away?.team?.displayName||"", abbr: away?.team?.abbreviation||"", logo: away?.team?.logo||"", score: away?.score??null, record: away?.records?.[0]?.summary||"" },
+    _raw: ev, // preserve original for normalizeEspnToLive
+  };
+}
+
+/* Convert an ESPN event + sport key into a backend-compatible liveGame object
+   so any live ESPN game can be opened in LiveTradingApp */
+function normalizeEspnToLive(ev, sportKey) {
+  const comp = ev.competitions?.[0];
+  const home = comp?.competitors?.find(c=>c.homeAway==="home");
+  const away = comp?.competitors?.find(c=>c.homeAway==="away");
+  if(!home||!away) return null;
+  // Try ESPN BET odds first, fall back to 0.5
+  let oraclePrice = 0.5;
+  const oddsEntry = comp?.odds?.[0];
+  if(oddsEntry?.homeTeamOdds?.moneyLine && oddsEntry?.awayTeamOdds?.moneyLine) {
+    const hO = oddsEntry.homeTeamOdds.moneyLine;
+    const aO = oddsEntry.awayTeamOdds.moneyLine;
+    const ph = hO>0 ? 100/(hO+100) : Math.abs(hO)/(Math.abs(hO)+100);
+    const pa = aO>0 ? 100/(aO+100) : Math.abs(aO)/(Math.abs(aO)+100);
+    oraclePrice = clamp(ph/(ph+pa), 0.01, 0.99);
+  }
+  const stype = ev.status?.type?.name||"";
+  const status = (stype==="STATUS_IN_PROGRESS"||stype==="STATUS_FIRST_HALF"||stype==="STATUS_SECOND_HALF"||stype==="STATUS_OVERTIME")?"live"
+    :stype==="STATUS_HALFTIME"?"halftime":(stype.includes("FINAL")||stype==="STATUS_FULL_TIME")?"final":"scheduled";
+  const emojiMap = {nhl:"🏒",nfl:"🏈",mlb:"⚾",ucl:"⚽",nba:"🏀"};
+  const labelMap = {nhl:"NHL",nfl:"NFL",mlb:"MLB",ucl:"UCL",nba:"NBA"};
+  return {
+    id: sportKey+"_espn_"+ev.id,
+    espnId: ev.id,
+    league: sportKey,
+    leagueDisplay: labelMap[sportKey]||sportKey.toUpperCase(),
+    sport: labelMap[sportKey]||"",
+    name: ev.name||"",
+    shortName: ev.shortName||"",
+    status,
+    statusDetail: ev.status?.type?.shortDetail||"",
+    period: ev.status?.period,
+    clock: ev.status?.displayClock,
+    home: {
+      name: home.team.displayName||"",
+      abbreviation: home.team.abbreviation||"",
+      logo: home.team.logo||"",
+      score: parseFloat(home.score)||0,
+      color: home.team.color||"",
+      altColor: home.team.alternateColor||home.team.color||"",
+    },
+    away: {
+      name: away.team.displayName||"",
+      abbreviation: away.team.abbreviation||"",
+      logo: away.team.logo||"",
+      score: parseFloat(away.score)||0,
+      color: away.team.color||"",
+      altColor: away.team.alternateColor||away.team.color||"",
+    },
+    oracle: {
+      indexPrice: oraclePrice,
+      markPrice: oraclePrice,
+      sources: [{name:"ESPN Odds",price:oraclePrice,weight:35,color:"#f59e0b",ageMs:0,stale:false}],
+      confidence: 0.45,
+    },
+    latestPlay: null,
+    _espnKey: sportKey,   // signals LiveTradingApp to use ESPN polling
   };
 }
 
@@ -1038,7 +1100,7 @@ const isRecent = (dateStr, hours=6) => {
 const byDate = (a,b) => new Date(a.date||0) - new Date(b.date||0);
 
 /* shared card used by Soccer and Hockey */
-function MatchCard({ g, emoji, showRecord }) {
+function MatchCard({ g, emoji, showRecord, onTrade, _espnKey }) {
   const homeScore = parseFloat(g.home.score) || 0;
   const awayScore = parseFloat(g.away.score) || 0;
   const homeWinning = homeScore > awayScore;
@@ -1072,6 +1134,13 @@ function MatchCard({ g, emoji, showRecord }) {
         ))}
       </div>
       {g.isScheduled&&g.detail&&<div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:10}}>{g.detail}</div>}
+      {onTrade&&(g.isLive||g.isHalf)&&(
+        <button onClick={()=>{const norm=normalizeEspnToLive(g._raw,_espnKey||'nhl');if(norm)onTrade(norm);}} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
+          background:"linear-gradient(135deg,"+B.primary+","+B.primaryLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
+          Trade Live
+        </button>
+      )}
     </div>
   );
 }
@@ -1119,7 +1188,7 @@ function NFLPage({ data={events:[],loading:true,error:false} }) {
 }
 
 /* ─── TRENDING PAGE — all live games across every sport ─── */
-function TrendingPage({ liveGames, espnData={} }) {
+function TrendingPage({ liveGames, espnData={}, onTrade }) {
   const loading = ESPN_SOURCES.some(s => espnData[s.key]?.loading !== false);
 
   const basketballLive = liveGames
@@ -1170,7 +1239,7 @@ function TrendingPage({ liveGames, espnData={} }) {
             <span style={{fontSize:18}}>🏀</span>
             <SectionHeader label="BASKETBALL" color={B.green}/>
           </div>
-          <Grid>{basketballLive.map(g=><MatchCard key={g.id} g={g} emoji="🏀"/>)}</Grid>
+          <Grid>{basketballLive.map(g=>{const lg=liveGames.find(x=>x.id===g.id);return<MatchCard key={g.id} g={{...g,_raw:lg}} emoji="🏀" onTrade={onTrade?()=>onTrade(lg):null} _espnKey="nba"/>;})}</Grid>
         </div>
       )}
 
@@ -1184,7 +1253,7 @@ function TrendingPage({ liveGames, espnData={} }) {
               <span style={{fontSize:18}}>{s.emoji}</span>
               <SectionHeader label={s.label} color={B.green}/>
             </div>
-            <Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji={s.emoji}/>)}</Grid>
+            <Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji={s.emoji} onTrade={onTrade?()=>{const norm=normalizeEspnToLive(g._raw,s.key);if(norm)onTrade(norm);}:null} _espnKey={s.key}/>)}</Grid>
           </div>
         );
       })}
@@ -1209,7 +1278,7 @@ function SoccerPage({ data={events:[],loading:true,error:false} }) {
 }
 
 /* ─── HOCKEY PAGE ─── */
-function HockeyPage({ data={events:[],loading:true,error:false} }) {
+function HockeyPage({ data={events:[],loading:true,error:false}, onTrade }) {
   const games = data.events.map(parseESPNEvent);
   const live = games.filter(g=>g.isLive);
   const final = games.filter(g=>g.isFinal && isRecent(g.date));
@@ -1217,7 +1286,7 @@ function HockeyPage({ data={events:[],loading:true,error:false} }) {
   return (
     <SportPageShell title="NHL" subtitle="HOCKEY" emoji="🏒" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏒</div><div style={{fontSize:14,color:"#555"}}>No NHL games scheduled today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord onTrade={onTrade} _espnKey="nhl"/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
     </SportPageShell>
@@ -1795,8 +1864,15 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
     setMarkers(prev => [...prev, {t: +chartT.toFixed(2), p, markerType: mt, line: side||'home'}]);
   }, []);
 
-  // ── fetch oracle history on mount ───────────────────────────────────────
+  // ── fetch oracle history on mount (backend only) ────────────────────────
   useEffect(() => {
+    if (initGame._espnKey) {
+      // ESPN game — no oracle history, seed chart with current price
+      const p = initGame.oracle?.indexPrice || 0.5;
+      setChartT0(Date.now());
+      setChartData([{t:0,ph:p,pa:1-p,mp:p,floor:clamp(p-0.2,0.01,0.99),ceil:clamp(p+0.2,0.01,0.99),mh_val:null,mh_marker:null,ma_val:null,ma_marker:null}]);
+      return;
+    }
     fetch(`${API_URL}/oracle/${initGame.id}/history`)
       .then(r => r.json())
       .then(data => {
@@ -1841,6 +1917,42 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
 
     const poll = async () => {
       try {
+        // ESPN game: poll ESPN scoreboard directly
+        if (initGame._espnKey) {
+          const espnUrls = {nhl:'hockey/nhl',nfl:'football/nfl',mlb:'baseball/mlb',ucl:'soccer/uefa.champions',nba:'basketball/nba'};
+          const path = espnUrls[initGame._espnKey];
+          if (!path) return;
+          const res2 = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/scoreboard`);
+          if (!res2.ok) return;
+          const d2 = await res2.json();
+          const ev = (d2.events||[]).find(e=>e.id===initGame.espnId);
+          if (!ev) return;
+          const norm = normalizeEspnToLive(ev, initGame._espnKey);
+          if (!norm) return;
+          setG(norm);
+          const op = norm.oracle.indexPrice;
+          const mp = norm.oracle.markPrice;
+          setOPrice(op); setOMark(mp);
+          setOSrcs(norm.oracle.sources||[]);
+          setBook(makeBook(op));
+          setChartT0(prev => {
+            const ref = prev || Date.now();
+            const t = +((Date.now() - ref) / 60000).toFixed(2);
+            setChartData(cd => [...cd, {t,ph:op,pa:1-op,mp,floor:clamp(op-0.2,0.01,0.99),ceil:clamp(op+0.2,0.01,0.99),mh_val:null,mh_marker:null,ma_val:null,ma_marker:null}]);
+            return prev||ref;
+          });
+          if (norm.latestPlay) setPlayLog(prev=>{if(!prev.length||prev[0].id!==norm.latestPlay.id)return[norm.latestPlay,...prev].slice(0,80);return prev;});
+          // Check positions
+          const cpE = posR.current;
+          if (cpE.length) {
+            let ch=false;
+            const upd=cpE.filter(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,mp);if(pnl<=-pos.margin*0.95){ch=true;setClosedPos(pr=>[{...pos,closedAt:op,pnl:-pos.margin,closeType:'LIQ'},...pr]);setClosedPnL(p=>p-pos.margin);notify('☠ LIQUIDATED','red');return false;}return true;});
+            if(ch)setPositions(upd);
+          }
+          if((norm.status==='final'||norm.status==='completed')&&!settled){setSettled(true);const homeWins=(norm.home.score||0)>(norm.away.score||0);const finalP=homeWins?1.0:0.0;setSettledWinner(homeWins?HOME.name:AWAY.name);const fp=posR.current;if(fp.length){let sp=0;const nc2=fp.map(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,finalP);sp+=pnl;return{...pos,closedAt:finalP,pnl,closeType:'SETTLED'};});setClosedPos(pr=>[...nc2,...pr]);setBalance(b=>b+fp.reduce((s,p)=>s+p.margin,0)+sp);setClosedPnL(p=>p+sp);setPositions([]);notify('🏆 FINAL — '+fmtUsd(sp),'green');}}
+          return;
+        }
+
         const res = await fetch(`${API_URL}/games/${initGame.id}`);
         if (!res.ok) return;
         const raw = await res.json();
@@ -2830,10 +2942,10 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="baseball"?<BaseballPage data={espnData.mlb}/>
         :terminalPage==="soccer"?<SoccerPage data={espnData.ucl}/>
-        :terminalPage==="hockey"?<HockeyPage data={espnData.nhl}/>
+        :terminalPage==="hockey"?<HockeyPage data={espnData.nhl} onTrade={onTrade}/>
         :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
         :terminalPage==="nfl"?<NFLPage data={espnData.nfl}/>
-        :terminalPage==="trending"?<TrendingPage liveGames={liveGames} espnData={espnData}/>
+        :terminalPage==="trending"?<TrendingPage liveGames={liveGames} espnData={espnData} onTrade={onTrade}/>
         :<>
 
         {/* LEFT SIDEBAR — other games */}
@@ -2846,7 +2958,34 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
             <div style={{fontSize:11,color:"#888",marginTop:2}}>{G.label}</div>
           </div>
 
-          {/* LIVE NOW — all live backend games, clickable */}
+          {/* ACTIVE POSITIONS */}
+          {positions.length > 0 && (
+            <div style={{padding:"0 16px 12px"}}>
+              <div style={{fontSize:10,fontWeight:700,color:B.primary,marginBottom:8,fontFamily:fm,letterSpacing:"0.08em",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span>ACTIVE POSITIONS</span>
+                <span style={{color:pctClr(totalUPnL),fontFamily:fm,fontWeight:700}}>{fmtUsd(totalUPnL)}</span>
+              </div>
+              {positions.map(pos=>{
+                const pnl=calcPnL(pos.side,pos.exposure,pos.entry,oracle.price);
+                const tm=pos.side==="home"?HOME:AWAY;
+                const posEntryP=pos.side==="home"?pos.entry:1-pos.entry;
+                return(
+                  <div key={pos.id} style={{padding:"8px 10px",marginBottom:4,background:"#0a0a0a",borderRadius:8,border:"1px solid #1f1f1f",borderLeft:"2px solid "+(pos.side==="home"?HOME.light:AWAY.light)}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                      <span style={{fontSize:11,fontWeight:700,color:pos.side==="home"?HOME.light:AWAY.light}}>{tm.name}</span>
+                      <span style={{fontSize:11,fontWeight:800,color:pctClr(pnl),fontFamily:fm}}>{fmtUsd(pnl)}</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#555",fontFamily:fm}}>
+                      <span>{pos.leverage}x · {(posEntryP*100)|0}¢ entry</span>
+                      <span>{fmtUsd(pos.exposure)} exp</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+                    {/* LIVE NOW — all live backend games, clickable */}
           {liveGames.filter(g=>g.status==="live"||g.status==="halftime").length > 0 && (
             <div style={{padding:"12px 16px 0"}}>
               <div style={{fontSize:10,fontWeight:700,color:B.green,marginBottom:10,fontFamily:fm,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:6}}>
