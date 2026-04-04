@@ -2243,42 +2243,81 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         <div style={{flex:1,minWidth:0,overflow:isMobile?'visible':'auto'}}>
 
           {/* LIVE SCOREBOARD */}
-          <div data-mob="score" style={{padding:'20px 24px',display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{display:'flex',alignItems:'center',gap:32,padding:'20px 40px',background:'#111',borderRadius:16,border:'1px solid #1f1f1f'}}>
-              <div style={{display:'flex',alignItems:'center',gap:12}}>
-                {HOME.logoUrl ? <img src={HOME.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/> : <span style={{fontSize:32}}>🏀</span>}
-                <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{HOME.name}</div>
-                  <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{HOME.short}</div>
+          <div data-mob="score" style={{padding:isMobile?'10px 12px':'20px 24px',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            {isMobile ? (
+              <div style={{width:'100%',background:'#111',borderRadius:14,border:'1px solid #1f1f1f',padding:'12px 14px'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0}}>
+                    {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>🏀</span>}
+                    <div style={{minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:800,color:'#fff',fontFamily:fm}}>{HOME.short}</div>
+                      <div style={{fontSize:9,color:'#555',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{HOME.name}</div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:'center',padding:'0 10px',flexShrink:0}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <span style={{fontSize:30,fontWeight:900,color:'#fff',fontFamily:fm,lineHeight:1}}>{g.home.score??'–'}</span>
+                      <span style={{fontSize:12,color:'#444'}}>–</span>
+                      <span style={{fontSize:30,fontWeight:900,color:'#fff',fontFamily:fm,lineHeight:1}}>{g.away.score??'–'}</span>
+                    </div>
+                    <div style={{fontSize:10,fontWeight:600,marginTop:3,
+                      color:g.status==='final'?'#4ade80':g.status==='halftime'?'#ff9f1c':B.green}}>
+                      {g.status==='final'?'Final':g.status==='halftime'?'Half':g.period?'Q'+g.period+' · '+g.clock:g.statusDetail||'Live'}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',minWidth:0}}>
+                    <div style={{textAlign:'right',minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:800,color:'#fff',fontFamily:fm}}>{AWAY.short}</div>
+                      <div style={{fontSize:9,color:'#555',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{AWAY.name}</div>
+                    </div>
+                    {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>🏀</span>}
+                  </div>
+                </div>
+                <div style={{marginTop:8,height:3,background:'#1a1a1a',borderRadius:3,overflow:'hidden'}}>
+                  <div style={{height:'100%',width:(oPrice*100)+'%',background:'linear-gradient(90deg,'+HOME.light+','+HOME.light+'99)',transition:'width .5s'}}/>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',marginTop:3}}>
+                  <span style={{fontSize:9,color:HOME.light,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(0)}% {HOME.short}</span>
+                  <span style={{fontSize:9,color:AWAY.light,fontWeight:700,fontFamily:fm}}>{((1-oPrice)*100).toFixed(0)}% {AWAY.short}</span>
                 </div>
               </div>
-              <div style={{textAlign:'center',minWidth:160}}>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16}}>
-                  <span style={{fontSize:48,fontWeight:900,fontFamily:fm,color:'#fff',lineHeight:1}}>{g.home.score ?? '–'}</span>
-                  <span style={{fontSize:20,color:'#333'}}>—</span>
-                  <span style={{fontSize:48,fontWeight:900,fontFamily:fm,color:'#fff',lineHeight:1}}>{g.away.score ?? '–'}</span>
+            ) : (
+              <div style={{display:'flex',alignItems:'center',gap:32,padding:'20px 40px',background:'#111',borderRadius:16,border:'1px solid #1f1f1f'}}>
+                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                  {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>🏀</span>}
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{HOME.name}</div>
+                    <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{HOME.short}</div>
+                  </div>
                 </div>
-                <div style={{marginTop:8}}>
-                  <span style={{fontSize:12,fontWeight:600,padding:'4px 16px',borderRadius:20,
-                    background: g.status==='final'?'#22c55e18': g.status==='halftime'?'#ff9f1c18':'#1a1a1a',
-                    color: g.status==='final'?'#4ade80': g.status==='halftime'?'#ff9f1c':B.green}}>
-                    {g.status==='final'?'Final': g.status==='halftime'?'Halftime': g.period?'Q'+g.period+' · '+g.clock: g.statusDetail||'Live'}
-                  </span>
+                <div style={{textAlign:'center',minWidth:160}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16}}>
+                    <span style={{fontSize:48,fontWeight:900,fontFamily:fm,color:'#fff',lineHeight:1}}>{g.home.score??'–'}</span>
+                    <span style={{fontSize:20,color:'#333'}}>—</span>
+                    <span style={{fontSize:48,fontWeight:900,fontFamily:fm,color:'#fff',lineHeight:1}}>{g.away.score??'–'}</span>
+                  </div>
+                  <div style={{marginTop:8}}>
+                    <span style={{fontSize:12,fontWeight:600,padding:'4px 16px',borderRadius:20,
+                      background:g.status==='final'?'#22c55e18':g.status==='halftime'?'#ff9f1c18':'#1a1a1a',
+                      color:g.status==='final'?'#4ade80':g.status==='halftime'?'#ff9f1c':B.green}}>
+                      {g.status==='final'?'Final':g.status==='halftime'?'Halftime':g.period?'Q'+g.period+' · '+g.clock:g.statusDetail||'Live'}
+                    </span>
+                  </div>
+                  <div style={{fontSize:11,color:'#555',marginTop:6}}>{g.shortName||g.name}</div>
                 </div>
-                <div style={{fontSize:11,color:'#555',marginTop:6}}>{g.shortName||g.name}</div>
+                <div style={{display:'flex',alignItems:'center',gap:12}}>
+                  <div>
+                    <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{AWAY.name}</div>
+                    <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{AWAY.short}</div>
+                  </div>
+                  {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>🏀</span>}
+                </div>
               </div>
-              <div style={{display:'flex',alignItems:'center',gap:12}}>
-                <div>
-                  <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{AWAY.name}</div>
-                  <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{AWAY.short}</div>
-                </div>
-                {AWAY.logoUrl ? <img src={AWAY.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/> : <span style={{fontSize:32}}>🏀</span>}
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* STATS BAR */}
-          <div style={{margin:'0 24px 0',padding:'8px 20px',background:'#0a0a0a',borderRadius:12,border:'1px solid #1a1a1a',display:'grid',gridTemplateColumns:'repeat(5,1fr)'}}>
+          {/* STATS BAR — desktop only */}
+          {!isMobile&&<div style={{margin:'0 24px 0',padding:'8px 20px',background:'#0a0a0a',borderRadius:12,border:'1px solid #1a1a1a',display:'grid',gridTemplateColumns:'repeat(5,1fr)'}}>
             {[
               {label:'Mark',  value:(oPrice*100).toFixed(1)+'¢', color:B.primaryLight},
               {label:'Volume',value:'$'+simVol.toLocaleString(), color:'#fff'},
@@ -2291,10 +2330,10 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                 <div style={{fontSize:11,fontWeight:700,color,fontFamily:fm}}>{value}</div>
               </div>
             ))}
-          </div>
+          </div>}
 
           {/* CHART */}
-          <div style={{margin:'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
+          <div style={{margin:isMobile?'8px 12px 0':'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
             <div style={{padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid #1f1f1f'}}>
               <span style={{fontSize:13,fontWeight:600,color:'#888'}}>Win Probability</span>
               <div style={{display:'flex',gap:16}}>
@@ -3815,7 +3854,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
                       <div style={{display:"flex",gap:6}}>
                         {[100,250,500,1000].map(v=>(
                           <button key={v} onClick={()=>setOrderMargin(v)} style={{flex:1,padding:"11px 0",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",fontFamily:fm,borderRadius:10,
-                            background:Math.round(eM)===v?"#2a2a2a":"#1a1a1a",color:Math.round(eM)===v?"#fff":"#666"}}>${v>=1000?"$"+(v/1000)+"k":v}</button>
+                            background:Math.round(eM)===v?"#2a2a2a":"#1a1a1a",color:Math.round(eM)===v?"#fff":"#666"}}>{v>=1000?"$"+(v/1000)+"k":"$"+v}</button>
                         ))}
                       </div>
                     </div>
