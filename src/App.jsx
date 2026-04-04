@@ -1728,7 +1728,7 @@ function DemosPage({ onSelectGame, currentGameId }) {
 /* ═══════════════════════════════════════════════════════════
    LIVE TRADING APP — real NBA games via backend oracle
    ═══════════════════════════════════════════════════════════ */
-function LiveTradingApp({ game: initGame, onBack, liveGames = [] }) {
+function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade }) {
   // ── normalise team colors from backend ──────────────────────────────────
   const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
 
@@ -2034,21 +2034,31 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [] }) {
         ))}
       </div>
 
-      {/* HEADER */}
+      {/* HEADER — full terminal nav */}
       <div style={{padding:'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
-        <div style={{display:'flex',alignItems:'center',gap:16}}>
-          <button onClick={onBack} style={{width:32,height:32,borderRadius:8,border:'1px solid #2a2a2a',background:'#111',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#888'}}>
-            <ChevronRight size={16} style={{transform:'rotate(180deg)'}}/>
-          </button>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
           <img src={LOGO_NAV} style={{height:26,width:'auto'}} alt="pd"/>
           <span style={{fontFamily:fd,fontWeight:800,fontSize:18}}>Perpdictions</span>
         </div>
+        {/* Center — sport tabs (same as TradingApp) */}
+        <div style={{display:'flex',gap:4,background:'#111',borderRadius:10,padding:3}}>
+          {[['demos','Demos',null],['trending','Live',null],['basketball','Basketball',liveGames.filter(g=>g.status==='live'||g.status==='halftime').length],['nfl','Football',null],['baseball','Baseball',null],['soccer','Soccer',null],['hockey','Hockey',null],['mma','MMA',null]].map(([tab,label,cnt])=>(
+            <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
+              {tab==='trending'
+                ? <span style={{display:'flex',alignItems:'center',gap:5}}>
+                    <span style={{width:6,height:6,borderRadius:'50%',background:'#ef4444',display:'inline-block',animation:'pulse 1.5s infinite',flexShrink:0}}/>
+                    Live
+                  </span>
+                : label}
+              {cnt>0&&<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({cnt})</span>}
+            </button>
+          ))}
+        </div>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 12px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
-            <span style={{width:6,height:6,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
+          <span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 10px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
+            <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
             LIVE
           </span>
-          <span style={{fontSize:11,color:'#555',padding:'4px 10px',background:'#111',borderRadius:8,fontFamily:fm}}>NBA</span>
           <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ff5028,#14b8a6)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
           <div style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14}}>👤</div>
         </div>
@@ -2077,7 +2087,8 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [] }) {
             <div style={{padding:'0 16px'}}>
               <div style={{fontSize:10,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,marginBottom:8}}>OTHER LIVE</div>
               {liveGames.filter(lg=>lg.id!==initGame.id&&(lg.status==='live'||lg.status==='halftime')).map(lg=>(
-                <div key={lg.id} style={{padding:'10px 12px',marginBottom:6,background:'#111',borderRadius:10,border:'1px solid #1f1f1f',fontSize:11,fontFamily:fm}}>
+                <div key={lg.id} onClick={()=>onTrade&&onTrade(lg)}
+                  style={{padding:'10px 12px',marginBottom:6,background:'#111',borderRadius:10,border:'1px solid #1f1f1f',fontSize:11,fontFamily:fm,cursor:onTrade?'pointer':'default'}}>
                   <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
                     <span style={{color:'#fff',fontWeight:600}}>{lg.home.abbreviation} <span style={{color:'#555'}}>vs</span> {lg.away.abbreviation}</span>
                     <span style={{color:B.green,fontSize:10}}>Q{lg.period} {lg.clock}</span>
@@ -2086,6 +2097,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [] }) {
                     <span style={{color:'#888'}}>{lg.home.score} – {lg.away.score}</span>
                     {lg.oracle?.indexPrice && <span style={{color:B.primary,fontWeight:700}}>{(lg.oracle.indexPrice*100).toFixed(0)}%</span>}
                   </div>
+                  {onTrade&&<div style={{marginTop:3,fontSize:9,color:'#444',textAlign:'right'}}>Trade →</div>}
                 </div>
               ))}
             </div>
@@ -2550,11 +2562,11 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [] }) {
   );
 }
 
-function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], onTrade }) {
+function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], onTrade, initialTab }) {
   const G=game,HOME=G.home,AWAY=G.away,PLAYS=G.plays,SCORING_PLAYS=G.scoringPlays,initProb=PLAYS[0].p;
   const [gameTime,setGameTime]=useState(0);const [playing,setPlaying]=useState(false);const [speed,setSpeed]=useState(10);
   const [sportTab,setSportTab]=useState("Live");
-  const [terminalPage,setTerminalPage]=useState("game"); // "game" | "demos"
+  const [terminalPage,setTerminalPage]=useState(initialTab||"game"); // "game" | "demos"
   // Single ESPN fetch — all sport data, one 30s interval, shared across all pages
   const [espnData, setEspnData] = useState(() =>
     Object.fromEntries(ESPN_SOURCES.map(s => [s.key, {events:[], loading:true, error:false}]))
@@ -2812,67 +2824,47 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
             <div style={{fontSize:11,color:"#888",marginTop:2}}>{G.label}</div>
           </div>
 
-          {/* Other Demo Games */}
-          <div style={{padding:"16px 16px 0"}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#555",marginBottom:10,fontFamily:fm,letterSpacing:"0.04em"}}>OTHER DEMO GAMES</div>
-            {PROC_GAMES.filter(pg=>pg.id!==G.id).map(pg=>(
-              <div key={pg.id} onClick={()=>onSwitchGame(pg)} style={{padding:"12px 14px",marginBottom:8,cursor:"pointer",background:"#111",borderRadius:12,border:"1px solid #1f1f1f",transition:"all .15s"}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-                  <span style={{fontSize:16}}>{pg.emoji}</span>
-                  <span style={{fontSize:11,color:"#888",fontWeight:600}}>{pg.sport}</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:14}}>{pg.home.logo}</span>
-                    <span style={{fontSize:12,fontWeight:600,color:"#fff"}}>{pg.home.name}</span>
-                  </div>
-                  <span style={{fontSize:13,fontWeight:800,fontFamily:fm,color:"#fff"}}>{pg.raw[pg.raw.length-1][2]}</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:14}}>{pg.away.logo}</span>
-                    <span style={{fontSize:12,fontWeight:600,color:"#fff"}}>{pg.away.name}</span>
-                  </div>
-                  <span style={{fontSize:13,fontWeight:800,fontFamily:fm,color:"#fff"}}>{pg.raw[pg.raw.length-1][3]}</span>
-                </div>
-                <div style={{fontSize:10,color:"#666"}}>{pg.tagline}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* LIVE BASKETBALL — from backend */}
+          {/* LIVE NOW — all live backend games, clickable */}
           {liveGames.filter(g=>g.status==="live"||g.status==="halftime").length > 0 && (
-            <div style={{padding:"16px 16px 0"}}>
-              <div style={{fontSize:11,fontWeight:700,color:B.primary,marginBottom:10,fontFamily:fm,letterSpacing:"0.04em"}}>
-                🏀 LIVE BASKETBALL ({liveGames.filter(g=>g.status==="live"||g.status==="halftime").length})
+            <div style={{padding:"12px 16px 0"}}>
+              <div style={{fontSize:10,fontWeight:700,color:B.green,marginBottom:10,fontFamily:fm,letterSpacing:"0.08em",display:"flex",alignItems:"center",gap:6}}>
+                <span style={{width:5,height:5,borderRadius:"50%",background:B.green,display:"inline-block",animation:"pulse 1.5s infinite"}}/>
+                LIVE NOW ({liveGames.filter(g=>g.status==="live"||g.status==="halftime").length})
               </div>
               {liveGames.filter(g=>g.status==="live"||g.status==="halftime").map(lg=>(
-                <div key={lg.id} style={{padding:"12px 14px",marginBottom:8,background:"#111",borderRadius:12,border:"1px solid #1f1f1f",transition:"all .15s"}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      {lg.status==="live"&&<span style={{width:6,height:6,borderRadius:"50%",background:B.green,flexShrink:0}}/>}
-                      <span style={{fontSize:11,color:lg.status==="live"?B.green:lg.status==="final"?"#888":"#666",fontWeight:600,fontFamily:fm}}>
-                        {lg.status==="live"?"LIVE":lg.status==="halftime"?"HALF":lg.status==="final"?"FINAL":lg.leagueDisplay}
+                <div key={lg.id} onClick={()=>onTrade&&onTrade(lg)}
+                  style={{padding:"10px 12px",marginBottom:6,cursor:onTrade?"pointer":"default",background:"#111",borderRadius:10,border:"1px solid #1f1f1f",transition:"all .15s",
+                  ...(onTrade?{':hover':{background:"#1a1a1a"}}:{})}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      <span style={{width:5,height:5,borderRadius:"50%",background:B.green,animation:"pulse 1.5s infinite",flexShrink:0}}/>
+                      <span style={{fontSize:9,color:B.green,fontWeight:700,fontFamily:fm,letterSpacing:"0.06em"}}>
+                        {lg.status==="halftime"?"HALF":"LIVE"}
                       </span>
+                      <span style={{fontSize:9,color:"#444",fontFamily:fm}}>{lg.leagueDisplay||"NBA"}</span>
                     </div>
-                    {lg.status!=="scheduled"&&<span style={{fontSize:10,color:"#555",fontFamily:fm}}>{lg.clock&&lg.period?`${lg.clock} · Q${lg.period}`:""}</span>}
+                    <span style={{fontSize:9,color:"#555",fontFamily:fm}}>{lg.clock&&lg.period?`Q${lg.period} ${lg.clock}`:""}</span>
                   </div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      {lg.home.logo&&<img src={lg.home.logo} style={{width:16,height:16,borderRadius:4}} alt=""/>}
-                      <span style={{fontSize:12,fontWeight:600,color:"#fff"}}>{lg.home.abbreviation || lg.home.name}</span>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      {lg.home.logo&&<img src={lg.home.logo} style={{width:14,height:14,objectFit:"contain"}} alt=""/>}
+                      <span style={{fontSize:11,fontWeight:700,color:"#fff"}}>{lg.home.abbreviation||lg.home.name}</span>
                     </div>
                     <span style={{fontSize:13,fontWeight:800,fontFamily:fm,color:"#fff"}}>{lg.home.score}</span>
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      {lg.away.logo&&<img src={lg.away.logo} style={{width:16,height:16,borderRadius:4}} alt=""/>}
-                      <span style={{fontSize:12,fontWeight:600,color:"#fff"}}>{lg.away.abbreviation || lg.away.name}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:5}}>
+                      {lg.away.logo&&<img src={lg.away.logo} style={{width:14,height:14,objectFit:"contain"}} alt=""/>}
+                      <span style={{fontSize:11,fontWeight:600,color:"#888"}}>{lg.away.abbreviation||lg.away.name}</span>
                     </div>
-                    <span style={{fontSize:13,fontWeight:800,fontFamily:fm,color:"#fff"}}>{lg.away.score}</span>
+                    <span style={{fontSize:13,fontWeight:800,fontFamily:fm,color:"#888"}}>{lg.away.score}</span>
                   </div>
-                  {lg.oracle?.indexPrice&&<div style={{marginTop:4,fontSize:10,color:B.primary,fontWeight:600,fontFamily:fm}}>{(lg.oracle.indexPrice*100).toFixed(1)}% win prob</div>}
-                  {lg.status==="scheduled"&&<div style={{marginTop:4,fontSize:10,color:"#555"}}>{lg.statusDetail}</div>}
+                  {lg.oracle?.indexPrice&&(
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:9,color:B.primary,fontWeight:700,fontFamily:fm}}>{(lg.oracle.indexPrice*100).toFixed(1)}% {lg.home.abbreviation}</span>
+                      {onTrade&&<span style={{fontSize:9,color:"#333",fontFamily:fm}}>Trade →</span>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -3500,8 +3492,10 @@ export default function App() {
   const [sel, setSel] = useState(PROC_GAMES[0]);
   const [liveGames, setLiveGames] = useState([]);
   const [liveGame, setLiveGame] = useState(null);
+  const [tradingTab, setTradingTab] = useState("game");
   const pick = (g) => { setSel(g); setPage("trading"); };
   const tradeLive = (g) => { setLiveGame(g); setPage("live-trading"); };
+  const navTo = (tab) => { setTradingTab(tab); setPage("trading"); };
 
   // Fetch basketball games from backend
   useEffect(() => {
@@ -3534,8 +3528,8 @@ export default function App() {
       `}</style>
       {page==="landing"?<LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>setPage("docs")}/>
       :page==="docs"?<DocsPage onBack={()=>setPage("landing")} onLaunch={()=>setPage("trading")}/>
-      :page==="live-trading"&&liveGame?<LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames}/>
-      :sel?<TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive}/>:null}
+      :page==="live-trading"&&liveGame?<LiveTradingApp key={liveGame.id} game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
+      :sel?<TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>:null}
     </div>
   );
 }
