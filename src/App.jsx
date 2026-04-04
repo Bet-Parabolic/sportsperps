@@ -2211,7 +2211,6 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                     <Tooltip content={<ChartTip/>} cursor={{stroke:'#ffffff06'}}/>
                     <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
                     {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3"/>))}
-                    {qLines.map(ql=>(<ReferenceLine key={ql.label} x={ql.chartT} stroke="#2a2a2a" strokeWidth={1} label={{value:ql.label,position:'insideTopRight',fontSize:9,fill:'#555',fontFamily:fm,dy:-4}}/>))}
                     {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?HOME.light:AWAY.light;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                     <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#lhg)" dot={false} animationDuration={0} baseValue={0}/>
                     <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
