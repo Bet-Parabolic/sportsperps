@@ -1815,6 +1815,26 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
       }).catch(() => {});
   }, [initGame.id]);
 
+  // When game changes (sidebar switch), reset chart/oracle but keep positions + balance
+  const prevGameIdRef = useRef(initGame.id);
+  useEffect(() => {
+    if (prevGameIdRef.current === initGame.id) return;
+    prevGameIdRef.current = initGame.id;
+    setG(initGame);
+    setOPrice(initGame.oracle?.indexPrice ?? 0.5);
+    setOMark(initGame.oracle?.markPrice ?? 0.5);
+    setOSrcs(initGame.oracle?.sources ?? []);
+    setOConf(initGame.oracle?.confidence ?? 0.5);
+    setChartData([]);
+    setChartT0(null);
+    setPlayLog([]);
+    setMarkers([]);
+    setSettled(false);
+    setSettledWinner(null);
+    setLimitOrders([]);
+    // positions, balance, closedPos, closedPnL preserved intentionally
+  }, [initGame.id, initGame]);
+
   // ── poll game + oracle every 5s ─────────────────────────────────────────
   useEffect(() => {
     let t0Local = null;
@@ -2184,11 +2204,14 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                       <linearGradient id="lag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={AWAY.light} stopOpacity={0.08}/><stop offset="100%" stopColor={AWAY.light} stopOpacity={0.01}/></linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="2 6" stroke="#ffffff04" vertical={false}/>
-                    <XAxis dataKey="t" tick={{fill:'#555',fontSize:10}} tickFormatter={v=>v.toFixed(0)+'m'} axisLine={{stroke:'#1f1f1f'}} tickLine={false}/>
+                    <XAxis dataKey="t" tick={{fill:'#555',fontSize:9}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
+                      tickFormatter={v=>v+'m'}
+                      ticks={(()=>{const mT=merged.length?Math.ceil(merged[merged.length-1].t):60;const s=mT>80?20:mT>40?10:mT>20?5:2;const ts=[];for(let t=0;t<=mT+s;t+=s)ts.push(t);return ts;})()}/>
                     <YAxis domain={[0,1]} tick={{fill:'#555',fontSize:10}} tickFormatter={v=>(v*100)+'%'} axisLine={false} tickLine={false} width={32} orientation="right"/>
                     <Tooltip content={<ChartTip/>} cursor={{stroke:'#ffffff06'}}/>
                     <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
                     {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3"/>))}
+                    {qLines.map(ql=>(<ReferenceLine key={ql.label} x={ql.chartT} stroke="#2a2a2a" strokeWidth={1} label={{value:ql.label,position:'insideTopRight',fontSize:9,fill:'#555',fontFamily:fm,dy:-4}}/>))}
                     {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?HOME.light:AWAY.light;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                     <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#lhg)" dot={false} animationDuration={0} baseValue={0}/>
                     <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
@@ -2466,7 +2489,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             <button onClick={placeOrder} disabled={settled||eM<10} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,border:'none',
               cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
               background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,
-              color:settled?'#666':'#000',opacity:settled||eM<10?0.4:1}}>
+              color:settled?'#666':'#fff',opacity:settled||eM<10?0.4:1}}>
               {settled?'Game Settled':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${shareCount} shares`:`Buy ${team.name} · ${shareCount} shares`}
             </button>
             {/* Account */}
@@ -2547,7 +2570,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         <div style={{position:'fixed',inset:0,zIndex:40,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,.85)',backdropFilter:'blur(20px)'}}>
           <div style={{textAlign:'center',padding:'48px 56px',maxWidth:440,background:'#111',borderRadius:24,border:'1px solid #2a2a2a'}}>
             <div style={{fontSize:56,marginBottom:16}}>🏆</div>
-            <div style={{fontSize:28,fontWeight:800,color:HOME.light,marginBottom:6}}>{settledWinner||HOME.name} Win</div>
+            <div style={{fontSize:28,fontWeight:800,color:(g.home.score||0)>=(g.away.score||0)?HOME.light:AWAY.light,marginBottom:6}}>{settledWinner||HOME.name} defeat {(g.home.score||0)>=(g.away.score||0)?AWAY.name:HOME.name}</div>
             <div style={{fontSize:18,color:'#888',fontFamily:fm,marginBottom:4}}>{g.home.score} – {g.away.score}</div>
             <div style={{fontSize:13,color:'#555',marginBottom:24}}>{g.shortName||g.name}</div>
             <div style={{fontSize:40,fontWeight:800,color:totalEq>=10000?B.green:'#ef4444',fontFamily:fm,marginBottom:4}}>{fmtUsd(totalEq)}</div>
@@ -3353,7 +3376,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
             <button onClick={placeOrder} disabled={settled||eM<10} style={{width:"100%",padding:"14px 0",fontWeight:700,fontSize:14,border:"none",
               cursor:settled||eM<10?"not-allowed":"pointer",fontFamily:fb,borderRadius:12,transition:"all .15s",
               background:settled?"#222":orderSide==="home"?HOME.light:AWAY.light,
-              color:settled?"#666":"#000",opacity:settled||eM<10?0.4:1}}>
+              color:settled?"#666":"#fff",opacity:settled||eM<10?0.4:1}}>
               {settled?"Market Settled":orderType==="limit"?`Limit ${team.name} @ ${limitCents}¢ · ${shareCount} shares`:`Buy ${team.name} · ${shareCount} shares`}
             </button>
 
@@ -3466,9 +3489,10 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
       {settled&&(
         <div style={{position:"fixed",inset:0,zIndex:40,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.85)",backdropFilter:"blur(20px)"}}>
           <div style={{textAlign:"center",padding:"48px 56px",maxWidth:440,background:"#111",borderRadius:24,border:"1px solid #2a2a2a"}}>
-            <div style={{fontSize:56,marginBottom:16}}>{HOME.logo}</div>
-            <div style={{fontSize:28,fontWeight:800,color:HOME.light,marginBottom:6}}>{HOME.name} Win</div>
-            <div style={{fontSize:18,color:"#888",fontFamily:fm,marginBottom:4}}>{gs.hs} – {gs.as}</div>
+            {(()=>{const wT=gs.hs>=gs.as?HOME:AWAY;const lT=gs.hs>=gs.as?AWAY:HOME;return(<>
+            <div style={{fontSize:56,marginBottom:16}}>{wT.logo}</div>
+            <div style={{fontSize:28,fontWeight:800,color:wT.light,marginBottom:6}}>{wT.name} defeat {lT.name}</div>
+            <div style={{fontSize:18,color:"#888",fontFamily:fm,marginBottom:4}}>{gs.hs} – {gs.as}</div></>);})()}
             <div style={{fontSize:13,color:"#555",marginBottom:24}}>{G.label}</div>
             <div style={{fontSize:40,fontWeight:800,color:totalEq>=10000?B.green:"#ef4444",fontFamily:fm,marginBottom:4}}>{fmtUsd(totalEq)}</div>
             <div style={{fontSize:15,marginBottom:36}}>
@@ -3528,7 +3552,7 @@ export default function App() {
       `}</style>
       {page==="landing"?<LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>setPage("docs")}/>
       :page==="docs"?<DocsPage onBack={()=>setPage("landing")} onLaunch={()=>setPage("trading")}/>
-      :page==="live-trading"&&liveGame?<LiveTradingApp key={liveGame.id} game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
+      :page==="live-trading"&&liveGame?<LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
       :sel?<TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>:null}
     </div>
   );
