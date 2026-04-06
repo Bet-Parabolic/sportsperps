@@ -1801,6 +1801,18 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
   // ── normalise team colors from backend ──────────────────────────────────
   const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
 
+  // ── userId: persist in localStorage, register with backend ──────────────
+  const [userId] = useState(() => {
+    let id = localStorage.getItem('perpdictions_userId');
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem('perpdictions_userId', id); }
+    return id;
+  });
+
+  // Register user with backend on mount
+  useEffect(() => {
+    fetch(`${API_URL}/users`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId}) }).catch(()=>{});
+  }, [userId]);
+
   // ── state ───────────────────────────────────────────────────────────────
   const [g, setG]           = useState(initGame);
   const [oPrice, setOPrice] = useState(initGame.oracle?.indexPrice ?? 0.5);
@@ -1977,7 +1989,6 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
           setOPrice(op); setOMark(mp);
           setOSrcs(upd.oracle.sources || []);
           setOConf(upd.oracle.confidence || 0.5);
-          setBook(makeBook(op));
 
           // append chart point
           setChartT0(prev => {
@@ -1992,83 +2003,66 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             }]);
             return prev || ref;
           });
-
-          // liquidation check (against markPrice)
-          const cp = posR.current;
-          if (cp.length) {
-            let changed = false;
-            const upd2 = cp.filter(pos => {
-              const pnl = calcPnL(pos.side, pos.exposure, pos.entry, mp);
-              if (pnl <= -pos.margin * 0.95) {
-                changed = true;
-                setClosedPos(pr => [{...pos, closedAt:op, pnl:-pos.margin, closeType:'LIQ'}, ...pr]);
-                setClosedPnL(p => p - pos.margin);
-                notify('☠ LIQUIDATED', 'red');
-                return false;
-              }
-              return true;
-            });
-            if (changed) setPositions(upd2);
-          }
-
-          // TP/SL
-          const cp2 = posR.current;
-          if (cp2.some(p => p.tp || p.sl)) {
-            let hit = false;
-            const rem = cp2.filter(pos => {
-              const tpHit = pos.tp && (pos.side==='home' ? op>=pos.tp : op<=pos.tp);
-              const slHit = pos.sl && (pos.side==='home' ? op<=pos.sl : op>=pos.sl);
-              if (tpHit || slHit) {
-                hit = true;
-                const pnl2 = calcPnL(pos.side, pos.exposure, pos.entry, op);
-                setBalance(b => b + pos.margin + pnl2);
-                setClosedPnL(p => p + pnl2);
-                setClosedPos(pr => [{...pos, closedAt:op, pnl:pnl2, closeType:tpHit?'TP':'SL'}, ...pr]);
-                const tn = pos.side==='home' ? HOME : AWAY;
-                notify((tpHit?'🎯 TP HIT':'🛑 SL HIT')+' '+tn.name+' '+fmtUsd(pnl2), tpHit?'green':'red');
-                return false;
-              }
-              return true;
-            });
-            if (hit) setPositions(rem);
-          }
-
-          // limit order fills
-          const lo = limR.current;
-          if (lo.length) {
-            let filled = false;
-            const remLO = lo.filter(lim => {
-              const fills = lim.side==='home' ? op<=lim.limitPrice : op>=(1-lim.limitPrice);
-              if (fills) {
-                filled = true;
-                const liq2 = liqPrice(lim.side, op, lim.leverage);
-                setPositions(prev => [...prev, {id:lim.id+1,side:lim.side,margin:lim.margin,leverage:lim.leverage,exposure:lim.exposure,entry:op,liq:liq2,tp:lim.tp,sl:lim.sl}]);
-                const loTm = lim.side==='home' ? HOME : AWAY;
-                notify('✅ FILLED: '+loTm.name+' @ '+(op*100).toFixed(1)+'¢', 'green');
-                return false;
-              }
-              return true;
-            });
-            if (filled) setLimitOrders(remLO);
-          }
         }
 
-        // settlement
+        // Fetch real orderbook depth from backend
+        try {
+          const mktRes = await fetch(`${API_URL}/market/${initGame.id}`);
+          if (mktRes.ok) {
+            const mktData = await mktRes.json();
+            if (mktData.depth?.bids?.length || mktData.depth?.asks?.length) {
+              const bids = mktData.depth.bids.map(b => ({price:b.price,size:b.size}));
+              const asks = mktData.depth.asks.map(a => ({price:a.price,size:a.size}));
+              let cumA=0,cumB=0;
+              asks.forEach(a=>{cumA+=a.size;a.cum=cumA;});
+              bids.forEach(b=>{cumB+=b.size;b.cum=cumB;});
+              setBook({asks, bids});
+            } else {
+              setBook(makeBook(upd.oracle?.indexPrice ?? 0.5));
+            }
+          }
+        } catch(e) {
+          setBook(makeBook(upd.oracle?.indexPrice ?? 0.5));
+        }
+
+        // Fetch positions + balance from backend (backend handles liq/TP/SL/settlement)
+        try {
+          const [balRes, posRes] = await Promise.all([
+            fetch(`${API_URL}/balance/${userId}`),
+            fetch(`${API_URL}/positions/${userId}`),
+          ]);
+          if (balRes.ok) {
+            const balData = await balRes.json();
+            setBalance(balData.balance);
+            setClosedPnL(balData.closedPnl);
+          }
+          if (posRes.ok) {
+            const posData = await posRes.json();
+            setPositions(posData.positions.map(p => ({
+              id: p.id,
+              gameId: p.gameId,
+              side: p.side,
+              size: p.size,
+              margin: p.margin,
+              leverage: p.leverage,
+              exposure: p.size * p.entryPx,
+              entry: p.entryPx,
+              liq: p.liqPrice,
+              tp: p.tp,
+              sl: p.sl,
+              pnl: p.pnl,
+              roe: p.roe,
+              openedAt: p.openedAt,
+            })));
+          }
+        } catch(e) { /* backend unavailable, keep local state */ }
+
+        // Settlement detection
         if ((upd.status==='final'||upd.status==='completed') && !settled) {
           setSettled(true);
           const homeWins = (upd.home.score||0) > (upd.away.score||0);
-          const finalP = homeWins ? 1.0 : 0.0;
           setSettledWinner(homeWins ? HOME.name : AWAY.name);
-          const fp = posR.current;
-          if (fp.length) {
-            let sp = 0;
-            const nc2 = fp.map(pos => { const pnl=calcPnL(pos.side,pos.exposure,pos.entry,finalP); sp+=pnl; return {...pos,closedAt:finalP,pnl,closeType:'SETTLED'}; });
-            setClosedPos(pr => [...nc2, ...pr]);
-            setBalance(b => b + fp.reduce((s,p)=>s+p.margin,0) + sp);
-            setClosedPnL(p => p + sp);
-            setPositions([]);
-            notify('🏆 FINAL — '+fmtUsd(sp), 'green');
-          }
+          notify('Game Final — '+(homeWins ? HOME.name : AWAY.name)+' wins', 'green');
         }
       } catch(e) {}
     };
@@ -2076,53 +2070,96 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
     poll();
     const iv = setInterval(poll, 5000);
     return () => clearInterval(iv);
-  }, [initGame.id, settled]);
+  }, [initGame.id, settled, userId]);
 
-  // ── placeOrder ──────────────────────────────────────────────────────────
-  const placeOrder = useCallback(() => {
+  // ── placeOrder (backend CLOB) ────────────────────────────────────────────
+  const placeOrder = useCallback(async () => {
     if (settled) return;
     const op = oR.current;
     const ml2 = maxLev(op), lev = Math.min(orderLev, ml2);
     const margin = Math.min(orderMargin, balance);
     if (margin < 10) { notify('Insufficient margin', 'red'); return; }
     if (reduceOnly && !posR.current.some(p => p.side===orderSide)) { notify('No position to reduce', 'red'); return; }
-    const exposure = margin * lev;
-    const tp = tpCents!==''&&+tpCents>0 ? (orderSide==='home'?+tpCents/100:1-+tpCents/100) : null;
-    const sl = slCents!==''&&+slCents>0 ? (orderSide==='home'?+slCents/100:1-+slCents/100) : null;
+    const tp = tpCents!==''&&+tpCents>0 ? +tpCents/100 : null;
+    const sl = slCents!==''&&+slCents>0 ? +slCents/100 : null;
     const chartNow = chartData.length ? chartData[chartData.length-1].t : 0;
-    if (orderType==='limit') {
-      setLimitOrders(p => [...p, {id:Date.now(), side:orderSide, margin, leverage:lev, exposure, limitPrice:limitCents/100, tp, sl}]);
-      setBalance(b => b - margin);
-      const tn = orderSide==='home' ? HOME : AWAY;
-      notify(tn.logo+' Limit '+tn.name+' @ '+limitCents+'¢', 'info');
-    } else {
-      const entry = op, liq = liqPrice(orderSide, entry, lev);
-      setPositions(p => [...p, {id:Date.now(), side:orderSide, margin, leverage:lev, exposure, entry, liq, tp, sl}]);
-      setBalance(b => b - margin);
-      addMark(chartNow, entry, 'entry', orderSide);
-      setBottomTab('positions');
-      const tn = orderSide==='home' ? HOME : AWAY;
-      notify(tn.name+' '+lev+'x @ '+(entry*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
-    }
-  }, [oPrice, orderSide, orderMargin, orderLev, balance, settled, orderType, limitCents, tpCents, slCents, reduceOnly, chartData, HOME, AWAY, notify, addMark]);
 
-  const closePosition = useCallback((id) => {
-    setPositions(prev => {
-      const pos = prev.find(p => p.id===id);
-      if (!pos) return prev;
-      const op = oR.current, chartNow = chartData.length ? chartData[chartData.length-1].t : 0;
-      const pnl = calcPnL(pos.side, pos.exposure, pos.entry, op);
-      setBalance(b => b + pos.margin + pnl);
-      setClosedPnL(p => p + pnl);
-      addMark(chartNow, op, pnl>=0?'exit-win':'exit-loss', pos.side);
-      setClosedPos(pr => [{...pos,closedAt:op,pnl,closeType:'CLOSED'}, ...pr]);
-      notify('Closed '+(pos.side==='home'?HOME:AWAY).name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
-      return prev.filter(p => p.id!==id);
-    });
-  }, [oPrice, chartData, HOME, AWAY, notify, addMark]);
+    // Calculate size from margin + leverage: size = (margin * leverage) / price
+    const price = orderType==='limit' ? limitCents/100 : op;
+    const size = Math.max(1, Math.round((margin * lev) / Math.max(price, 0.01)));
+
+    try {
+      const res = await fetch(`${API_URL}/orders`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          userId,
+          gameId: g.id,
+          side: orderSide,
+          price: orderType==='limit' ? limitCents/100 : undefined,
+          size,
+          type: orderType,
+          leverage: lev,
+          tif: orderType==='limit' ? 'GTC' : undefined,
+          reduceOnly,
+          tp, sl,
+        }),
+      });
+      const result = await res.json();
+      if (result.status === 'rejected') {
+        notify('Rejected: '+(result.reason||'unknown'), 'red');
+        return;
+      }
+      const tn = orderSide==='home' ? HOME : AWAY;
+      if (result.fills?.length > 0) {
+        const avgPx = result.fills.reduce((s,f)=>s+f.px*f.size,0) / result.fills.reduce((s,f)=>s+f.size,0);
+        addMark(chartNow, avgPx, 'entry', orderSide);
+        setBottomTab('positions');
+        notify(tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
+      } else if (result.status === 'resting') {
+        notify('Limit '+tn.name+' @ '+limitCents+'¢', 'info');
+      }
+    } catch(e) {
+      notify('Order failed: '+e.message, 'red');
+    }
+  }, [oPrice, orderSide, orderMargin, orderLev, balance, settled, orderType, limitCents, tpCents, slCents, reduceOnly, chartData, HOME, AWAY, notify, addMark, userId, g.id]);
+
+  const closePosition = useCallback(async (posId) => {
+    // Find position to close — use backend positions
+    const pos = posR.current.find(p => p.id===posId);
+    if (!pos) return;
+    const chartNow = chartData.length ? chartData[chartData.length-1].t : 0;
+
+    try {
+      const closeSide = pos.side === 'home' ? 'away' : 'home';
+      const res = await fetch(`${API_URL}/orders`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          userId,
+          gameId: pos.gameId || g.id,
+          side: closeSide,
+          size: pos.size,
+          type: 'market',
+          leverage: pos.leverage,
+          reduceOnly: true,
+        }),
+      });
+      const result = await res.json();
+      if (result.fills?.length > 0) {
+        const avgPx = result.fills.reduce((s,f)=>s+f.px*f.size,0) / result.fills.reduce((s,f)=>s+f.size,0);
+        const pnl = pos.pnl || 0;
+        addMark(chartNow, avgPx, pnl>=0?'exit-win':'exit-loss', pos.side);
+        const tn = pos.side==='home' ? HOME : AWAY;
+        notify('Closed '+tn.name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
+      }
+    } catch(e) {
+      notify('Close failed: '+e.message, 'red');
+    }
+  }, [chartData, HOME, AWAY, notify, addMark, userId, g.id]);
 
   // ── derived ─────────────────────────────────────────────────────────────
-  const totalUPnL = positions.reduce((s,p) => s + calcPnL(p.side,p.exposure,p.entry,oPrice), 0);
+  const totalUPnL = positions.reduce((s,p) => s + (p.pnl != null ? p.pnl : calcPnL(p.side,p.exposure||0,p.entry,oPrice)), 0);
   const totalEq   = balance + positions.reduce((s,p)=>s+p.margin,0) + totalUPnL;
   const ml  = maxLev(oPrice), eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
   const team = orderSide==='home' ? HOME : AWAY;
@@ -2131,8 +2168,8 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
   const shareCount = Math.max(1, Math.round(expo/entryP));
   const awayProb = 1 - oPrice;
   const momentum = chartData.length>20 ? oPrice - chartData[chartData.length-20].ph : 0;
-  const simVol = Math.floor(9200 + chartData.length*60 + positions.reduce((s,p)=>s+p.exposure,0) + closedPos.reduce((s,p)=>s+p.exposure,0));
-  const simOI  = positions.reduce((s,p)=>s+p.exposure,0) + Math.floor(chartData.length*40);
+  const simVol = Math.floor(9200 + chartData.length*60 + positions.reduce((s,p)=>s+(p.exposure||0),0) + closedPos.reduce((s,p)=>s+(p.exposure||0),0));
+  const simOI  = positions.reduce((s,p)=>s+(p.exposure||0),0) + Math.floor(chartData.length*40);
   const fundingRate = ((oPrice-0.5)*0.08).toFixed(3);
 
   // merged chart data with markers
@@ -2411,12 +2448,12 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
               ) : (
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
                   {positions.map(pos=>{
-                    const pnl=calcPnL(pos.side,pos.exposure,pos.entry,oPrice);
-                    const pnlPct=(pnl/pos.margin)*100;
+                    const pnl=pos.pnl!=null?pos.pnl:calcPnL(pos.side,pos.exposure||0,pos.entry,oPrice);
+                    const pnlPct=pos.margin>0?(pnl/pos.margin)*100:0;
                     const tm=pos.side==='home'?HOME:AWAY;
                     const markP=pos.side==='home'?oPrice:1-oPrice;
                     const posEntryP=pos.side==='home'?pos.entry:1-pos.entry;
-                    const posShares=Math.round(pos.exposure/pos.entry);
+                    const posShares=pos.size||Math.round((pos.exposure||0)/Math.max(pos.entry,0.01));
                     return (
                       <div key={pos.id} style={{borderRadius:12,border:'1px solid #1f1f1f',overflow:'hidden',background:'#0a0a0a'}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',borderLeft:'3px solid '+(pos.side==='home'?HOME.light:AWAY.light)}}>
@@ -2432,7 +2469,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                           </div>
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',padding:'8px 14px',borderTop:'1px solid #1a1a1a'}}>
-                          {[['Entry',(posEntryP*100).toFixed(1)+'¢','#888'],['Mark',(markP*100).toFixed(1)+'¢',B.primaryLight],['Liq',(pos.side==='home'?pos.liq:1-pos.liq)*100|0+'¢',B.red],['Size',fmtUsd(pos.exposure),'#888']].map(([label,value,color])=>(
+                          {[['Entry',(posEntryP*100).toFixed(1)+'¢','#888'],['Mark',(markP*100).toFixed(1)+'¢',B.primaryLight],['Liq',(pos.liq!=null?(pos.side==='home'?pos.liq:1-pos.liq)*100|0:'-')+'¢',B.red],['Size',pos.size?pos.size+' shr':fmtUsd(pos.exposure||0),'#888']].map(([label,value,color])=>(
                             <div key={label} style={{textAlign:'center'}}>
                               <div style={{fontSize:10,color:'#444',marginBottom:2}}>{label}</div>
                               <div style={{fontSize:12,fontWeight:700,fontFamily:fm,color}}>{value}</div>
