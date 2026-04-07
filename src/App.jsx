@@ -2124,9 +2124,9 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
     }
   }, [oPrice, orderSide, orderMargin, orderLev, balance, settled, orderType, limitCents, tpCents, slCents, reduceOnly, chartData, HOME, AWAY, notify, addMark, userId, g.id]);
 
-  const closePosition = useCallback(async (posId) => {
-    // Find position to close — use backend positions
-    const pos = posR.current.find(p => p.id===posId);
+  const closePosition = useCallback(async (posObj) => {
+    // posObj is the full position object passed directly from the button
+    const pos = typeof posObj === 'object' ? posObj : posR.current.find(p => p.id===posObj);
     if (!pos) return;
     const chartNow = chartData.length ? chartData[chartData.length-1].t : 0;
 
@@ -2152,6 +2152,8 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         addMark(chartNow, avgPx, pnl>=0?'exit-win':'exit-loss', pos.side);
         const tn = pos.side==='home' ? HOME : AWAY;
         notify('Closed '+tn.name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
+      } else if (result.status === 'rejected') {
+        notify('Close rejected: '+(result.reason||''), 'red');
       }
     } catch(e) {
       notify('Close failed: '+e.message, 'red');
@@ -2478,7 +2480,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                         </div>
                         <div style={{padding:'8px 14px',borderTop:'1px solid #1a1a1a',display:'flex',alignItems:'center',gap:6}}>
                           <span style={{fontSize:11,color:'#555',flex:1,fontFamily:fm}}>{posShares.toLocaleString()} shares · margin {fmtUsd(pos.margin)}</span>
-                          <button onClick={()=>closePosition(pos.id)} style={{padding:'5px 14px',background:'#ef444415',border:'1px solid #ef444430',borderRadius:8,cursor:'pointer',color:'#ef4444',fontWeight:700,fontSize:11,fontFamily:fb}}>Close</button>
+                          <button onClick={()=>closePosition(pos)} style={{padding:'5px 14px',background:'#ef444415',border:'1px solid #ef444430',borderRadius:8,cursor:'pointer',color:'#ef4444',fontWeight:700,fontSize:11,fontFamily:fb}}>Close</button>
                         </div>
                       </div>
                     );
