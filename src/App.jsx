@@ -1172,7 +1172,7 @@ function Grid({ children }) {
 }
 
 /* ─── NFL PAGE ─── */
-function NFLPage({ data={events:[],loading:true,error:false} }) {
+function NFLPage({ data={events:[],loading:true,error:false}, onTrade }) {
   const games = data.events.map(parseESPNEvent);
   const live  = games.filter(g => g.isLive);
   const final = games.filter(g => g.isFinal && isRecent(g.date));
@@ -1180,7 +1180,7 @@ function NFLPage({ data={events:[],loading:true,error:false} }) {
   return (
     <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏈</div><div style={{fontSize:14,color:"#555"}}>No NFL games scheduled today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={onTrade} _espnKey="nfl"/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
     </SportPageShell>
@@ -1262,7 +1262,7 @@ function TrendingPage({ liveGames, espnData={}, onTrade }) {
 }
 
 /* ─── SOCCER PAGE ─── */
-function SoccerPage({ data={events:[],loading:true,error:false} }) {
+function SoccerPage({ data={events:[],loading:true,error:false}, onTrade }) {
   const games = data.events.map(parseESPNEvent);
   const live = games.filter(g=>g.isLive);
   const final = games.filter(g=>g.isFinal && isRecent(g.date));
@@ -1270,7 +1270,7 @@ function SoccerPage({ data={events:[],loading:true,error:false} }) {
   return (
     <SportPageShell title="UEFA Champions League" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No Champions League fixtures today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽" onTrade={onTrade} _espnKey="ucl"/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
     </SportPageShell>
@@ -1390,7 +1390,7 @@ function MMAPage({ data={events:[],loading:true,error:false} }) {
 /* ═══════════════════════════════════════════════════════════
    BASEBALL PAGE — live/upcoming MLB games via ESPN public API
    ═══════════════════════════════════════════════════════════ */
-function BaseballPage({ data={events:[],loading:true,error:false} }) {
+function BaseballPage({ data={events:[],loading:true,error:false}, onTrade }) {
   const games  = data.events.map(parseESPNEvent);
   const live    = games.filter(g => g.isLive);
   const final   = games.filter(g => g.isFinal && isRecent(g.date));
@@ -1444,6 +1444,13 @@ function BaseballPage({ data={events:[],loading:true,error:false} }) {
         {/* Scheduled time */}
         {g.isScheduled && g.detail && (
           <div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:4}}>{g.detail}</div>
+        )}
+        {onTrade&&g.isLive&&(
+          <button onClick={()=>{const norm=normalizeEspnToLive(g._raw,'mlb');if(norm)onTrade(norm);}} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
+            background:"linear-gradient(135deg,"+B.primary+","+B.primaryLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
+            Trade Live
+          </button>
         )}
       </div>
     );
@@ -1879,6 +1886,45 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
     setMarkers(prev => [...prev, {t: +chartT.toFixed(2), p, markerType: mt, line: side||'home'}]);
   }, []);
 
+  // ── fetch ESPN live games for sidebar (all sports) ──────────────────────
+  const [espnSidebarGames, setEspnSidebarGames] = useState([]);
+  useEffect(() => {
+    const SIDEBAR_SPORTS = [
+      {key:'nfl',path:'football/nfl',emoji:'🏈'},
+      {key:'mlb',path:'baseball/mlb',emoji:'⚾'},
+      {key:'nhl',path:'hockey/nhl',emoji:'🏒'},
+      {key:'ucl',path:'soccer/uefa.champions',emoji:'⚽'},
+    ];
+    const fetchEspnSidebar = async () => {
+      const allLive = [];
+      for (const s of SIDEBAR_SPORTS) {
+        try {
+          const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${s.path}/scoreboard`);
+          if (!res.ok) continue;
+          const d = await res.json();
+          for (const ev of (d.events||[])) {
+            const parsed = parseESPNEvent(ev);
+            if (parsed.isLive) {
+              const norm = normalizeEspnToLive(ev, s.key);
+              if (norm) allLive.push({...norm, _emoji: s.emoji, _sport: s.key});
+            }
+          }
+        } catch(e) {}
+      }
+      setEspnSidebarGames(allLive);
+    };
+    fetchEspnSidebar();
+    const iv = setInterval(fetchEspnSidebar, 30000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Combined sidebar games: backend + ESPN
+  const allSidebarGames = useMemo(() => {
+    const backend = liveGames.filter(lg => lg.id!==initGame.id && (lg.status==='live'||lg.status==='halftime'));
+    const espn = espnSidebarGames.filter(g => g.id !== initGame.id && g.id !== initGame.espnId);
+    return [...backend, ...espn];
+  }, [liveGames, espnSidebarGames, initGame.id, initGame.espnId]);
+
   // ── fetch oracle history on mount (backend only) ────────────────────────
   useEffect(() => {
     if (initGame._espnKey) {
@@ -2256,19 +2302,19 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             </div>
           </div>
 
-          {/* Other live games */}
-          {liveGames.filter(lg => lg.id!==initGame.id && (lg.status==='live'||lg.status==='halftime')).length > 0 && (
+          {/* Other live games — all sports */}
+          {allSidebarGames.length > 0 && (
             <div style={{padding:'0 16px'}}>
-              <div style={{fontSize:10,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,marginBottom:8}}>OTHER LIVE</div>
-              {liveGames.filter(lg=>lg.id!==initGame.id&&(lg.status==='live'||lg.status==='halftime')).map(lg=>(
+              <div style={{fontSize:10,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,marginBottom:8}}>OTHER LIVE ({allSidebarGames.length})</div>
+              {allSidebarGames.map(lg=>(
                 <div key={lg.id} onClick={()=>onTrade&&onTrade(lg)}
                   style={{padding:'10px 12px',marginBottom:6,background:'#111',borderRadius:10,border:'1px solid #1f1f1f',fontSize:11,fontFamily:fm,cursor:onTrade?'pointer':'default'}}>
                   <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                    <span style={{color:'#fff',fontWeight:600}}>{lg.home.abbreviation} <span style={{color:'#555'}}>vs</span> {lg.away.abbreviation}</span>
-                    <span style={{color:B.green,fontSize:10}}>Q{lg.period} {lg.clock}</span>
+                    <span style={{color:'#fff',fontWeight:600}}>{lg._emoji?lg._emoji+' ':''}{lg.home.abbreviation||lg.home.name?.slice(0,3).toUpperCase()||'HOME'} <span style={{color:'#555'}}>vs</span> {lg.away.abbreviation||lg.away.name?.slice(0,3).toUpperCase()||'AWAY'}</span>
+                    <span style={{color:B.green,fontSize:10}}>{lg.period?`Q${lg.period} `:''}{lg.clock||lg.statusDetail||'LIVE'}</span>
                   </div>
                   <div style={{display:'flex',justifyContent:'space-between'}}>
-                    <span style={{color:'#888'}}>{lg.home.score} – {lg.away.score}</span>
+                    <span style={{color:'#888'}}>{lg.home.score??0} – {lg.away.score??0}</span>
                     {lg.oracle?.indexPrice && <span style={{color:B.primary,fontWeight:700}}>{(lg.oracle.indexPrice*100).toFixed(0)}%</span>}
                   </div>
                   {onTrade&&<div style={{marginTop:3,fontSize:9,color:'#444',textAlign:'right'}}>Trade →</div>}
@@ -2567,13 +2613,13 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
           {rightTab==='order'&&(<div style={{background:'#111',borderRadius:16,border:'1px solid #1f1f1f',padding:18}}>
             {/* Team selector */}
             <div style={{display:'flex',gap:0,marginBottom:14,background:'#1a1a1a',borderRadius:12,padding:3}}>
-              <button onClick={()=>{setOrderSide('home');if(orderType==='limit')setLimitCents(Math.round(oPrice*100));}} style={{flex:1,padding:'10px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .15s',
-                background:orderSide==='home'?HOME.light:'transparent',color:orderSide==='home'?'#000':'#666'}}>
+              <button onClick={()=>{setOrderSide('home');if(orderType==='limit')setLimitCents(Math.round(oPrice*100));}} style={{flex:1,padding:'10px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:orderSide==='home'?'2px solid '+HOME.light:'2px solid transparent',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .15s',
+                background:orderSide==='home'?HOME.light+'22':'transparent',color:'#fff'}}>
                 {HOME.logoUrl&&<img src={HOME.logoUrl} style={{width:18,height:18,objectFit:'contain',borderRadius:4}} alt=""/>}
                 {HOME.short} <span style={{fontSize:11,fontWeight:600,opacity:0.7}}>{(oPrice*100).toFixed(0)}¢</span>
               </button>
-              <button onClick={()=>{setOrderSide('away');if(orderType==='limit')setLimitCents(Math.round(awayProb*100));}} style={{flex:1,padding:'10px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .15s',
-                background:orderSide==='away'?AWAY.light:'transparent',color:orderSide==='away'?'#000':'#666'}}>
+              <button onClick={()=>{setOrderSide('away');if(orderType==='limit')setLimitCents(Math.round(awayProb*100));}} style={{flex:1,padding:'10px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:orderSide==='away'?'2px solid '+AWAY.light:'2px solid transparent',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .15s',
+                background:orderSide==='away'?AWAY.light+'22':'transparent',color:'#fff'}}>
                 {AWAY.logoUrl&&<img src={AWAY.logoUrl} style={{width:18,height:18,objectFit:'contain',borderRadius:4}} alt=""/>}
                 {AWAY.short} <span style={{fontSize:11,fontWeight:600,opacity:0.7}}>{(awayProb*100).toFixed(0)}¢</span>
               </button>
@@ -2678,10 +2724,11 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
               </div>
             </div>
             {/* Submit */}
-            <button onClick={placeOrder} disabled={settled||eM<10} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,border:'none',
+            <button onClick={placeOrder} disabled={settled||eM<10} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
+              border:settled?'2px solid #333':'2px solid '+B.green,
               cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
               background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,
-              color:settled?'#666':'#fff',opacity:settled||eM<10?0.4:1}}>
+              color:'#fff',opacity:settled||eM<10?0.4:1}}>
               {settled?'Game Settled':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${shareCount} shares`:`Buy ${team.name} · ${shareCount} shares`}
             </button>
             {/* Account */}
@@ -2802,13 +2849,13 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                   </div>
                   <div style={{padding:'0 16px 16px'}}>
                     <div style={{display:'flex',gap:0,margin:'12px 0',background:'#1a1a1a',borderRadius:12,padding:3}}>
-                      <button onClick={()=>setOrderSide('home')} style={{flex:1,padding:'11px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'all .15s',
-                        background:orderSide==='home'?HOME.light:'transparent',color:orderSide==='home'?'#000':'#666'}}>
+                      <button onClick={()=>setOrderSide('home')} style={{flex:1,padding:'11px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:orderSide==='home'?'2px solid '+HOME.light:'2px solid transparent',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'all .15s',
+                        background:orderSide==='home'?HOME.light+'22':'transparent',color:'#fff'}}>
                         {HOME.logoUrl&&<img src={HOME.logoUrl} style={{width:16,height:16,objectFit:'contain',borderRadius:3}} alt=""/>}
                         {HOME.short} <span style={{fontSize:11,opacity:0.7}}>{(oPrice*100).toFixed(0)}¢</span>
                       </button>
-                      <button onClick={()=>setOrderSide('away')} style={{flex:1,padding:'11px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'all .15s',
-                        background:orderSide==='away'?AWAY.light:'transparent',color:orderSide==='away'?'#000':'#666'}}>
+                      <button onClick={()=>setOrderSide('away')} style={{flex:1,padding:'11px 0',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:fb,borderRadius:10,border:orderSide==='away'?'2px solid '+AWAY.light:'2px solid transparent',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'all .15s',
+                        background:orderSide==='away'?AWAY.light+'22':'transparent',color:'#fff'}}>
                         {AWAY.logoUrl&&<img src={AWAY.logoUrl} style={{width:16,height:16,objectFit:'contain',borderRadius:3}} alt=""/>}
                         {AWAY.short} <span style={{fontSize:11,opacity:0.7}}>{(awayProb*100).toFixed(0)}¢</span>
                       </button>
@@ -2833,8 +2880,9 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                         </div>
                       ))}
                     </div>
-                    <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||eM<10} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:14,
-                      background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,color:settled?'#666':'#000',opacity:settled||eM<10?0.4:1}}>
+                    <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||eM<10} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
+                      border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
+                      background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,color:'#fff',opacity:settled||eM<10?0.4:1}}>
                       {settled?'Game Settled':`Buy ${team.name} · ${shareCount} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>
@@ -3118,11 +3166,11 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
 
         {terminalPage==="demos"?<DemosPage onSelectGame={(g)=>{onSwitchGame(g);setTerminalPage("game");}} currentGameId={G.id}/>
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
-        :terminalPage==="baseball"?<BaseballPage data={espnData.mlb}/>
-        :terminalPage==="soccer"?<SoccerPage data={espnData.ucl}/>
+        :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade}/>
+        :terminalPage==="soccer"?<SoccerPage data={espnData.ucl} onTrade={onTrade}/>
         :terminalPage==="hockey"?<HockeyPage data={espnData.nhl} onTrade={onTrade}/>
         :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
-        :terminalPage==="nfl"?<NFLPage data={espnData.nfl}/>
+        :terminalPage==="nfl"?<NFLPage data={espnData.nfl} onTrade={onTrade}/>
         :terminalPage==="trending"?<TrendingPage liveGames={liveGames} espnData={espnData} onTrade={onTrade}/>
         :<>
 
