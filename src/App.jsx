@@ -1802,6 +1802,251 @@ function DemosPage({ onSelectGame, currentGameId }) {
    ═══════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
+   PROFILE MODAL — user profile creation + trade history
+   ═══════════════════════════════════════════════════════════ */
+function ProfileModal({ userId, onClose }) {
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [error, setError] = useState('');
+  const [trades, setTrades] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_URL}/profile/${userId}`).then(r=>r.json()).then(d=>{
+      if(d.email||d.username){setProfile(d);setEmail(d.email||'');setUsername(d.username||'');}
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+    fetch(`${API_URL}/profile/${userId}/trades?limit=20`).then(r=>r.json()).then(d=>setTrades(d.trades||[])).catch(()=>{});
+  }, [userId]);
+
+  const saveProfile = async () => {
+    if(!email||!username){setError('Both email and username are required');return;}
+    setSaving(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/profile/${userId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,username})});
+      const data = await res.json();
+      if(res.ok){setProfile(data);localStorage.setItem('perpdictions_profile',JSON.stringify(data));}
+      else setError(data.error||'Failed to save');
+    } catch(e){setError(e.message);}
+    setSaving(false);
+  };
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',animation:'fadeIn .2s'}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'#0a0a0a',border:'1px solid #1f1f1f',borderRadius:20,width:Math.min(520,window.innerWidth-32),maxHeight:'80vh',overflow:'auto',padding:32}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
+          <h2 style={{fontFamily:fd,fontSize:22,fontWeight:800,color:'#fff'}}>{profile?.username?`@${profile.username}`:'Create Profile'}</h2>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'#666',fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+
+        {loading ? <div style={{textAlign:'center',padding:40,color:'#555'}}>Loading...</div> : !profile?.username ? (
+          <div>
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:11,color:'#666',fontFamily:fm,display:'block',marginBottom:4}}>USERNAME</label>
+              <input value={username} onChange={e=>setUsername(e.target.value)} placeholder="e.g. degen_trader"
+                style={{width:'100%',padding:'12px 14px',background:'#111',border:'1px solid #2a2a2a',borderRadius:10,color:'#fff',fontSize:14,fontFamily:fm,outline:'none'}}/>
+            </div>
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:11,color:'#666',fontFamily:fm,display:'block',marginBottom:4}}>EMAIL</label>
+              <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="you@example.com"
+                style={{width:'100%',padding:'12px 14px',background:'#111',border:'1px solid #2a2a2a',borderRadius:10,color:'#fff',fontSize:14,fontFamily:fm,outline:'none'}}/>
+            </div>
+            {error&&<div style={{color:B.red,fontSize:12,marginBottom:12,fontFamily:fm}}>{error}</div>}
+            <button onClick={saveProfile} disabled={saving} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,border:'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:12,background:B.primary,color:'#fff',opacity:saving?0.5:1}}>
+              {saving?'Saving...':'Create Profile'}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:24}}>
+              {[['Balance',fmtUsd(profile.balance),'#fff'],['Return',profile.returnPct+'%',profile.returnPct>=0?B.green:B.red],
+                ['Closed PnL',fmtUsd(profile.closedPnl),profile.closedPnl>=0?B.green:B.red],['Trades',profile.tradeCount,'#fff'],
+                ['Volume',fmtUsd(profile.totalVolume),'#fff'],['Open Positions',profile.openPositions,B.primary],
+              ].map(([label,val,color])=>(
+                <div key={label} style={{background:'#111',borderRadius:12,padding:'14px 16px',border:'1px solid #1f1f1f'}}>
+                  <div style={{fontSize:10,color:'#555',fontFamily:fm,marginBottom:4}}>{label}</div>
+                  <div style={{fontSize:18,fontWeight:800,color,fontFamily:fm}}>{val}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:24}}>
+              <button style={{flex:1,padding:'12px 0',fontWeight:700,fontSize:13,border:'1px solid #2a2a2a',cursor:'pointer',fontFamily:fb,borderRadius:10,background:'#111',color:'#fff'}}>Deposit (Coming Soon)</button>
+              <button style={{flex:1,padding:'12px 0',fontWeight:700,fontSize:13,border:'1px solid #2a2a2a',cursor:'pointer',fontFamily:fb,borderRadius:10,background:'#111',color:'#fff'}}>Withdraw (Coming Soon)</button>
+            </div>
+            {trades.length>0&&(<div>
+              <div style={{fontSize:11,color:'#555',fontWeight:700,fontFamily:fm,marginBottom:8,letterSpacing:'0.08em'}}>TRADE HISTORY</div>
+              <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                {trades.map((t,i)=>(
+                  <div key={t.id||i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'#111',borderRadius:8,border:'1px solid #1a1a1a',fontSize:11,fontFamily:fm}}>
+                    <div>
+                      <span style={{color:t.side==='home'?B.primary:'#ef4444',fontWeight:700}}>{t.side.toUpperCase()}</span>
+                      <span style={{color:'#555',margin:'0 6px'}}>{t.leverage}x</span>
+                      <span style={{color:'#888'}}>{(t.entryPx*100).toFixed(1)}¢ → {t.exitPx!=null?(t.exitPx*100).toFixed(1)+'¢':'—'}</span>
+                    </div>
+                    <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                      <span style={{color:t.pnl>=0?B.green:B.red,fontWeight:700}}>{t.pnl>=0?'+':''}{fmtUsd(t.pnl)}</span>
+                      <span style={{color:'#444',fontSize:10}}>{t.closeType}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>)}
+            <div style={{marginTop:20,paddingTop:12,borderTop:'1px solid #1a1a1a',fontSize:11,color:'#555',fontFamily:fm}}>
+              <div>{profile.email}</div>
+              <div style={{marginTop:2,color:'#333'}}>ID: {userId.slice(0,8)}...</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LEADERBOARD PAGE
+   ═══════════════════════════════════════════════════════════ */
+function LeaderboardPage({ userId }) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLb = () => fetch(`${API_URL}/leaderboard?limit=50`).then(r=>r.json()).then(d=>{setData(d.leaderboard||[]);setLoading(false);}).catch(()=>setLoading(false));
+    fetchLb();
+    const iv = setInterval(fetchLb, 30000);
+    return () => clearInterval(iv);
+  }, []);
+
+  return (
+    <div style={{flex:1,overflow:'auto',background:'#0a0a0a',padding:'32px 40px'}}>
+      <div style={{marginBottom:32}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+          <Trophy size={18} color={B.primary}/>
+          <div style={{fontSize:11,fontWeight:700,color:B.primary,letterSpacing:'0.12em',fontFamily:fm}}>LEADERBOARD</div>
+        </div>
+        <h2 style={{fontFamily:fd,fontSize:28,fontWeight:800,letterSpacing:'-0.03em',color:'#fff',marginBottom:8}}>Top Traders</h2>
+        <p style={{fontSize:13,color:'#666',lineHeight:1.6}}>Ranked by return % on initial $10,000 balance.</p>
+      </div>
+
+      {loading?<div style={{textAlign:'center',padding:60,color:'#555'}}>Loading leaderboard...</div>:
+      data.length===0?<div style={{textAlign:'center',padding:60,color:'#555'}}>No trades yet. Be the first!</div>:(
+        <div style={{borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
+          <div style={{display:'grid',gridTemplateColumns:'50px 1fr 100px 100px 80px 100px',padding:'12px 16px',background:'#111',borderBottom:'1px solid #1a1a1a',fontSize:10,fontWeight:700,color:'#555',fontFamily:fm,letterSpacing:'0.06em'}}>
+            <div>RANK</div><div>TRADER</div><div style={{textAlign:'right'}}>RETURN</div><div style={{textAlign:'right'}}>PNL</div><div style={{textAlign:'right'}}>TRADES</div><div style={{textAlign:'right'}}>VOLUME</div>
+          </div>
+          {data.map((entry,i)=>{
+            const isMe = entry.userId===userId;
+            return (
+              <div key={entry.userId} style={{display:'grid',gridTemplateColumns:'50px 1fr 100px 100px 80px 100px',padding:'12px 16px',borderBottom:'1px solid #1a1a1a',fontSize:12,fontFamily:fm,
+                background:isMe?B.primary+'10':'transparent',borderLeft:isMe?'3px solid '+B.primary:'3px solid transparent'}}>
+                <div style={{fontWeight:800,color:i<3?'#fff':'#888'}}>{entry.rank||i+1}</div>
+                <div style={{fontWeight:600,color:isMe?B.primary:'#fff'}}>{entry.username||entry.userId.slice(0,8)+'...'}{isMe&&' (you)'}</div>
+                <div style={{textAlign:'right',fontWeight:700,color:entry.returnPct>=0?B.green:B.red}}>{entry.returnPct>=0?'+':''}{entry.returnPct}%</div>
+                <div style={{textAlign:'right',color:entry.closedPnl>=0?B.green:B.red}}>{fmtUsd(entry.closedPnl)}</div>
+                <div style={{textAlign:'right',color:'#888'}}>{entry.tradeCount}</div>
+                <div style={{textAlign:'right',color:'#888'}}>{fmtUsd(entry.totalVolume)}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TRADE CARD — shareable trade image
+   ═══════════════════════════════════════════════════════════ */
+function TradeCard({ card, onClose }) {
+  const cardRef = useRef(null);
+  const [copying, setCopying] = useState(false);
+
+  const capture = async (action) => {
+    if(!cardRef.current) return;
+    setCopying(true);
+    try {
+      const html2canvas = (await import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/+esm')).default;
+      const canvas = await html2canvas(cardRef.current, { backgroundColor:'#0a0a0a', useCORS:true, scale:2 });
+      if(action==='copy'){
+        canvas.toBlob(async blob=>{
+          try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);}catch(e){}
+        },'image/png');
+      } else if(action==='download'){
+        const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='perpdictions-trade.png';a.click();
+      } else if(action==='share'&&navigator.share){
+        canvas.toBlob(async blob=>{
+          try{await navigator.share({files:[new File([blob],'perpdictions-trade.png',{type:'image/png'})]});}catch(e){}
+        },'image/png');
+      }
+    } catch(e){ console.log('Trade card capture error:', e); }
+    setCopying(false);
+  };
+
+  const isClose = card.type==='close';
+  const direction = card.side==='home'?'LONG':'SHORT';
+  const pnlColor = card.pnl>=0?B.green:B.red;
+
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9998,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',animation:'fadeIn .2s'}}>
+      <div ref={cardRef} onClick={e=>e.stopPropagation()} style={{width:400,background:'linear-gradient(180deg,#0a0a0a,#111)',borderRadius:20,border:'1px solid #1f1f1f',borderLeft:'4px solid '+(card.teamColor||B.primary),padding:'28px 32px',fontFamily:fb}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:20}}>
+          <img src={LOGO_MARK} style={{height:20,width:20}} alt=""/>
+          <span style={{fontSize:13,fontWeight:700,color:'#888'}}>Perpdictions</span>
+          <span style={{marginLeft:'auto',fontSize:10,color:'#444',fontFamily:fm}}>perps.io</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+          {card.teamLogo&&<img src={card.teamLogo} style={{width:40,height:40,objectFit:'contain',borderRadius:8}} alt=""/>}
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:card.side==='home'?B.primary:'#ef4444',fontFamily:fm,letterSpacing:'0.1em'}}>{direction}</div>
+            <div style={{fontSize:20,fontWeight:800,color:'#fff'}}>{card.teamName}</div>
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:isClose?'1fr 1fr':'1fr 1fr',gap:12,marginBottom:16}}>
+          <div style={{background:'#1a1a1a',borderRadius:10,padding:'10px 14px'}}>
+            <div style={{fontSize:10,color:'#555',fontFamily:fm}}>ENTRY</div>
+            <div style={{fontSize:18,fontWeight:800,color:'#fff',fontFamily:fm}}>{(card.entryPx*100).toFixed(1)}¢</div>
+          </div>
+          <div style={{background:'#1a1a1a',borderRadius:10,padding:'10px 14px'}}>
+            <div style={{fontSize:10,color:'#555',fontFamily:fm}}>LEVERAGE</div>
+            <div style={{fontSize:18,fontWeight:800,color:B.primary,fontFamily:fm}}>{card.leverage}x</div>
+          </div>
+        </div>
+        {isClose&&(
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+            <div style={{background:'#1a1a1a',borderRadius:10,padding:'10px 14px'}}>
+              <div style={{fontSize:10,color:'#555',fontFamily:fm}}>EXIT</div>
+              <div style={{fontSize:18,fontWeight:800,color:'#fff',fontFamily:fm}}>{(card.exitPx*100).toFixed(1)}¢</div>
+            </div>
+            <div style={{background:card.pnl>=0?B.green+'15':B.red+'15',borderRadius:10,padding:'10px 14px',border:'1px solid '+(card.pnl>=0?B.green+'30':B.red+'30')}}>
+              <div style={{fontSize:10,color:'#555',fontFamily:fm}}>P&L</div>
+              <div style={{fontSize:18,fontWeight:800,color:pnlColor,fontFamily:fm}}>{card.pnl>=0?'+':''}{fmtUsd(card.pnl)}</div>
+            </div>
+          </div>
+        )}
+        <div style={{fontSize:11,color:'#555',fontFamily:fm}}>{card.gameInfo} · {card.gameStatus}</div>
+      </div>
+      <div onClick={e=>e.stopPropagation()} style={{display:'flex',gap:8,marginTop:16}}>
+        <button onClick={()=>capture('copy')} disabled={copying} style={{padding:'10px 20px',fontWeight:700,fontSize:12,border:'1px solid #2a2a2a',cursor:'pointer',fontFamily:fb,borderRadius:10,background:'#111',color:'#fff'}}>
+          {copying?'...':'Copy Image'}
+        </button>
+        <button onClick={()=>capture('download')} disabled={copying} style={{padding:'10px 20px',fontWeight:700,fontSize:12,border:'1px solid #2a2a2a',cursor:'pointer',fontFamily:fb,borderRadius:10,background:'#111',color:'#fff'}}>
+          Download
+        </button>
+        {typeof navigator!=='undefined'&&navigator.share&&(
+          <button onClick={()=>capture('share')} disabled={copying} style={{padding:'10px 20px',fontWeight:700,fontSize:12,border:'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:10,background:B.primary,color:'#fff'}}>
+            Share
+          </button>
+        )}
+        <button onClick={onClose} style={{padding:'10px 20px',fontWeight:700,fontSize:12,border:'1px solid #2a2a2a',cursor:'pointer',fontFamily:fb,borderRadius:10,background:'#111',color:'#666'}}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
    LIVE TRADING APP — real NBA games via backend oracle
    ═══════════════════════════════════════════════════════════ */
 function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade }) {
@@ -1852,6 +2097,8 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
   const [notifs,     setNotifs]     = useState([]);
   const [markers,    setMarkers]    = useState([]);
   const [showWager,  setShowWager]  = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [tradeCard, setTradeCard] = useState(null);
   const [isMobile,   setIsMobile]   = useState(()=>window.innerWidth<768);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
 
@@ -2162,6 +2409,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         addMark(chartNow, avgPx, 'entry', orderSide);
         setBottomTab('positions');
         notify(tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
+        setTradeCard({ type:'open', side:orderSide, teamName:tn.name, teamLogo:orderSide==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:orderSide==='home'?HOME.light:AWAY.light, entryPx:avgPx, leverage:lev, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:g.period?`Q${g.period} ${g.clock}`:g.statusDetail||'' });
       } else if (result.status === 'resting') {
         notify('Limit '+tn.name+' @ '+limitCents+'¢', 'info');
       }
@@ -2198,6 +2446,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         addMark(chartNow, avgPx, pnl>=0?'exit-win':'exit-loss', pos.side);
         const tn = pos.side==='home' ? HOME : AWAY;
         notify('Closed '+tn.name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
+        setTradeCard({ type:'close', side:pos.side, teamName:tn.name, teamLogo:pos.side==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:pos.side==='home'?HOME.light:AWAY.light, entryPx:pos.entry||pos.entryPx, exitPx:avgPx, leverage:pos.leverage, pnl, pnlPct:pos.roe||0, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:g.period?`Q${g.period} ${g.clock}`:g.statusDetail||'' });
       } else if (result.status === 'rejected') {
         notify('Close rejected: '+(result.reason||''), 'red');
       }
@@ -2262,7 +2511,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         </div>
         {/* Center — sport tabs (same as TradingApp) */}
         <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',maxWidth:isMobile?'calc(100vw - 100px)':'none'}}>
-          {[['demos','Demos',null],['trending','Live',null],['basketball','Basketball',liveGames.filter(g=>g.status==='live'||g.status==='halftime').length],['nfl','Football',null],['baseball','Baseball',null],['soccer','Soccer',null],['hockey','Hockey',null],['mma','MMA',null]].map(([tab,label,cnt])=>(
+          {[['demos','Demos',null],['trending','Live',null],['basketball','Basketball',liveGames.filter(g=>g.status==='live'||g.status==='halftime').length],['nfl','Football',null],['baseball','Baseball',null],['soccer','Soccer',null],['hockey','Hockey',null],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='trending'
                 ? <span style={{display:'flex',alignItems:'center',gap:5}}>
@@ -2280,7 +2529,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             LIVE
           </span>
           <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#ff5028,#14b8a6)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
-          <div style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14}}>👤</div>
+          <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14}}>👤</div>
         </div>
       </div>
 
@@ -2915,6 +3164,8 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
           </div>
         </div>
       )}
+      {showProfile && <ProfileModal userId={userId} onClose={()=>setShowProfile(false)}/>}
+      {tradeCard && <TradeCard card={tradeCard} onClose={()=>setTradeCard(null)}/>}
     </div>
   );
 }
@@ -2923,7 +3174,13 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
   const G=game,HOME=G.home,AWAY=G.away,PLAYS=G.plays,SCORING_PLAYS=G.scoringPlays,initProb=PLAYS[0].p;
   const [gameTime,setGameTime]=useState(0);const [playing,setPlaying]=useState(false);const [speed,setSpeed]=useState(10);
   const [sportTab,setSportTab]=useState("Live");
-  const [terminalPage,setTerminalPage]=useState(initialTab||"game"); // "game" | "demos"
+  const [terminalPage,setTerminalPage]=useState(initialTab||"game");
+  const [showProfile, setShowProfile] = useState(false);
+  const [userId] = useState(() => {
+    let id = localStorage.getItem('perpdictions_userId');
+    if (!id) { id = crypto.randomUUID(); localStorage.setItem('perpdictions_userId', id); }
+    return id;
+  });
   // Single ESPN fetch — all sport data, one 30s interval, shared across all pages
   const [espnData, setEspnData] = useState(() =>
     Object.fromEntries(ESPN_SOURCES.map(s => [s.key, {events:[], loading:true, error:false}]))
@@ -3123,8 +3380,8 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
 
         {/* Center — sport tabs */}
         <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",maxWidth:isMobile?"calc(100vw - 120px)":"none"}}>
-          {["Demos","Live","Basketball","Football","Baseball","Soccer","Hockey","MMA"].map((sport)=>{
-            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Live"?terminalPage==="trending":terminalPage==="game"&&sportTab===sport;
+          {["Demos","Live","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"].map((sport)=>{
+            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Live"?terminalPage==="trending":sport==="Leaderboard"?terminalPage==="leaderboard":terminalPage==="game"&&sportTab===sport;
             return (
             <button key={sport} onClick={()=>{
               if(sport==="Demos"){setTerminalPage("demos");}
@@ -3135,6 +3392,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
               else if(sport==="MMA"){setTerminalPage("mma");}
               else if(sport==="Football"){setTerminalPage("nfl");}
               else if(sport==="Live"){setTerminalPage("trending");}
+              else if(sport==="Leaderboard"){setTerminalPage("leaderboard");}
               else{setTerminalPage("game");setSportTab(sport);}
             }} style={{padding:isMobile?"4px 8px":"6px 14px",fontSize:isMobile?10:12,fontWeight:isActive?600:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
               background:isActive?B.primary+"20":"transparent",color:isActive?"#fff":"#666"}}>
@@ -3156,7 +3414,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
             Deposit
           </button>
           <div style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-            <span style={{fontSize:14,color:"#888"}}>👤</span>
+            <span onClick={()=>setShowProfile(true)} style={{fontSize:14,color:"#888",cursor:'pointer'}}>👤</span>
           </div>
         </div>
       </div>
@@ -3172,6 +3430,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
         :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
         :terminalPage==="nfl"?<NFLPage data={espnData.nfl} onTrade={onTrade}/>
         :terminalPage==="trending"?<TrendingPage liveGames={liveGames} espnData={espnData} onTrade={onTrade}/>
+        :terminalPage==="leaderboard"?<LeaderboardPage userId={userId}/>
         :<>
 
         {/* LEFT SIDEBAR — other games */}
@@ -4011,6 +4270,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
           </div>
         </div>
       )}
+      {showProfile && <ProfileModal userId={userId} onClose={()=>setShowProfile(false)}/>}
     </div>
   );
 }
