@@ -238,6 +238,39 @@ function ChartTip({active,payload}){
 /* ═══════════════════════════════════════════════════════════
    LANDING PAGE — BOLD FINTECH
    ═══════════════════════════════════════════════════════════ */
+/* ─── Platform Stats Bar (landing page + shared) ─── */
+function PlatformStats({ delay={} }) {
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    const fetchStats = () => fetch(`${API_URL}/stats`).then(r=>r.json()).then(setStats).catch(()=>{});
+    fetchStats();
+    const iv = setInterval(fetchStats, 30000);
+    return () => clearInterval(iv);
+  }, []);
+
+  if (!stats) return null;
+  const items = [
+    { label: 'Total Volume', value: '$'+stats.totalVolume.toLocaleString(), color: '#fff' },
+    { label: 'Open Interest', value: '$'+stats.openInterest.toLocaleString(), color: B.primary },
+    { label: 'Live Markets', value: stats.liveMarkets.toString(), color: stats.liveMarkets > 0 ? B.green : '#666' },
+    { label: 'Traders', value: stats.activeTraders.toString(), color: '#fff' },
+    { label: 'Vault TVL', value: '$'+stats.vaultBalance.toLocaleString(), color: B.primary },
+  ];
+
+  return (
+    <div style={{...delay,maxWidth:720,margin:'0 auto',padding:'0 32px 40px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:8,flexWrap:'wrap'}}>
+        {items.map(({label,value,color})=>(
+          <div key={label} style={{textAlign:'center',flex:'1 1 100px'}}>
+            <div style={{fontSize:22,fontWeight:800,color,fontFamily:fm}}>{value}</div>
+            <div style={{fontSize:10,color:'#555',fontWeight:600,letterSpacing:'0.08em',fontFamily:fm,marginTop:2}}>{label.toUpperCase()}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LandingPage({ onLaunch, onDocs }) {
   const [vis, setVis] = useState(false);
   const [tick, setTick] = useState(0);
@@ -319,6 +352,9 @@ function LandingPage({ onLaunch, onDocs }) {
             </button>
           </div>
         </section>
+
+        {/* LIVE PLATFORM STATS */}
+        <PlatformStats delay={a(0.22)}/>
 
         {/* TERMINAL PREVIEW */}
         <div style={{...a(0.25),maxWidth:680,margin:"0 auto",padding:"0 32px 60px"}}>
@@ -2320,6 +2356,15 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             } else {
               setBook(makeBook(upd.oracle?.indexPrice ?? 0.5));
             }
+            // Update real market stats
+            if (mktData.stats) {
+              setMarketStats({
+                volume: mktData.stats.volume24h || 0,
+                oi: mktData.stats.totalOrders ? mktData.stats.volume24h * 0.3 : 0,
+                funding: mktData.funding?.currentRate || 0,
+                trades: mktData.stats.tradeCount || 0,
+              });
+            }
           }
         } catch(e) {
           setBook(makeBook(upd.oracle?.indexPrice ?? 0.5));
@@ -2472,9 +2517,11 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
   const shareCount = Math.max(1, Math.round(expo/entryP));
   const awayProb = 1 - oPrice;
   const momentum = chartData.length>20 ? oPrice - chartData[chartData.length-20].ph : 0;
-  const simVol = Math.floor(9200 + chartData.length*60 + positions.reduce((s,p)=>s+(p.exposure||0),0) + closedPos.reduce((s,p)=>s+(p.exposure||0),0));
-  const simOI  = positions.reduce((s,p)=>s+(p.exposure||0),0) + Math.floor(chartData.length*40);
-  const fundingRate = ((oPrice-0.5)*0.08).toFixed(3);
+  // Real market stats from backend (updated in poll loop via marketStats state)
+  const [marketStats, setMarketStats] = useState({volume:0,oi:0,funding:0,trades:0});
+  const simVol = marketStats.volume || Math.floor(9200 + chartData.length*60 + positions.reduce((s,p)=>s+(p.exposure||0),0));
+  const simOI  = marketStats.oi || positions.reduce((s,p)=>s+(p.exposure||0),0) + Math.floor(chartData.length*40);
+  const fundingRate = marketStats.funding ? marketStats.funding.toFixed(3) : ((oPrice-0.5)*0.08).toFixed(3);
 
   // merged chart data with markers
   const merged = useMemo(() => {
