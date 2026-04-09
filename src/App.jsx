@@ -1827,7 +1827,11 @@ function ProfileModal({ userId, onClose }) {
     try {
       const res = await fetch(`${API_URL}/profile/${userId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,username})});
       const data = await res.json();
-      if(res.ok){setProfile(data);localStorage.setItem('perpdictions_profile',JSON.stringify(data));}
+      if(res.ok){
+        setProfile(data);localStorage.setItem('perpdictions_profile',JSON.stringify(data));
+        // Refresh trade history after profile creation
+        fetch(`${API_URL}/profile/${userId}/trades?limit=20`).then(r=>r.json()).then(d=>setTrades(d.trades||[])).catch(()=>{});
+      }
       else setError(data.error||'Failed to save');
     } catch(e){setError(e.message);}
     setSaving(false);
@@ -1996,7 +2000,10 @@ function TradeCard({ card, onClose }) {
           <span style={{marginLeft:'auto',fontSize:10,color:'#444',fontFamily:fm}}>perps.io</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
-          {card.teamLogo&&<img src={card.teamLogo} style={{width:40,height:40,objectFit:'contain',borderRadius:8}} alt=""/>}
+          {card.teamLogo
+            ?<img src={card.teamLogo} crossOrigin="anonymous" onError={e=>{e.target.style.display='none';e.target.nextSibling&&(e.target.nextSibling.style.display='flex');}} style={{width:40,height:40,objectFit:'contain',borderRadius:8}} alt=""/>
+            :null}
+          <div style={{width:40,height:40,borderRadius:8,background:card.teamColor||B.primary,display:card.teamLogo?'none':'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:800,color:'#fff',fontFamily:fm}}>{card.teamName?.slice(0,2).toUpperCase()||'??'}</div>
           <div>
             <div style={{fontSize:11,fontWeight:700,color:card.side==='home'?B.primary:'#ef4444',fontFamily:fm,letterSpacing:'0.1em'}}>{direction}</div>
             <div style={{fontSize:20,fontWeight:800,color:'#fff'}}>{card.teamName}</div>
@@ -2510,7 +2517,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
           <span style={{fontFamily:fd,fontWeight:800,fontSize:18}}>Perpdictions</span>
         </div>
         {/* Center — sport tabs (same as TradingApp) */}
-        <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',maxWidth:isMobile?'calc(100vw - 100px)':'none'}}>
+        <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',flex:1,marginLeft:isMobile?8:16,marginRight:isMobile?8:16,minWidth:0}}>
           {[['demos','Demos',null],['trending','Live',null],['basketball','Basketball',liveGames.filter(g=>g.status==='live'||g.status==='halftime').length],['nfl','Football',null],['baseball','Baseball',null],['soccer','Soccer',null],['hockey','Hockey',null],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='trending'
@@ -2523,7 +2530,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             </button>
           ))}
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
           <span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 10px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
             LIVE
@@ -3383,7 +3390,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
         </div>
 
         {/* Center — sport tabs */}
-        <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",maxWidth:isMobile?"calc(100vw - 120px)":"none"}}>
+        <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",flex:1,marginLeft:isMobile?8:16,marginRight:isMobile?8:16,minWidth:0}}>
           {["Demos","Live","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"].map((sport)=>{
             const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Live"?terminalPage==="trending":sport==="Leaderboard"?terminalPage==="leaderboard":terminalPage==="game"&&sportTab===sport;
             return (
@@ -3413,7 +3420,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
         </div>
 
         {/* Right — deposit + profile */}
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
           <button style={{padding:"8px 20px",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:10,background:B.green,color:"#fff"}}>
             Deposit
           </button>
