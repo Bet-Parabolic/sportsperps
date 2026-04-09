@@ -3413,8 +3413,8 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
           <button style={{padding:"8px 20px",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:10,background:B.green,color:"#fff"}}>
             Deposit
           </button>
-          <div style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-            <span onClick={()=>setShowProfile(true)} style={{fontSize:14,color:"#888",cursor:'pointer'}}>👤</span>
+          <div onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+            <span style={{fontSize:14,color:"#888"}}>👤</span>
           </div>
         </div>
       </div>
