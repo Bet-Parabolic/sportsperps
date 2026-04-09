@@ -3181,6 +3181,10 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
     if (!id) { id = crypto.randomUUID(); localStorage.setItem('perpdictions_userId', id); }
     return id;
   });
+  // Register user with backend
+  useEffect(() => {
+    fetch(`${API_URL}/users`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId}) }).catch(()=>{});
+  }, [userId]);
   // Single ESPN fetch — all sport data, one 30s interval, shared across all pages
   const [espnData, setEspnData] = useState(() =>
     Object.fromEntries(ESPN_SOURCES.map(s => [s.key, {events:[], loading:true, error:false}]))
