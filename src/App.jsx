@@ -275,8 +275,10 @@ function PlatformStats({ delay={} }) {
 function LandingPage({ onLaunch, onDocs }) {
   const [vis, setVis] = useState(false);
   const [tick, setTick] = useState(0);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => { setTimeout(() => setVis(true), 50); }, []);
   useEffect(() => { const iv = setInterval(() => setTick(t => t+1), 2000); return () => clearInterval(iv); }, []);
+  useEffect(() => { const h = () => setIsMobile(window.innerWidth < 768); window.addEventListener("resize", h); return () => window.removeEventListener("resize", h); }, []);
 
   // Brand palette: orange → warm → amber → white → ice → cyan
   const R = "#fe4202", T = "#fe4202", TL = "#ff6b2b";
@@ -317,38 +319,38 @@ function LandingPage({ onLaunch, onDocs }) {
 
       <div style={{position:"relative",zIndex:1}}>
         {/* NAV */}
-        <div style={{...a(0),padding:"16px 32px",display:"flex",justifyContent:"center"}}>
-          <nav style={{width:"100%",maxWidth:900,padding:"8px 28px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0a0a0acc",backdropFilter:"blur(20px)",borderRadius:16,border:"1px solid #1f1f1f"}}>
-            <div style={{display:"flex",alignItems:"center",gap:0,marginLeft:-30}}>
-              <img src={LOGO_NAV} style={{height:252,width:"auto",margin:"-80px 0",marginLeft:-45,marginRight:-48}} alt="Perpdictions"/>
-              <img src={LOGO_WORDMARK} style={{height:54,width:"auto"}} alt="Perpdictions"/>
+        <div style={{...a(0),padding:isMobile?"10px 12px":"16px 32px",display:"flex",justifyContent:"center"}}>
+          <nav style={{width:"100%",maxWidth:900,padding:isMobile?"8px 16px":"8px 28px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0a0a0acc",backdropFilter:"blur(20px)",borderRadius:isMobile?12:16,border:"1px solid #1f1f1f"}}>
+            <div style={{display:"flex",alignItems:"center",gap:0,marginLeft:isMobile?-10:-30}}>
+              <img src={LOGO_NAV} style={{height:isMobile?100:252,width:"auto",margin:isMobile?"-28px 0":"-80px 0",marginLeft:isMobile?-16:-45,marginRight:isMobile?-16:-48}} alt="Perpdictions"/>
+              <img src={LOGO_WORDMARK} style={{height:isMobile?24:54,width:"auto"}} alt="Perpdictions"/>
             </div>
-            <button onClick={onLaunch} style={{padding:"12px 30px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:18,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:10}}>
+            <button onClick={onLaunch} style={{padding:isMobile?"10px 20px":"12px 30px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:18,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:10}}>
               Launch App
             </button>
           </nav>
         </div>
 
         {/* HERO */}
-        <section style={{maxWidth:900,margin:"0 auto",padding:"80px 32px 40px",textAlign:"center"}}>
-          <div style={{...a(0.05),marginBottom:20}}>
-            <span style={{fontSize:13,fontWeight:600,color:T,display:"inline-flex",alignItems:"center",gap:8,padding:"6px 16px",background:T+"10",borderRadius:20,border:"1px solid "+T+"20"}}>
+        <section style={{maxWidth:900,margin:"0 auto",padding:isMobile?"40px 20px 24px":"80px 32px 40px",textAlign:"center"}}>
+          <div style={{...a(0.05),marginBottom:isMobile?14:20}}>
+            <span style={{fontSize:isMobile?11:13,fontWeight:600,color:T,display:"inline-flex",alignItems:"center",gap:8,padding:isMobile?"5px 12px":"6px 16px",background:T+"10",borderRadius:20,border:"1px solid "+T+"20"}}>
               <span style={{width:6,height:6,borderRadius:"50%",background:T,display:"inline-block",animation:"pulse 2s infinite"}}/>
               Leveraged Sports Markets
             </span>
           </div>
-          <h1 style={{...a(0.1),fontFamily:fd,fontSize:72,fontWeight:800,lineHeight:1.0,letterSpacing:"-0.04em",margin:"0 0 24px"}}>
+          <h1 style={{...a(0.1),fontFamily:fd,fontSize:isMobile?38:72,fontWeight:800,lineHeight:1.0,letterSpacing:"-0.04em",margin:isMobile?"0 0 16px":"0 0 24px"}}>
             Leveraged sports<br/>
             <span style={{background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>perpetuals.</span>
           </h1>
-          <p style={{...a(0.15),fontSize:18,lineHeight:1.7,color:"#888",maxWidth:560,margin:"0 auto 36px",fontWeight:400}}>
+          <p style={{...a(0.15),fontSize:isMobile?15:18,lineHeight:1.7,color:"#888",maxWidth:560,margin:isMobile?"0 auto 24px":"0 auto 36px",fontWeight:400}}>
             Trade live win probability with up to 10x leverage. Multi-oracle pricing. Trustless settlement. No counterparty risk.
           </p>
           <div style={{...a(0.2),display:"flex",gap:12,justifyContent:"center"}}>
-            <button onClick={onLaunch} style={{padding:"14px 36px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:15,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:12}}>
+            <button onClick={onLaunch} style={{padding:isMobile?"12px 28px":"14px 36px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:12}}>
               Try Demo
             </button>
-            <button onClick={onDocs} style={{padding:"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:600,fontSize:15,background:"transparent",color:"#888",borderRadius:12}}>
+            <button onClick={onDocs} style={{padding:isMobile?"12px 28px":"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:600,fontSize:isMobile?14:15,background:"transparent",color:"#888",borderRadius:12}}>
               Read Docs
             </button>
           </div>
@@ -358,7 +360,7 @@ function LandingPage({ onLaunch, onDocs }) {
         <PlatformStats delay={a(0.22)}/>
 
         {/* TERMINAL PREVIEW */}
-        <div style={{...a(0.25),maxWidth:680,margin:"0 auto",padding:"0 32px 60px"}}>
+        <div style={{...a(0.25),maxWidth:680,margin:"0 auto",padding:isMobile?"0 12px 40px":"0 32px 60px"}}>
           <div style={{background:"#0a0a0a",border:"1px solid #1f1f1f",borderRadius:20,overflow:"hidden"}}>
             <div style={{padding:"12px 20px",borderBottom:"1px solid #1f1f1f",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{color:"#666",fontWeight:600,fontSize:12}}>Perpdictions terminal</span>
@@ -420,49 +422,49 @@ function LandingPage({ onLaunch, onDocs }) {
         </div>
 
         {/* How it works */}
-        <section style={{maxWidth:1100,margin:"0 auto",padding:"100px 32px"}}>
-          <div style={{...a(0.35),textAlign:"center",marginBottom:64}}>
-            <span style={{fontSize:70,fontWeight:800,letterSpacing:"-0.03em",background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>How it works</span>
-            <h2 style={{fontFamily:fd,fontSize:30,fontWeight:700,letterSpacing:"-0.03em",marginTop:12,lineHeight:1.1,color:"#fff"}}>Three steps. Zero complexity.</h2>
+        <section style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"60px 16px":"100px 32px"}}>
+          <div style={{...a(0.35),textAlign:"center",marginBottom:isMobile?32:64}}>
+            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.03em",background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>How it works</span>
+            <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.03em",marginTop:12,lineHeight:1.1,color:"#fff"}}>Three steps. Zero complexity.</h2>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:16}}>
             {[{n:"01",title:"Pick a Side",desc:"Select the team you believe wins. You're trading their win probability as a perpetual future.",c:R},{n:"02",title:"Set Leverage",desc:"1x to 10x. Higher leverage amplifies gains and losses. Dynamic liquidation engine protects the pool.",c:"#ff9f1c"},{n:"03",title:"Trade Live",desc:"Watch the game. Your position moves with real-time oracle prices. Close anytime or ride to settlement.",c:T}].map((s,i) => (
-              <div key={s.n} style={{...a(0.4+i*0.05),background:"#0a0a0a",borderRadius:16,border:"1px solid #1f1f1f",padding:"36px 28px"}}>
-                <div style={{fontSize:48,fontWeight:800,color:s.c,lineHeight:1,marginBottom:20,fontFamily:fm}}>{s.n}</div>
-                <h3 style={{fontFamily:fd,fontSize:18,fontWeight:700,marginBottom:10,color:s.c}}>{s.title}</h3>
-                <p style={{fontSize:14,lineHeight:1.7,color:"#888",fontWeight:400}}>{s.desc}</p>
+              <div key={s.n} style={{...a(0.4+i*0.05),background:"#0a0a0a",borderRadius:16,border:"1px solid #1f1f1f",padding:isMobile?"24px 20px":"36px 28px"}}>
+                <div style={{fontSize:isMobile?36:48,fontWeight:800,color:s.c,lineHeight:1,marginBottom:isMobile?14:20,fontFamily:fm}}>{s.n}</div>
+                <h3 style={{fontFamily:fd,fontSize:isMobile?16:18,fontWeight:700,marginBottom:10,color:s.c}}>{s.title}</h3>
+                <p style={{fontSize:isMobile?13:14,lineHeight:1.7,color:"#888",fontWeight:400}}>{s.desc}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* Architecture */}
-        <section style={{maxWidth:1100,margin:"0 auto",padding:"0 32px 100px"}}>
-          <div style={{...a(0.45),textAlign:"center",marginBottom:64}}>
-            <span style={{fontSize:70,fontWeight:800,letterSpacing:"-0.03em",background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Architecture</span>
-            <h2 style={{fontFamily:fd,fontSize:30,fontWeight:700,letterSpacing:"-0.03em",marginTop:12,lineHeight:1.1,color:"#fff"}}>DeFi-grade infrastructure.</h2>
+        <section style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"0 16px 60px":"0 32px 100px"}}>
+          <div style={{...a(0.45),textAlign:"center",marginBottom:isMobile?32:64}}>
+            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.03em",background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Architecture</span>
+            <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.03em",marginTop:12,lineHeight:1.1,color:"#fff"}}>DeFi-grade infrastructure.</h2>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:isMobile?12:16}}>
             {[{title:"Multi-Oracle Consensus",desc:"Weighted median across Polymarket, Kalshi, sportsbooks, ESPN and our internal model. Manipulation-resistant fair price discovery.",icon:"◉",c:R},{title:"Perpetual Futures",desc:"Continuous price exposure to win probability. Not a binary bet — trade in, trade out at any point during the live game.",icon:"∞",c:"#ff9f1c"},{title:"Liquidation Engine",desc:"Real-time mark-to-market. Dynamic max leverage based on oracle confidence. Automatic liquidation protects the pool.",icon:"⚡",c:TL},{title:"Trustless Settlement",desc:"Every trade, funding payment, and liquidation settles trustlessly. Transparent, verifiable, zero counterparty risk.",icon:"◆",c:T}].map((f,i) => (
-              <div key={f.title} style={{...a(0.5+i*0.05),background:"#0a0a0a",borderRadius:16,border:"1px solid #1f1f1f",padding:"32px 28px"}}>
-                <div style={{fontSize:24,color:f.c,marginBottom:16}}>{f.icon}</div>
-                <h4 style={{fontFamily:fd,fontSize:16,fontWeight:700,marginBottom:10}}>{f.title}</h4>
-                <p style={{fontSize:14,lineHeight:1.7,color:"#888",fontWeight:400}}>{f.desc}</p>
+              <div key={f.title} style={{...a(0.5+i*0.05),background:"#0a0a0a",borderRadius:16,border:"1px solid #1f1f1f",padding:isMobile?"24px 20px":"32px 28px"}}>
+                <div style={{fontSize:isMobile?20:24,color:f.c,marginBottom:isMobile?12:16}}>{f.icon}</div>
+                <h4 style={{fontFamily:fd,fontSize:isMobile?15:16,fontWeight:700,marginBottom:10}}>{f.title}</h4>
+                <p style={{fontSize:isMobile?13:14,lineHeight:1.7,color:"#888",fontWeight:400}}>{f.desc}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* CTA */}
-        <section style={{...a(0.6),padding:"80px 32px",textAlign:"center"}}>
-          <div style={{maxWidth:700,margin:"0 auto",padding:"60px 40px",background:"#0a0a0a",borderRadius:24,border:"1px solid #1f1f1f",position:"relative",overflow:"hidden"}}>
+        <section style={{...a(0.6),padding:isMobile?"40px 16px":"80px 32px",textAlign:"center"}}>
+          <div style={{maxWidth:700,margin:"0 auto",padding:isMobile?"40px 20px":"60px 40px",background:"#0a0a0a",borderRadius:isMobile?16:24,border:"1px solid #1f1f1f",position:"relative",overflow:"hidden"}}>
             <div style={{position:"absolute",top:"-50%",left:"-20%",width:"140%",height:"200%",background:`radial-gradient(ellipse at 30% 50%, ${R}08 0%, transparent 50%), radial-gradient(ellipse at 70% 50%, ${T}08 0%, transparent 50%)`,pointerEvents:"none"}}/>
             <div style={{position:"relative"}}>
-              <h2 style={{fontFamily:fd,fontSize:48,fontWeight:800,letterSpacing:"-0.03em",marginBottom:14}}>
+              <h2 style={{fontFamily:fd,fontSize:isMobile?32:48,fontWeight:800,letterSpacing:"-0.03em",marginBottom:14}}>
                 See it <span style={{background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>live.</span>
               </h2>
-              <p style={{fontSize:16,color:"#888",marginBottom:32,fontWeight:400}}>Replay real championship games with the full trading engine.</p>
-              <button onClick={onLaunch} style={{padding:"16px 48px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:16,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:12}}>
+              <p style={{fontSize:isMobile?14:16,color:"#888",marginBottom:isMobile?24:32,fontWeight:400}}>Replay real championship games with the full trading engine.</p>
+              <button onClick={onLaunch} style={{padding:isMobile?"14px 36px":"16px 48px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:16,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:12}}>
                 Launch Demo →
               </button>
             </div>
@@ -470,10 +472,10 @@ function LandingPage({ onLaunch, onDocs }) {
         </section>
 
         {/* Footer */}
-        <footer style={{borderTop:"1px solid #1a1a1a",padding:"24px 48px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{fontSize:13,color:"#444",display:"flex",alignItems:"center",gap:8}}><img src={LOGO_NAV} style={{height:64,width:"auto",opacity:0.5}} alt=""/>© 2026 Perpdictions</span>
-          <div style={{display:"flex",gap:24}}>
-            {["Twitter","Discord","GitHub","Docs"].map(t => (<span key={t} style={{fontSize:13,color:"#555",cursor:"pointer"}}>{t}</span>))}
+        <footer style={{borderTop:"1px solid #1a1a1a",padding:isMobile?"20px 16px":"24px 48px",display:"flex",flexDirection:isMobile?"column":"row",justifyContent:"space-between",alignItems:"center",gap:isMobile?12:0}}>
+          <span style={{fontSize:isMobile?12:13,color:"#444",display:"flex",alignItems:"center",gap:8}}><img src={LOGO_NAV} style={{height:isMobile?32:64,width:"auto",opacity:0.5,margin:isMobile?"-8px 0":0}} alt=""/>© 2026 Perpdictions</span>
+          <div style={{display:"flex",gap:isMobile?16:24}}>
+            {["Twitter","Discord","GitHub","Docs"].map(t => (<span key={t} style={{fontSize:isMobile?12:13,color:"#555",cursor:"pointer"}}>{t}</span>))}
           </div>
         </footer>
       </div>
