@@ -487,7 +487,10 @@ function LandingPage({ onLaunch, onDocs }) {
 function DocsPage({ onBack, onLaunch }) {
   const [vis, setVis] = useState(false);
   const [activeSection, setActiveSection] = useState("intro");
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showNav, setShowNav] = useState(false);
   useEffect(() => { setTimeout(() => setVis(true), 50); window.scrollTo(0,0); }, []);
+  useEffect(() => { const h = () => setIsMobile(window.innerWidth < 768); window.addEventListener("resize", h); return () => window.removeEventListener("resize", h); }, []);
   const a = (d) => ({ opacity:vis?1:0, transform:vis?"translateY(0)":"translateY(16px)", transition:`all 0.6s cubic-bezier(0.16,1,0.3,1) ${d}s` });
 
   const T = "#fe4202", TL = "#ff6b2b", R = "#fe4202";
@@ -515,33 +518,46 @@ function DocsPage({ onBack, onLaunch }) {
     {id:"faq",label:"FAQ"},
   ];
 
-  const S = ({id,children}) => (<section id={id} style={{marginBottom:64,scrollMarginTop:100}}>{children}</section>);
-  const H = ({children}) => (<h2 style={{fontFamily:fd,fontSize:32,fontWeight:800,marginBottom:20,color:"#fff"}}>{children}</h2>);
-  const P = ({children}) => (<p style={{fontSize:15,lineHeight:1.8,color:"#999",marginBottom:16}}>{children}</p>);
-  const Card = ({children}) => (<div style={{background:"#111",borderRadius:16,border:"1px solid #1f1f1f",padding:"24px 28px",marginBottom:16}}>{children}</div>);
-  const Label = ({children}) => (<span style={{fontSize:12,fontWeight:700,color:T,letterSpacing:"0.06em",display:"block",marginBottom:8}}>{children}</span>);
-  const Code = ({children}) => (<div style={{background:"#0a0a0a",borderRadius:10,padding:16,fontFamily:fm,fontSize:13,color:TL,lineHeight:1.6,overflowX:"auto",marginTop:8,marginBottom:8}}>{children}</div>);
-  const Row = ({items}) => (<div style={{display:"grid",gridTemplateColumns:`repeat(${items.length},1fr)`,gap:12,marginTop:12}}>{items.map((it,i)=>(
-    <div key={i} style={{background:"#0a0a0a",borderRadius:12,padding:16,...(it.hl?{border:"1px solid "+T+"30",background:T+"08"}:{border:"1px solid #1a1a1a"})}}>{it.content}</div>
+  const S = ({id,children}) => (<section id={id} style={{marginBottom:isMobile?40:64,scrollMarginTop:isMobile?80:100}}>{children}</section>);
+  const H = ({children}) => (<h2 style={{fontFamily:fd,fontSize:isMobile?24:32,fontWeight:800,marginBottom:isMobile?14:20,color:"#fff"}}>{children}</h2>);
+  const P = ({children}) => (<p style={{fontSize:isMobile?14:15,lineHeight:1.8,color:"#999",marginBottom:16}}>{children}</p>);
+  const Card = ({children}) => (<div style={{background:"#111",borderRadius:isMobile?12:16,border:"1px solid #1f1f1f",padding:isMobile?"16px 16px":"24px 28px",marginBottom:16}}>{children}</div>);
+  const Label = ({children}) => (<span style={{fontSize:isMobile?11:12,fontWeight:700,color:T,letterSpacing:"0.06em",display:"block",marginBottom:8}}>{children}</span>);
+  const Code = ({children}) => (<div style={{background:"#0a0a0a",borderRadius:10,padding:isMobile?12:16,fontFamily:fm,fontSize:isMobile?11:13,color:TL,lineHeight:1.6,overflowX:"auto",marginTop:8,marginBottom:8}}>{children}</div>);
+  const Row = ({items}) => (<div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":`repeat(${items.length},1fr)`,gap:12,marginTop:12}}>{items.map((it,i)=>(
+    <div key={i} style={{background:"#0a0a0a",borderRadius:12,padding:isMobile?12:16,...(it.hl?{border:"1px solid "+T+"30",background:T+"08"}:{border:"1px solid #1a1a1a"})}}>{it.content}</div>
   ))}</div>);
 
   return (
     <div style={{background:"#030303",minHeight:"100vh",fontFamily:fb,color:"#fff"}}>
-      <div style={{...a(0),padding:"16px 32px",display:"flex",justifyContent:"center",position:"fixed",top:0,left:0,right:0,zIndex:20}}>
-        <nav style={{width:"100%",maxWidth:900,padding:"10px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0a0a0aee",backdropFilter:"blur(20px)",borderRadius:16,border:"1px solid #1f1f1f"}}>
+      <div style={{...a(0),padding:isMobile?"10px 12px":"16px 32px",display:"flex",justifyContent:"center",position:"fixed",top:0,left:0,right:0,zIndex:20}}>
+        <nav style={{width:"100%",maxWidth:900,padding:isMobile?"8px 14px":"10px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0a0a0aee",backdropFilter:"blur(20px)",borderRadius:isMobile?12:16,border:"1px solid #1f1f1f"}}>
           <div style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}} onClick={onBack}>
-            <img src={LOGO_NAV} style={{height:130,width:"auto",margin:"-30px 0",marginRight:-10}} alt="Perpdictions"/>
-            <img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>
+            <img src={LOGO_NAV} style={{height:isMobile?80:130,width:"auto",margin:isMobile?"-20px 0":"-30px 0",marginRight:isMobile?-6:-10}} alt="Perpdictions"/>
+            {!isMobile&&<img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:14,color:B.primary,fontWeight:600,padding:"6px 14px",cursor:"pointer"}} onClick={onBack}>Home</span>
-            <button onClick={onLaunch} style={{padding:"9px 22px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,background:`linear-gradient(135deg, ${R}, ${T})`,color:"#fff",borderRadius:10}}>Launch App</button>
+            {isMobile&&<button onClick={()=>setShowNav(n=>!n)} style={{background:"none",border:"1px solid #333",borderRadius:8,padding:"6px 12px",color:"#888",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:fb}}>{showNav?"Close":"Sections"}</button>}
+            <span style={{fontSize:isMobile?12:14,color:B.primary,fontWeight:600,padding:"6px 14px",cursor:"pointer"}} onClick={onBack}>Home</span>
+            {!isMobile&&<button onClick={onLaunch} style={{padding:"9px 22px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,background:`linear-gradient(135deg, ${R}, ${T})`,color:"#fff",borderRadius:10}}>Launch App</button>}
           </div>
         </nav>
       </div>
 
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"100px 32px 0",display:"flex",gap:48}}>
-        <div style={{...a(0.05),width:200,flexShrink:0,position:"sticky",top:88,alignSelf:"flex-start",maxHeight:"calc(100vh - 120px)",overflow:"auto"}}>
+      {/* Mobile section nav dropdown */}
+      {isMobile&&showNav&&(
+        <div style={{position:"fixed",top:60,left:0,right:0,zIndex:19,padding:"8px 12px",background:"#0a0a0aee",backdropFilter:"blur(20px)",borderBottom:"1px solid #1f1f1f",maxHeight:"60vh",overflowY:"auto"}}>
+          {sections.map(s=>(
+            <a key={s.id} href={"#"+s.id} onClick={(e)=>{e.preventDefault();setActiveSection(s.id);setShowNav(false);document.getElementById(s.id)?.scrollIntoView({behavior:"smooth",block:"start"});}}
+              style={{display:"block",padding:"10px 16px",fontSize:13,fontWeight:activeSection===s.id?600:400,color:activeSection===s.id?T:"#888",
+                borderLeft:activeSection===s.id?"2px solid "+T:"2px solid transparent",textDecoration:"none",borderRadius:"0 6px 6px 0",
+                background:activeSection===s.id?T+"08":"transparent",cursor:"pointer"}}>{s.label}</a>
+          ))}
+        </div>
+      )}
+
+      <div style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"80px 16px 0":"100px 32px 0",display:"flex",gap:isMobile?0:48}}>
+        {!isMobile&&<div style={{...a(0.05),width:200,flexShrink:0,position:"sticky",top:88,alignSelf:"flex-start",maxHeight:"calc(100vh - 120px)",overflow:"auto"}}>
           <div style={{fontSize:13,fontWeight:700,color:"#555",marginBottom:16}}>Documentation</div>
           {sections.map(s=>(
             <a key={s.id} href={"#"+s.id} onClick={(e)=>{e.preventDefault();setActiveSection(s.id);document.getElementById(s.id)?.scrollIntoView({behavior:"smooth",block:"start"});}}
@@ -549,11 +565,11 @@ function DocsPage({ onBack, onLaunch }) {
                 borderLeft:activeSection===s.id?"2px solid "+T:"2px solid transparent",textDecoration:"none",marginBottom:1,borderRadius:"0 6px 6px 0",
                 background:activeSection===s.id?T+"08":"transparent",cursor:"pointer"}}>{s.label}</a>
           ))}
-        </div>
+        </div>}
 
         <div style={{...a(0.1),flex:1,minWidth:0}}>
-          <div style={{marginBottom:64}}>
-            <h1 style={{fontFamily:fd,fontSize:48,fontWeight:800,letterSpacing:"-0.03em",marginBottom:12}}>
+          <div style={{marginBottom:isMobile?32:64}}>
+            <h1 style={{fontFamily:fd,fontSize:isMobile?32:48,fontWeight:800,letterSpacing:"-0.03em",marginBottom:12}}>
               <span style={{background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Documentation</span>
             </h1>
             <P>The complete technical reference for Perpdictions — from product mechanics to infrastructure, risk management, and settlement.</P>
