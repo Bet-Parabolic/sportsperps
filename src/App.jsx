@@ -527,10 +527,10 @@ function DocsPage({ onBack, onLaunch }) {
 
   return (
     <div style={{background:"#030303",minHeight:"100vh",fontFamily:fb,color:"#fff"}}>
-      <div style={{...a(0),padding:"16px 32px",display:"flex",justifyContent:"center",position:"sticky",top:0,zIndex:20}}>
-        <nav style={{width:"100%",maxWidth:900,padding:"10px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0a0a0acc",backdropFilter:"blur(20px)",borderRadius:16,border:"1px solid #1f1f1f"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={onBack}>
-            <img src={LOGO_NAV} style={{height:104,width:"auto"}} alt="Perpdictions"/>
+      <div style={{...a(0),padding:"16px 32px",display:"flex",justifyContent:"center",position:"fixed",top:0,left:0,right:0,zIndex:20}}>
+        <nav style={{width:"100%",maxWidth:900,padding:"10px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0a0a0aee",backdropFilter:"blur(20px)",borderRadius:16,border:"1px solid #1f1f1f"}}>
+          <div style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}} onClick={onBack}>
+            <img src={LOGO_NAV} style={{height:130,width:"auto",margin:"-30px 0",marginRight:-10}} alt="Perpdictions"/>
             <img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -540,7 +540,7 @@ function DocsPage({ onBack, onLaunch }) {
         </nav>
       </div>
 
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"40px 32px 0",display:"flex",gap:48}}>
+      <div style={{maxWidth:1100,margin:"0 auto",padding:"100px 32px 0",display:"flex",gap:48}}>
         <div style={{...a(0.05),width:200,flexShrink:0,position:"sticky",top:88,alignSelf:"flex-start",maxHeight:"calc(100vh - 120px)",overflow:"auto"}}>
           <div style={{fontSize:13,fontWeight:700,color:"#555",marginBottom:16}}>Documentation</div>
           {sections.map(s=>(
@@ -991,8 +991,8 @@ function GameSelector({ onSelect, onBack }) {
             <ChevronRight size={14} style={{transform:"rotate(180deg)"}}/> HOME
           </button>
           <div style={{width:1,height:16,background:B.border}}/>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <img src={LOGO_NAV} style={{height:96,width:"auto"}} alt="Perpdictions"/>
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <img src={LOGO_NAV} style={{height:120,width:"auto",margin:"-26px 0",marginRight:-8}} alt="Perpdictions"/>
             <img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>
           </div>
         </nav>
@@ -1173,7 +1173,7 @@ function MatchCard({ g, emoji, showRecord, onTrade, _espnKey }) {
       {g.isScheduled&&g.detail&&<div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:10}}>{g.detail}</div>}
       {onTrade&&(g.isLive||g.isHalf)&&(
         <button onClick={()=>{const norm=normalizeEspnToLive(g._raw,_espnKey||'nhl');if(norm)onTrade(norm);}} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
-          background:"linear-gradient(135deg,"+B.primary+","+B.primaryLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
           Trade Live
         </button>
@@ -1484,7 +1484,7 @@ function BaseballPage({ data={events:[],loading:true,error:false}, onTrade }) {
         )}
         {onTrade&&g.isLive&&(
           <button onClick={()=>{const norm=normalizeEspnToLive(g._raw,'mlb');if(norm)onTrade(norm);}} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
-            background:"linear-gradient(135deg,"+B.primary+","+B.primaryLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
             Trade Live
           </button>
@@ -1662,7 +1662,7 @@ function BasketballPage({ liveGames, onTrade }) {
         {/* Trade Live button */}
         {onTrade && (isLive || isHalf) && (
           <button onClick={()=>onTrade(g)} style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
-            background:"linear-gradient(135deg, "+B.primary+", "+B.primaryLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            background:"linear-gradient(135deg, "+B.green+", "+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
             <span style={{width:7,height:7,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
             Trade Live
           </button>
@@ -2216,6 +2216,15 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
     return [...backend, ...espn];
   }, [liveGames, espnSidebarGames, initGame.id, initGame.espnId]);
 
+  // Sport counts for nav tabs
+  const sportCounts = useMemo(() => ({
+    nba: liveGames.filter(g=>g.status==='live'||g.status==='halftime').length,
+    nfl: espnSidebarGames.filter(g=>g._sport==='nfl').length,
+    mlb: espnSidebarGames.filter(g=>g._sport==='mlb').length,
+    nhl: espnSidebarGames.filter(g=>g._sport==='nhl').length,
+    ucl: espnSidebarGames.filter(g=>g._sport==='ucl').length,
+  }), [liveGames, espnSidebarGames]);
+
   // ── fetch oracle history on mount (backend only) ────────────────────────
   useEffect(() => {
     if (initGame._espnKey) {
@@ -2560,13 +2569,13 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
 
       {/* HEADER — full terminal nav */}
       <div style={{padding:isMobile?'0 10px':'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <img src={LOGO_NAV} style={{height:104,width:'auto'}} alt="pd"/>
+        <div style={{display:'flex',alignItems:'center',gap:5}}>
+          <img src={LOGO_NAV} style={{height:130,width:'auto',margin:'-30px 0',marginRight:-10}} alt="pd"/>
           <img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>
         </div>
         {/* Center — sport tabs (same as TradingApp) */}
         <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',flex:1,marginLeft:isMobile?8:16,marginRight:isMobile?8:16,minWidth:0}}>
-          {[['demos','Demos',null],['trending','Live',null],['basketball','Basketball',liveGames.filter(g=>g.status==='live'||g.status==='halftime').length],['nfl','Football',null],['baseball','Baseball',null],['soccer','Soccer',null],['hockey','Hockey',null],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
+          {[['demos','Demos',null],['trending','Live',null],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.ucl],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='trending'
                 ? <span style={{display:'flex',alignItems:'center',gap:5}}>
@@ -3063,13 +3072,13 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             const displayAsks=[...book.asks].reverse().slice(0,6);
             const displayBids=book.bids.slice(0,6);
             return(
-            <div style={{background:'#111',borderRadius:16,border:'1px solid #1f1f1f',padding:'14px 12px'}}>
+            <div style={{background:'#d4d4d4',borderRadius:16,border:'1px solid #bbb',padding:'14px 12px'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                <span style={{fontSize:13,fontWeight:600,color:'#888'}}>Order Book</span>
-                <span style={{fontSize:10,color:'#555'}}>Spread <span style={{color:'#fff',fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
+                <span style={{fontSize:13,fontWeight:600,color:'#333'}}>Order Book</span>
+                <span style={{fontSize:10,color:'#555'}}>Spread <span style={{color:'#111',fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',padding:'0 4px 6px',fontSize:9,fontWeight:700,color:'#444',letterSpacing:'0.06em'}}>
-                <span>PRICE (Eagles%)</span><span style={{textAlign:'center'}}>{AWAY.short} equiv</span><span style={{textAlign:'right'}}>SIZE</span>
+                <span>PRICE ({HOME.short}%)</span><span style={{textAlign:'center'}}>{AWAY.short} equiv</span><span style={{textAlign:'right'}}>SIZE</span>
               </div>
               <div style={{marginBottom:2}}>
                 <div style={{fontSize:9,fontWeight:700,color:AWAY.light,letterSpacing:'0.08em',padding:'2px 4px 4px',opacity:0.7}}>SELL {HOME.short.toUpperCase()} · BUY {AWAY.short.toUpperCase()}</div>
@@ -3431,8 +3440,8 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
           <button onClick={onChangeGame} style={{background:"none",border:"none",cursor:"pointer",color:"#666",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:600,fontFamily:fb,padding:0}}>
             <ChevronRight size={16} style={{transform:"rotate(180deg)"}}/> 
           </button>
-          <div style={{display:"flex",alignItems:"center",gap:isMobile?6:10}}>
-            <img src={LOGO_NAV} style={{height:isMobile?88:112,width:"auto"}} alt="pd"/>
+          <div style={{display:"flex",alignItems:"center",gap:isMobile?3:5}}>
+            <img src={LOGO_NAV} style={{height:isMobile?110:140,width:"auto",margin:"-30px 0",marginRight:isMobile?-8:-10}} alt="pd"/>
             {!isMobile&&<img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>}
           </div>
         </div>
@@ -4126,26 +4135,26 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
             const displayAsks=[...book.asks].reverse().slice(0,6); // show 6 asks, closest to mid at bottom
             const displayBids=book.bids.slice(0,6);                // show 6 bids, closest to mid at top
             return(
-            <div style={{background:"#111",borderRadius:16,border:"1px solid #1f1f1f",padding:"14px 12px"}}>
+            <div style={{background:"#d4d4d4",borderRadius:16,border:"1px solid #bbb",padding:"14px 12px"}}>
               {/* Header */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                <span style={{fontSize:13,fontWeight:600,color:"#888"}}>Order Book</span>
+                <span style={{fontSize:13,fontWeight:600,color:"#333"}}>Order Book</span>
                 <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                  <span style={{fontSize:10,color:"#555"}}>Spread <span style={{color:"#fff",fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
+                  <span style={{fontSize:10,color:"#555"}}>Spread <span style={{color:"#111",fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
                 </div>
               </div>
 
               {/* Column headers */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"0 4px 6px",fontSize:9,fontWeight:700,color:"#444",letterSpacing:"0.06em"}}>
-                <span>PRICE (Eagles%)</span>
-                <span style={{textAlign:"center"}}>CHIEFS equiv</span>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"0 4px 6px",fontSize:9,fontWeight:700,color:"#666",letterSpacing:"0.06em"}}>
+                <span>PRICE ({HOME.short}%)</span>
+                <span style={{textAlign:"center"}}>{AWAY.short} equiv</span>
                 <span style={{textAlign:"right"}}>SIZE</span>
               </div>
 
-              {/* Asks — Sell Eagles / Buy Chiefs — red side */}
+              {/* Asks — Sell Home / Buy Away — away color */}
               <div style={{marginBottom:2}}>
                 <div style={{fontSize:9,fontWeight:700,color:AWAY.light,letterSpacing:"0.08em",padding:"2px 4px 4px",opacity:0.7}}>
-                  SELL EAGLES · BUY {AWAY.name.toUpperCase()}
+                  SELL {HOME.short.toUpperCase()} · BUY {AWAY.short.toUpperCase()}
                 </div>
                 {displayAsks.map((a,i)=>{
                   const depthPct=(a.cum/maxCum)*100;
@@ -4163,13 +4172,13 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
               </div>
 
               {/* Mid / spread row */}
-              <div style={{margin:"6px 0",padding:"6px 4px",borderTop:"1px solid #1f1f1f",borderBottom:"1px solid #1f1f1f",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",alignItems:"center"}}>
-                <span style={{fontSize:13,fontWeight:800,color:"#fff",fontFamily:fm}}>{(oracle.price*100).toFixed(1)}¢</span>
-                <span style={{fontSize:10,color:"#444",textAlign:"center"}}>mid · {spread}¢ spread</span>
-                <span style={{fontSize:10,color:"#444",textAlign:"right"}}>{((1-oracle.price)*100).toFixed(1)}¢</span>
+              <div style={{margin:"6px 0",padding:"6px 4px",borderTop:"1px solid #999",borderBottom:"1px solid #999",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",alignItems:"center"}}>
+                <span style={{fontSize:13,fontWeight:800,color:"#111",fontFamily:fm}}>{(oracle.price*100).toFixed(1)}¢</span>
+                <span style={{fontSize:10,color:"#555",textAlign:"center"}}>mid · {spread}¢ spread</span>
+                <span style={{fontSize:10,color:"#555",textAlign:"right"}}>{((1-oracle.price)*100).toFixed(1)}¢</span>
               </div>
 
-              {/* Bids — Buy Eagles / Sell Chiefs — home color */}
+              {/* Bids — Buy Home / Sell Away — home color */}
               <div style={{marginTop:2}}>
                 {displayBids.map((b,i)=>{
                   const depthPct=(b.cum/maxCum)*100;
@@ -4185,14 +4194,14 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
                   );
                 })}
                 <div style={{fontSize:9,fontWeight:700,color:HOME.light,letterSpacing:"0.08em",padding:"4px 4px 0",opacity:0.7}}>
-                  BUY EAGLES · SELL {AWAY.name.toUpperCase()}
+                  BUY {HOME.short.toUpperCase()} · SELL {AWAY.short.toUpperCase()}
                 </div>
               </div>
 
               {/* Footer legend */}
-              <div style={{marginTop:10,paddingTop:8,borderTop:"1px solid #1a1a1a",fontSize:10,color:"#444",lineHeight:1.6}}>
-                <div>A <span style={{color:HOME.light}}>Buy Eagles</span> order at <span style={{fontFamily:fm}}>P¢</span> matches a <span style={{color:AWAY.light}}>Buy {AWAY.name}</span> order at <span style={{fontFamily:fm}}>(100−P)¢</span></div>
-                <div style={{marginTop:2,color:"#333"}}>Click any level to set a limit order</div>
+              <div style={{marginTop:10,paddingTop:8,borderTop:"1px solid #999",fontSize:10,color:"#555",lineHeight:1.6}}>
+                <div>A <span style={{color:HOME.light}}>Buy {HOME.short}</span> order at <span style={{fontFamily:fm}}>P¢</span> matches a <span style={{color:AWAY.light}}>Buy {AWAY.short}</span> order at <span style={{fontFamily:fm}}>(100−P)¢</span></div>
+                <div style={{marginTop:2,color:"#666"}}>Click any level to set a limit order</div>
               </div>
             </div>
           );})()}
