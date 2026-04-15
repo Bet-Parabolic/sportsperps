@@ -1108,7 +1108,7 @@ function normalizeEspnToLive(ev, sportKey) {
   const emojiMap = {nhl:"🏒",nfl:"🏈",mlb:"⚾",ucl:"⚽",nba:"🏀"};
   const labelMap = {nhl:"NHL",nfl:"NFL",mlb:"MLB",ucl:"UCL",nba:"NBA"};
   return {
-    id: sportKey+"_espn_"+ev.id,
+    id: sportKey+"_"+ev.id,
     espnId: ev.id,
     league: sportKey,
     leagueDisplay: labelMap[sportKey]||sportKey.toUpperCase(),
@@ -1246,22 +1246,29 @@ function NFLPage({ data={events:[],loading:true,error:false}, onTrade }) {
 function TrendingPage({ liveGames, espnData={}, onTrade }) {
   const loading = ESPN_SOURCES.some(s => espnData[s.key]?.loading !== false);
 
-  const basketballLive = liveGames
-    .filter(g => g.status==="live" || g.status==="halftime")
-    .map(g => ({
-      id: g.id,
-      isLive: true, isFinal: false, isScheduled: false, isHalf: g.status==="halftime", isDelayed: false,
+  // Group backend live games by sport
+  const backendLive = liveGames.filter(g => g.status==="live" || g.status==="halftime");
+  const backendBySport = {};
+  const sportEmoji = {nba:"🏀",ncaam:"🏀",mlb:"⚾",nfl:"🏈",nhl:"🏒",mls:"⚽"};
+  const sportLabel = {nba:"BASKETBALL",ncaam:"BASKETBALL",mlb:"BASEBALL",nfl:"FOOTBALL",nhl:"HOCKEY",mls:"SOCCER"};
+  backendLive.forEach(g => {
+    const key = g.league || "nba";
+    if (!backendBySport[key]) backendBySport[key] = [];
+    backendBySport[key].push({
+      id: g.id, isLive: true, isFinal: false, isScheduled: false, isHalf: g.status==="halftime", isDelayed: false,
       detail: g.clock && g.period ? `${g.clock} · Q${g.period}` : "",
       home: { name: g.home.name||"", abbr: g.home.abbreviation||"", logo: g.home.logo||"", score: g.home.score??null },
       away: { name: g.away.name||"", abbr: g.away.abbreviation||"", logo: g.away.logo||"", score: g.away.score??null },
-    }));
+      _backendGame: g,
+    });
+  });
 
   const espnLive = ESPN_SOURCES.flatMap(s => {
     const events = (espnData[s.key]?.events||[]).map(parseESPNEvent).filter(g => g.isLive);
     return events.map(g => ({...g, _emoji: s.emoji, _label: s.label, _key: s.key}));
   });
 
-  const totalLive = espnLive.length + basketballLive.length;
+  const totalLive = espnLive.length + backendLive.length;
 
   return (
     <div style={{flex:1,overflow:"auto",background:"#0a0a0a",padding:"32px 40px"}}>
@@ -1287,16 +1294,16 @@ function TrendingPage({ liveGames, espnData={}, onTrade }) {
         </div>
       )}
 
-      {/* Basketball live (from backend) */}
-      {basketballLive.length>0&&(
-        <div style={{marginBottom:32}}>
+      {/* Backend live games grouped by sport */}
+      {Object.entries(backendBySport).map(([key, games]) => (
+        <div key={key} style={{marginBottom:32}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-            <span style={{fontSize:18}}>🏀</span>
-            <SectionHeader label="BASKETBALL" color={B.green}/>
+            <span style={{fontSize:18}}>{sportEmoji[key]||"🏀"}</span>
+            <SectionHeader label={sportLabel[key]||key.toUpperCase()} color={B.green}/>
           </div>
-          <Grid>{basketballLive.map(g=>{const lg=liveGames.find(x=>x.id===g.id);return<MatchCard key={g.id} g={{...g,_raw:lg}} emoji="🏀" onTrade={onTrade?()=>onTrade(lg):null} _espnKey="nba"/>;})}</Grid>
+          <Grid>{games.map(g=><MatchCard key={g.id} g={{...g,_raw:g._backendGame}} emoji={sportEmoji[key]||"🏀"} onTrade={onTrade?()=>onTrade(g._backendGame):null} _espnKey={key}/>)}</Grid>
         </div>
-      )}
+      ))}
 
       {/* ESPN live games by sport */}
       {ESPN_SOURCES.filter(s=>s.key!=="ufc").map(s => {
@@ -2237,11 +2244,11 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
 
   // Sport counts for nav tabs
   const sportCounts = useMemo(() => ({
-    nba: liveGames.filter(g=>g.status==='live'||g.status==='halftime').length,
-    nfl: espnSidebarGames.filter(g=>g._sport==='nfl').length,
-    mlb: espnSidebarGames.filter(g=>g._sport==='mlb').length,
-    nhl: espnSidebarGames.filter(g=>g._sport==='nhl').length,
-    ucl: espnSidebarGames.filter(g=>g._sport==='ucl').length,
+    nba: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&(!g.league||g.league==='nba'||g.league==='ncaam')).length,
+    nfl: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&g.league==='nfl').length || espnSidebarGames.filter(g=>g._sport==='nfl').length,
+    mlb: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&g.league==='mlb').length || espnSidebarGames.filter(g=>g._sport==='mlb').length,
+    nhl: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&g.league==='nhl').length || espnSidebarGames.filter(g=>g._sport==='nhl').length,
+    ucl: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&g.league==='mls').length || espnSidebarGames.filter(g=>g._sport==='ucl').length,
   }), [liveGames, espnSidebarGames]);
 
   // ── fetch oracle history on mount (backend only) ────────────────────────
@@ -3296,11 +3303,11 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
   const sportCounts = useMemo(() => {
     const countLive = evts => (evts||[]).filter(ev => LIVE_STATUS.includes(ev.status?.type?.name)).length;
     return {
-      nba: liveGames.filter(g => g.status==="live"||g.status==="halftime").length,
-      nfl: countLive(espnData.nfl?.events),
-      mlb: countLive(espnData.mlb?.events),
-      nhl: countLive(espnData.nhl?.events),
-      ucl: countLive(espnData.ucl?.events),
+      nba: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && (!g.league || g.league==="nba" || g.league==="ncaam")).length,
+      nfl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="nfl").length || countLive(espnData.nfl?.events),
+      mlb: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="mlb").length || countLive(espnData.mlb?.events),
+      nhl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="nhl").length || countLive(espnData.nhl?.events),
+      ucl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="mls").length || countLive(espnData.ucl?.events),
       ufc: countLive(espnData.ufc?.events),
     };
   }, [espnData, liveGames]);
