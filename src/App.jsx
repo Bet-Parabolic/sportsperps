@@ -1574,9 +1574,10 @@ function BaseballPage({ data={events:[],loading:true,error:false}, onTrade }) {
    BASKETBALL PAGE — live NBA/NCAAM games from backend
    ═══════════════════════════════════════════════════════════ */
 function BasketballPage({ liveGames, onTrade }) {
-  const live    = liveGames.filter(g => g.status === "live" || g.status === "halftime");
-  const final   = liveGames.filter(g => (g.status === "final" || g.status === "completed") && isRecent(g.date || g.startTime));
-  const sched   = liveGames.filter(g => g.status === "scheduled").sort((a,b) => new Date(a.date||a.startTime||0) - new Date(b.date||b.startTime||0));
+  const bballGames = liveGames.filter(g => !g.league || g.league === "nba" || g.league === "ncaam" || g.sport === "Basketball");
+  const live    = bballGames.filter(g => g.status === "live" || g.status === "halftime");
+  const final   = bballGames.filter(g => (g.status === "final" || g.status === "completed") && isRecent(g.date || g.startTime));
+  const sched   = bballGames.filter(g => g.status === "scheduled").sort((a,b) => new Date(a.date||a.startTime||0) - new Date(b.date||b.startTime||0));
   const hasGames = live.length > 0 || sched.length > 0 || final.length > 0;
 
   const GameCard = ({ g }) => {
