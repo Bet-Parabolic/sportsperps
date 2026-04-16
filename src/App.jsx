@@ -1174,8 +1174,8 @@ const isRecent = (dateStr, hours=6) => {
 /* Sort upcoming games soonest first */
 const byDate = (a,b) => new Date(a.date||0) - new Date(b.date||0);
 
-/* shared card used by Soccer and Hockey */
-function MatchCard({ g, emoji, showRecord, onTrade, _espnKey }) {
+/* shared card used by Soccer, Hockey, and NFL */
+function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }) {
   const homeScore = parseFloat(g.home.score) || 0;
   const awayScore = parseFloat(g.away.score) || 0;
   const homeWinning = homeScore > awayScore;
@@ -1209,13 +1209,22 @@ function MatchCard({ g, emoji, showRecord, onTrade, _espnKey }) {
         ))}
       </div>
       {g.isScheduled&&g.detail&&<div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:10}}>{g.detail}</div>}
-      {onTrade&&(g.isLive||g.isHalf)&&(
-        <button onClick={()=>onTrade(g)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
+      {(g.isLive||g.isHalf)&&(()=>{const bg=liveGames?findBackendGame(liveGames,g,_espnKey):null;const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
+        {wp&&<div style={{marginTop:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+            <span style={{fontSize:10,color:B.primary,fontWeight:700,fontFamily:fm}}>{wp}% {g.home.name}</span>
+            <span style={{fontSize:10,color:"#ef4444",fontWeight:700,fontFamily:fm}}>{(100-parseFloat(wp)).toFixed(1)}% {g.away.name}</span>
+          </div>
+          <div style={{height:4,background:"#1a1a1a",borderRadius:4,overflow:"hidden"}}>
+            <div style={{height:"100%",width:wp+"%",background:`linear-gradient(90deg, ${B.primary}, ${B.primaryLight})`,borderRadius:4,transition:"width .5s ease"}}/>
+          </div>
+        </div>}
+        {onTrade&&<button onClick={()=>onTrade(g)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
           background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
           Trade Live
-        </button>
-      )}
+        </button>}
+      </>);})()}
     </div>
   );
 }
@@ -1256,7 +1265,7 @@ function NFLPage({ data={events:[],loading:true,error:false}, onTrade, liveGames
   return (
     <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏈</div><div style={{fontSize:14,color:"#555"}}>No NFL games scheduled today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={tradeFn} _espnKey="nfl"/>)}</Grid></>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={tradeFn} _espnKey="nfl" liveGames={liveGames}/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
     </SportPageShell>
@@ -1322,7 +1331,7 @@ function TrendingPage({ liveGames, espnData={}, onTrade }) {
             <span style={{fontSize:18}}>{sportEmoji[key]||"🏀"}</span>
             <SectionHeader label={sportLabel[key]||key.toUpperCase()} color={B.green}/>
           </div>
-          <Grid>{games.map(g=><MatchCard key={g.id} g={{...g,_raw:g._backendGame}} emoji={sportEmoji[key]||"🏀"} onTrade={onTrade?()=>onTrade(g._backendGame):null} _espnKey={key}/>)}</Grid>
+          <Grid>{games.map(g=><MatchCard key={g.id} g={{...g,_raw:g._backendGame}} emoji={sportEmoji[key]||"🏀"} onTrade={onTrade?()=>onTrade(g._backendGame):null} _espnKey={key} liveGames={liveGames}/>)}</Grid>
         </div>
       ))}
 
@@ -1341,7 +1350,7 @@ function SoccerPage({ data={events:[],loading:true,error:false}, onTrade, liveGa
   return (
     <SportPageShell title="Soccer" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No soccer fixtures today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽" onTrade={tradeFn} _espnKey="mls"/>)}</Grid></>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽" onTrade={tradeFn} _espnKey="mls" liveGames={liveGames}/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
     </SportPageShell>
@@ -1358,7 +1367,7 @@ function HockeyPage({ data={events:[],loading:true,error:false}, onTrade, liveGa
   return (
     <SportPageShell title="NHL" subtitle="HOCKEY" emoji="🏒" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏒</div><div style={{fontSize:14,color:"#555"}}>No NHL games scheduled today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord onTrade={tradeFn} _espnKey="nhl"/>)}</Grid></>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord onTrade={tradeFn} _espnKey="nhl" liveGames={liveGames}/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
     </SportPageShell>
@@ -1517,13 +1526,22 @@ function BaseballPage({ data={events:[],loading:true,error:false}, onTrade, live
         {g.isScheduled && g.detail && (
           <div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:4}}>{g.detail}</div>
         )}
-        {onTrade&&g.isLive&&(()=>{const bg=findBackendGame(liveGames,g,'mlb');return bg?(
-          <button onClick={()=>onTrade(bg)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
+        {g.isLive&&(()=>{const bg=findBackendGame(liveGames,g,'mlb');const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
+          {wp&&<div style={{marginTop:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+              <span style={{fontSize:10,color:B.primary,fontWeight:700,fontFamily:fm}}>{wp}% {g.home.name}</span>
+              <span style={{fontSize:10,color:"#ef4444",fontWeight:700,fontFamily:fm}}>{(100-parseFloat(wp)).toFixed(1)}% {g.away.name}</span>
+            </div>
+            <div style={{height:4,background:"#1a1a1a",borderRadius:4,overflow:"hidden"}}>
+              <div style={{height:"100%",width:wp+"%",background:`linear-gradient(90deg, ${B.primary}, ${B.primaryLight})`,borderRadius:4,transition:"width .5s ease"}}/>
+            </div>
+          </div>}
+          {onTrade&&bg&&<button onClick={()=>onTrade(bg)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
             background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
             Trade Live
-          </button>
-        ):null;})()}
+          </button>}
+        </>);})()}
       </div>
     );
   };
