@@ -2629,7 +2629,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         </div>
         {/* Center — sport tabs (same as TradingApp) */}
         <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',flex:1,marginLeft:isMobile?8:16,marginRight:isMobile?8:16,minWidth:0}}>
-          {[['demos','Demos',null],['trending','Live',null],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.ucl],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
+          {[['demos','Demos',null],['trending','Live',sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.ucl],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.ucl],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='trending'
                 ? <span style={{display:'flex',alignItems:'center',gap:5}}>
@@ -3524,7 +3524,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
                     Live
                   </span>
                 : sport}{(() => {
-                  const c = sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.ucl:sport==="MMA"?sportCounts.ufc:null;
+                  const c = sport==="Live"?(sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.ucl+(sportCounts.ufc||0)):sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.ucl:sport==="MMA"?sportCounts.ufc:null;
                   return c>0?<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({c})</span>:null;
                 })()}</button>
           );})}
