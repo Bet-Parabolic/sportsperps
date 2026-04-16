@@ -228,11 +228,18 @@ function AwayMarkerDot({cx,cy,payload}){
 }
 function ChartTip({active,payload}){
   if(!active||!payload||!payload[0])return null;const d=payload[0].payload;
-  return(<div style={{background:"#000",border:"1px solid "+B.border2,borderRadius:8,padding:"8px 14px"}}>
-    <div style={{display:"flex",gap:16}}>
+  const markerLabels={entry:"Entered",["exit-win"]:"Closed (Win)",["exit-loss"]:"Closed (Loss)",liquidated:"Liquidated",settle:"Settled"};
+  return(<div style={{background:"#000",border:"1px solid "+B.border2,borderRadius:8,padding:"8px 14px",minWidth:120}}>
+    <div style={{display:"flex",gap:16,marginBottom:d.mh_marker||d.ma_marker?6:0}}>
       <span style={{color:B.primary,fontWeight:900,fontSize:15,fontFamily:fm}}>{((d.ph||0)*100).toFixed(1)}%</span>
       <span style={{color:B.pink,fontWeight:900,fontSize:15,fontFamily:fm}}>{((d.pa||0)*100).toFixed(1)}%</span>
     </div>
+    {d.mh_marker&&<div style={{fontSize:11,fontWeight:700,color:d.mh_marker==="entry"?B.green:d.mh_marker.includes("loss")||d.mh_marker==="liquidated"?B.red:B.primary,borderTop:"1px solid #222",paddingTop:4,marginTop:2}}>
+      {markerLabels[d.mh_marker]||d.mh_marker} @ {(d.mh_val*100).toFixed(1)}¢
+    </div>}
+    {d.ma_marker&&<div style={{fontSize:11,fontWeight:700,color:d.ma_marker==="entry"?B.green:d.ma_marker.includes("loss")||d.ma_marker==="liquidated"?B.red:B.primary,borderTop:"1px solid #222",paddingTop:4,marginTop:2}}>
+      {markerLabels[d.ma_marker]||d.ma_marker} @ {((1-d.ma_val)*100).toFixed(1)}¢
+    </div>}
   </div>);
 }
 
@@ -1229,6 +1236,23 @@ function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }) {
   );
 }
 
+function SkeletonCard(){return(
+  <div style={{background:"#111",border:"1px solid #1f1f1f",borderRadius:16,padding:"20px 24px",animation:"pulse 1.5s infinite"}}>
+    <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}>
+      <div style={{width:60,height:12,background:"#1a1a1a",borderRadius:6}}/>
+      <div style={{width:30,height:12,background:"#1a1a1a",borderRadius:6}}/>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {[0,1].map(i=>(<div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:28,height:28,borderRadius:6,background:"#1a1a1a"}}/>
+          <div style={{width:100+i*20,height:14,background:"#1a1a1a",borderRadius:6}}/>
+        </div>
+        <div style={{width:30,height:24,background:"#1a1a1a",borderRadius:6}}/>
+      </div>))}
+    </div>
+  </div>
+);}
 function SportPageShell({ title, subtitle, emoji, liveCount, loading, error, noGamesMsg, children }) {
   return (
     <div style={{flex:1,overflow:"auto",background:"#0a0a0a",padding:"32px 40px"}}>
@@ -1238,10 +1262,10 @@ function SportPageShell({ title, subtitle, emoji, liveCount, loading, error, noG
           {liveCount>0&&<span style={{fontSize:10,fontWeight:700,color:B.green,fontFamily:fm,padding:"2px 8px",background:B.green+"15",borderRadius:6,letterSpacing:"0.06em",animation:"pulse 2s infinite"}}>{liveCount} LIVE</span>}
         </div>
         <h2 style={{fontFamily:fd,fontSize:28,fontWeight:800,letterSpacing:"-0.03em",color:"#fff",marginBottom:8}}>{title}</h2>
-        {loading&&<p style={{fontSize:13,color:"#666"}}>Loading…</p>}
+        {loading&&<p style={{fontSize:13,color:"#666"}}>Loading games…</p>}
         {error&&<p style={{fontSize:13,color:"#ef4444"}}>Could not reach ESPN — try again shortly.</p>}
       </div>
-      {loading&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>{emoji}</div><div style={{fontSize:13,color:"#555"}}>Loading…</div></div>}
+      {loading&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16}}>{[0,1,2,3].map(i=><SkeletonCard key={i}/>)}</div>}
       {!loading&&!error&&children}
     </div>
   );
@@ -1249,6 +1273,19 @@ function SportPageShell({ title, subtitle, emoji, liveCount, loading, error, noG
 
 function SectionHeader({ label, color }) {
   return <div style={{fontSize:11,fontWeight:700,color:color||"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>{label}</div>;
+}
+function EmptyState({ emoji, sport, scheduledGames=[] }) {
+  const next = scheduledGames.sort((a,b)=>new Date(a.date||a.detail||0)-new Date(b.date||b.detail||0))[0];
+  return (
+    <div style={{textAlign:"center",padding:"60px 0"}}>
+      <div style={{fontSize:36,marginBottom:12}}>{emoji}</div>
+      <div style={{fontSize:14,color:"#555",marginBottom:next?8:0}}>No live {sport} games right now.</div>
+      {next&&<div style={{fontSize:12,color:"#888",marginTop:4}}>
+        Next: <span style={{color:"#fff",fontWeight:600}}>{next.home?.name||next.home?.abbr} vs {next.away?.name||next.away?.abbr}</span>
+        {next.detail&&<span style={{color:"#666"}}> · {next.detail}</span>}
+      </div>}
+    </div>
+  );
 }
 
 function Grid({ children }) {
@@ -1264,7 +1301,7 @@ function NFLPage({ data={events:[],loading:true,error:false}, onTrade, liveGames
   const tradeFn = onTrade ? (g) => { const bg = findBackendGame(liveGames, g, 'nfl'); if (bg) onTrade(bg); } : null;
   return (
     <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={data.loading} error={data.error}>
-      {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏈</div><div style={{fontSize:14,color:"#555"}}>No NFL games scheduled today.</div></div>}
+      {!data.loading&&!data.error&&games.length===0&&<EmptyState emoji="🏈" sport="NFL" scheduledGames={sched}/>}
       {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={tradeFn} _espnKey="nfl" liveGames={liveGames}/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
@@ -1349,7 +1386,7 @@ function SoccerPage({ data={events:[],loading:true,error:false}, onTrade, liveGa
   const tradeFn = onTrade ? (g) => { const bg = findBackendGame(liveGames, g, 'mls'); if (bg) onTrade(bg); } : null;
   return (
     <SportPageShell title="Soccer" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={data.loading} error={data.error}>
-      {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No soccer fixtures today.</div></div>}
+      {!data.loading&&!data.error&&games.length===0&&<EmptyState emoji="⚽" sport="soccer" scheduledGames={sched}/>}
       {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽" onTrade={tradeFn} _espnKey="mls" liveGames={liveGames}/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
@@ -1366,7 +1403,7 @@ function HockeyPage({ data={events:[],loading:true,error:false}, onTrade, liveGa
   const tradeFn = onTrade ? (g) => { const bg = findBackendGame(liveGames, g, 'nhl'); if (bg) onTrade(bg); } : null;
   return (
     <SportPageShell title="NHL" subtitle="HOCKEY" emoji="🏒" liveCount={live.length} loading={data.loading} error={data.error}>
-      {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏒</div><div style={{fontSize:14,color:"#555"}}>No NHL games scheduled today.</div></div>}
+      {!data.loading&&!data.error&&games.length===0&&<EmptyState emoji="🏒" sport="NHL" scheduledGames={sched}/>}
       {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord onTrade={tradeFn} _espnKey="nhl" liveGames={liveGames}/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
@@ -1573,12 +1610,7 @@ function BaseballPage({ data={events:[],loading:true,error:false}, onTrade, live
         </div>
       )}
 
-      {!data.loading && !data.error && games.length === 0 && (
-        <div style={{textAlign:"center",padding:"60px 0",color:"#444"}}>
-          <div style={{fontSize:32,marginBottom:16}}>⚾</div>
-          <div style={{fontSize:14,color:"#555"}}>No MLB games scheduled today.</div>
-        </div>
-      )}
+      {!data.loading && !data.error && games.length === 0 && <EmptyState emoji="⚾" sport="MLB" scheduledGames={sched}/>}
 
       {/* Live */}
       {live.length > 0 && (
@@ -1752,12 +1784,7 @@ function BasketballPage({ liveGames, onTrade }) {
         </p>
       </div>
 
-      {!hasGames && (
-        <div style={{textAlign:"center",padding:"60px 0",color:"#444"}}>
-          <div style={{fontSize:32,marginBottom:16}}>🏀</div>
-          <div style={{fontSize:14,color:"#555"}}>No games found. The backend may be starting up or there are no games scheduled right now.</div>
-        </div>
-      )}
+      {!hasGames && <EmptyState emoji="🏀" sport="basketball" scheduledGames={sched}/>}
 
       {/* Live / halftime */}
       {live.length > 0 && (
@@ -2603,6 +2630,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
 
   const liqLines = useMemo(() => positions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
+    liqPriceCents: (pos.liq*100).toFixed(1),
   })), [positions]);
 
   // ── render ──────────────────────────────────────────────────────────────
@@ -2816,7 +2844,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                     <YAxis domain={[0,1]} tick={{fill:'#555',fontSize:10}} tickFormatter={v=>(v*100)+'%'} axisLine={false} tickLine={false} width={32} orientation="right"/>
                     <Tooltip content={<ChartTip/>} cursor={{stroke:'#ffffff06'}}/>
                     <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
-                    {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3"/>))}
+                    {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3" label={{value:`LIQ ${ll.liqPriceCents}¢`,position:"right",fill:B.red,fontSize:9,fontWeight:700}}/>))}
                     {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?HOME.light:AWAY.light;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                     <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#lhg)" dot={false} animationDuration={0} baseValue={0}/>
                     <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
@@ -3064,8 +3092,9 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
               </div>
             </div>
             {/* Summary */}
-            <div style={{background:'#0a0a0a',borderRadius:12,padding:'10px 12px',marginBottom:14,fontSize:12}}>
-              {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Liquidation',(liqP*100).toFixed(1)+'¢',B.red]].map(([l,v,c])=>(
+            {(()=>{const estFee=expo*0.001;const liqDist=oPrice>0?Math.abs(oPrice-liqP)/oPrice*100:0;const liqCol=liqDist>15?B.green:liqDist>5?'#ff9f1c':B.red;const balPct=balance>0?eM/balance*100:0;return(<>
+            <div style={{background:'#0a0a0a',borderRadius:12,padding:'10px 12px',marginBottom:10,fontSize:12}}>
+              {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Est. Fee (10 bps)',fmtUsd(estFee),'#888']].map(([l,v,c])=>(
                 <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'3px 0'}}>
                   <span style={{color:'#555'}}>{l}</span><span style={{color:c,fontWeight:600,fontFamily:fm}}>{v}</span>
                 </div>
@@ -3080,6 +3109,22 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                 <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>-{fmtUsd(eM)}</span>
               </div>
             </div>
+            {/* Liquidation callout */}
+            <div style={{background:liqCol+'10',border:'1px solid '+liqCol+'30',borderRadius:10,padding:'10px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10}}>
+              <div style={{fontSize:18,flexShrink:0}}>{liqDist>15?'🟢':liqDist>5?'🟡':'🔴'}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:liqCol,fontFamily:fm}}>Liquidation @ {(liqP*100).toFixed(1)}¢</div>
+                <div style={{fontSize:10,color:'#888',marginTop:2}}>{liqDist.toFixed(1)}% from current price</div>
+              </div>
+            </div>
+            {/* Warnings */}
+            {balPct>50&&<div style={{fontSize:11,color:'#ff9f1c',marginBottom:8,padding:'6px 10px',background:'#ff9f1c10',borderRadius:8,border:'1px solid #ff9f1c22'}}>
+              Using {balPct.toFixed(0)}% of your balance
+            </div>}
+            {eL>=ml&&ml<10&&<div style={{fontSize:11,color:B.red,marginBottom:8,padding:'6px 10px',background:B.red+'10',borderRadius:8,border:'1px solid '+B.red+'22'}}>
+              Maximum leverage — higher liquidation risk
+            </div>}
+            </>);})()}
             {/* Reduce Only */}
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,padding:'8px 10px',background:reduceOnly?B.primary+'10':'#0a0a0a',borderRadius:10,border:'1px solid '+(reduceOnly?B.primary+'30':'#1a1a1a'),cursor:'pointer'}} onClick={()=>setReduceOnly(r=>!r)}>
               <div style={{width:16,height:16,borderRadius:4,border:'1.5px solid '+(reduceOnly?B.primary:'#333'),background:reduceOnly?B.primary:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .15s'}}>
@@ -3759,7 +3804,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
                   <YAxis domain={[0,1]} tick={{fill:"#555",fontSize:10}} tickFormatter={v=>(v*100)+"%"} axisLine={false} tickLine={false} width={32} orientation="right"/>
                   <Tooltip content={<ChartTip/>} cursor={{stroke:"#ffffff06"}}/>
                   <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
-                  {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3"/>))}
+                  {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3" label={{value:`LIQ ${ll.liqPriceCents}¢`,position:"right",fill:B.red,fontSize:9,fontWeight:700}}/>))}
                   {limitOrders.map(lo=>{const ly=lo.side==="home"?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==="home"?HOME.light:AWAY.light;return(<ReferenceLine key={"lo-"+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+"¢ LIMIT",position:"insideTopLeft",fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                   <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#hg)" dot={false} animationDuration={0} baseValue={0}/>
                   <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#ag)" dot={false} animationDuration={0} baseValue={0}/>
