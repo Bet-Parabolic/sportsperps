@@ -1085,6 +1085,26 @@ function parseESPNEvent(ev) {
   };
 }
 
+/* Find a backend game matching an ESPN event by ID or team names */
+function findBackendGame(liveGames, espnGame, sportKey) {
+  if (!liveGames || !espnGame) return null;
+  const espnId = espnGame.id || espnGame._raw?.id;
+  // Match by ESPN event ID embedded in backend game ID (e.g. mlb_401814954)
+  const byId = liveGames.find(g => g.espnId === String(espnId) || g.id === sportKey+"_"+espnId);
+  if (byId) return byId;
+  // Fallback: match by team names
+  const homeName = (espnGame.home?.name || "").toLowerCase();
+  const awayName = (espnGame.away?.name || "").toLowerCase();
+  if (homeName && awayName) {
+    return liveGames.find(g =>
+      g.league === sportKey &&
+      (g.home.name.toLowerCase().includes(homeName) || homeName.includes(g.home.name.toLowerCase())) &&
+      (g.away.name.toLowerCase().includes(awayName) || awayName.includes(g.away.name.toLowerCase()))
+    );
+  }
+  return null;
+}
+
 /* Convert an ESPN event + sport key into a backend-compatible liveGame object
    so any live ESPN game can be opened in LiveTradingApp */
 function normalizeEspnToLive(ev, sportKey) {
@@ -1190,7 +1210,7 @@ function MatchCard({ g, emoji, showRecord, onTrade, _espnKey }) {
       </div>
       {g.isScheduled&&g.detail&&<div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:10}}>{g.detail}</div>}
       {onTrade&&(g.isLive||g.isHalf)&&(
-        <button onClick={()=>{const norm=normalizeEspnToLive(g._raw,_espnKey||'nhl');if(norm)onTrade(norm);}} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
+        <button onClick={()=>onTrade(g)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
           background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
           Trade Live
@@ -1227,15 +1247,16 @@ function Grid({ children }) {
 }
 
 /* ─── NFL PAGE ─── */
-function NFLPage({ data={events:[],loading:true,error:false}, onTrade }) {
+function NFLPage({ data={events:[],loading:true,error:false}, onTrade, liveGames=[] }) {
   const games = data.events.map(parseESPNEvent);
   const live  = games.filter(g => g.isLive);
   const final = games.filter(g => g.isFinal && isRecent(g.date));
   const sched = games.filter(g => g.isScheduled).sort(byDate);
+  const tradeFn = onTrade ? (g) => { const bg = findBackendGame(liveGames, g, 'nfl'); if (bg) onTrade(bg); } : null;
   return (
     <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏈</div><div style={{fontSize:14,color:"#555"}}>No NFL games scheduled today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={onTrade} _espnKey="nfl"/>)}</Grid></>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={tradeFn} _espnKey="nfl"/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
     </SportPageShell>
@@ -1305,34 +1326,22 @@ function TrendingPage({ liveGames, espnData={}, onTrade }) {
         </div>
       ))}
 
-      {/* ESPN live games by sport */}
-      {ESPN_SOURCES.filter(s=>s.key!=="ufc").map(s => {
-        const live = (espnData[s.key]?.events||[]).map(parseESPNEvent).filter(g => g.isLive);
-        if(live.length===0) return null;
-        return (
-          <div key={s.key} style={{marginBottom:32}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <span style={{fontSize:18}}>{s.emoji}</span>
-              <SectionHeader label={s.label} color={B.green}/>
-            </div>
-            <Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji={s.emoji} onTrade={onTrade?()=>{const norm=normalizeEspnToLive(g._raw,s.key);if(norm)onTrade(norm);}:null} _espnKey={s.key}/>)}</Grid>
-          </div>
-        );
-      })}
+      {/* ESPN-only games removed — all live games come from backend with real odds */}
     </div>
   );
 }
 
 /* ─── SOCCER PAGE ─── */
-function SoccerPage({ data={events:[],loading:true,error:false}, onTrade }) {
+function SoccerPage({ data={events:[],loading:true,error:false}, onTrade, liveGames=[] }) {
   const games = data.events.map(parseESPNEvent);
   const live = games.filter(g=>g.isLive);
   const final = games.filter(g=>g.isFinal && isRecent(g.date));
   const sched = games.filter(g=>g.isScheduled).sort(byDate);
+  const tradeFn = onTrade ? (g) => { const bg = findBackendGame(liveGames, g, 'mls'); if (bg) onTrade(bg); } : null;
   return (
-    <SportPageShell title="UEFA Champions League" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={data.loading} error={data.error}>
-      {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No Champions League fixtures today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽" onTrade={onTrade} _espnKey="ucl"/>)}</Grid></>}
+    <SportPageShell title="Soccer" subtitle="SOCCER" emoji="⚽" liveCount={live.length} loading={data.loading} error={data.error}>
+      {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>⚽</div><div style={{fontSize:14,color:"#555"}}>No soccer fixtures today.</div></div>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="⚽" onTrade={tradeFn} _espnKey="mls"/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="⚽"/>)}</Grid></>}
     </SportPageShell>
@@ -1340,15 +1349,16 @@ function SoccerPage({ data={events:[],loading:true,error:false}, onTrade }) {
 }
 
 /* ─── HOCKEY PAGE ─── */
-function HockeyPage({ data={events:[],loading:true,error:false}, onTrade }) {
+function HockeyPage({ data={events:[],loading:true,error:false}, onTrade, liveGames=[] }) {
   const games = data.events.map(parseESPNEvent);
   const live = games.filter(g=>g.isLive);
   const final = games.filter(g=>g.isFinal && isRecent(g.date));
   const sched = games.filter(g=>g.isScheduled).sort(byDate);
+  const tradeFn = onTrade ? (g) => { const bg = findBackendGame(liveGames, g, 'nhl'); if (bg) onTrade(bg); } : null;
   return (
     <SportPageShell title="NHL" subtitle="HOCKEY" emoji="🏒" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>🏒</div><div style={{fontSize:14,color:"#555"}}>No NHL games scheduled today.</div></div>}
-      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord onTrade={onTrade} _espnKey="nhl"/>)}</Grid></>}
+      {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord onTrade={tradeFn} _espnKey="nhl"/>)}</Grid></>}
       {sched.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{sched.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏒" showRecord/>)}</Grid></>}
     </SportPageShell>
@@ -1452,7 +1462,7 @@ function MMAPage({ data={events:[],loading:true,error:false} }) {
 /* ═══════════════════════════════════════════════════════════
    BASEBALL PAGE — live/upcoming MLB games via ESPN public API
    ═══════════════════════════════════════════════════════════ */
-function BaseballPage({ data={events:[],loading:true,error:false}, onTrade }) {
+function BaseballPage({ data={events:[],loading:true,error:false}, onTrade, liveGames=[] }) {
   const games  = data.events.map(parseESPNEvent);
   const live    = games.filter(g => g.isLive);
   const final   = games.filter(g => g.isFinal && isRecent(g.date));
@@ -1507,13 +1517,13 @@ function BaseballPage({ data={events:[],loading:true,error:false}, onTrade }) {
         {g.isScheduled && g.detail && (
           <div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:4}}>{g.detail}</div>
         )}
-        {onTrade&&g.isLive&&(
-          <button onClick={()=>{const norm=normalizeEspnToLive(g._raw,'mlb');if(norm)onTrade(norm);}} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
+        {onTrade&&g.isLive&&(()=>{const bg=findBackendGame(liveGames,g,'mlb');return bg?(
+          <button onClick={()=>onTrade(bg)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
             background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
             <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
             Trade Live
           </button>
-        )}
+        ):null;})()}
       </div>
     );
   };
@@ -3518,11 +3528,11 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
 
         {terminalPage==="demos"?<DemosPage onSelectGame={(g)=>{onSwitchGame(g);setTerminalPage("game");}} currentGameId={G.id}/>
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
-        :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade}/>
-        :terminalPage==="soccer"?<SoccerPage data={espnData.ucl} onTrade={onTrade}/>
-        :terminalPage==="hockey"?<HockeyPage data={espnData.nhl} onTrade={onTrade}/>
+        :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade} liveGames={liveGames}/>
+        :terminalPage==="soccer"?<SoccerPage data={espnData.ucl} onTrade={onTrade} liveGames={liveGames}/>
+        :terminalPage==="hockey"?<HockeyPage data={espnData.nhl} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
-        :terminalPage==="nfl"?<NFLPage data={espnData.nfl} onTrade={onTrade}/>
+        :terminalPage==="nfl"?<NFLPage data={espnData.nfl} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="trending"?<TrendingPage liveGames={liveGames} espnData={espnData} onTrade={onTrade}/>
         :terminalPage==="leaderboard"?<LeaderboardPage userId={userId}/>
         :<>
