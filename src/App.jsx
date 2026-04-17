@@ -207,40 +207,99 @@ function makeBook(mid){
 }
 function maxLev(p){const d=Math.min(p,1-p);if(d>=.2)return 10;if(d>=.1)return 5;if(d>=.05)return 3;return 2;}
 function liqPrice(side,entry,lev){return side==="home"?entry*(1-1/lev):entry*(1+1/lev);}
+/* Return sport-appropriate period label: "Q3" for football/basketball, "P2" for hockey, "T7" (top of 7th) or "B7" for baseball, "45'" for soccer */
+function periodLabel(league, period, clock, statusDetail){
+  if(period==null||period==="")return clock||statusDetail||"";
+  const lg=(league||"").toLowerCase();
+  if(lg==="mlb"||lg.includes("baseball")){
+    // Baseball: prefer ESPN status detail (e.g. "Top 7th", "Bot 3rd"); fall back to "Inn N"
+    if(statusDetail&&/^(top|bot|mid|end)\s/i.test(statusDetail))return statusDetail;
+    return "Inn "+period;
+  }
+  if(lg==="nhl"||lg.includes("hockey")){
+    return "P"+period+(clock?" "+clock:"");
+  }
+  if(lg==="mls"||lg==="ucl"||lg.includes("soccer")){
+    return clock||(period==1?"1H":"2H");
+  }
+  // Default: NBA, NCAAM, NFL → "Q{n}"
+  return "Q"+period+(clock?" "+clock:"");
+}
+/* Brighten a hex color toward white for dark-background readability */
+function brighten(hex, factor=0.45){
+  if(!hex||typeof hex!=="string")return "#ffffff";
+  const c=hex.replace("#","");
+  const full=c.length===3?c.split("").map(x=>x+x).join(""):c;
+  if(full.length!==6)return hex;
+  const r=parseInt(full.slice(0,2),16),g=parseInt(full.slice(2,4),16),b=parseInt(full.slice(4,6),16);
+  const br=Math.min(255,Math.round(r+(255-r)*factor));
+  const bg=Math.min(255,Math.round(g+(255-g)*factor));
+  const bb=Math.min(255,Math.round(b+(255-b)*factor));
+  return "#"+[br,bg,bb].map(v=>v.toString(16).padStart(2,"0")).join("");
+}
 function calcPnL(side,exposure,entry,mark){return side==="home"?exposure*(mark-entry)/entry:exposure*(entry-mark)/entry;}
 
+/* Render a small price tag next to a marker, attached to the chart at (cx, cy) */
+function PriceTag({cx, cy, color, bg, text, above=true}){
+  const w = text.length * 5.5 + 10;
+  const h = 14;
+  const ty = above ? cy - 14 : cy + 14;
+  return (
+    <g>
+      <rect x={cx + 8} y={ty - h/2} width={w} height={h} rx={3} fill={bg||"#000"} stroke={color} strokeWidth={1}/>
+      <text x={cx + 8 + w/2} y={ty + 3} textAnchor="middle" fill={color} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text>
+    </g>
+  );
+}
 function HomeMarkerDot({cx,cy,payload}){
-  if(!payload||!payload.mh_marker||cx==null||cy==null)return null;const m=payload.mh_marker;
-  if(m==="entry")return(<g><circle cx={cx} cy={cy} r={6} fill="#059669" stroke={B.primary} strokeWidth={2}/><text x={cx} y={cy-12} textAnchor="middle" fill={B.primary} fontSize={9} fontWeight="900">BUY</text></g>);
-  if(m==="exit-win")return(<g><polygon points={`${cx},${cy-8} ${cx-6},${cy+4} ${cx+6},${cy+4}`} fill={B.primary} strokeWidth={1}/><text x={cx} y={cy-12} textAnchor="middle" fill={B.primary} fontSize={9} fontWeight="900">WIN</text></g>);
-  if(m==="exit-loss")return(<g><polygon points={`${cx},${cy+8} ${cx-6},${cy-4} ${cx+6},${cy-4}`} fill={B.pink}/><text x={cx} y={cy+20} textAnchor="middle" fill={B.pink} fontSize={9} fontWeight="900">LOSS</text></g>);
-  if(m==="liquidated")return(<g><rect x={cx-7} y={cy-7} width={14} height={14} rx={3} fill="#dc2626" stroke="#fca5a5" strokeWidth={2}/><text x={cx} y={cy+4} textAnchor="middle" fill="#fff" fontSize={8} fontWeight="900">X</text></g>);
-  if(m==="settle")return(<g><circle cx={cx} cy={cy} r={9} fill="rgba(255,159,28,0.12)" stroke={B.primary} strokeWidth={2}/><text x={cx} y={cy+4} textAnchor="middle" fontSize={11} fill={B.primary} fontWeight="900">W</text></g>);
+  if(!payload||!payload.mh_marker||cx==null||cy==null)return null;
+  const m=payload.mh_marker;
+  const px = payload.mh_val ? (payload.mh_val*100).toFixed(1)+"¢" : "";
+  if(m==="entry")return(<g>
+    <circle cx={cx} cy={cy} r={6} fill="#059669" stroke={B.primary} strokeWidth={2}/>
+    <PriceTag cx={cx} cy={cy} color={B.primary} bg="#000" text={"IN " + px} above={true}/>
+  </g>);
+  if(m==="exit-win")return(<g>
+    <polygon points={`${cx},${cy-8} ${cx-6},${cy+4} ${cx+6},${cy+4}`} fill={B.primary}/>
+    <PriceTag cx={cx} cy={cy} color={B.primary} bg="#000" text={"OUT " + px} above={true}/>
+  </g>);
+  if(m==="exit-loss")return(<g>
+    <polygon points={`${cx},${cy+8} ${cx-6},${cy-4} ${cx+6},${cy-4}`} fill={B.pink}/>
+    <PriceTag cx={cx} cy={cy} color={B.pink} bg="#000" text={"OUT " + px} above={false}/>
+  </g>);
+  if(m==="liquidated")return(<g>
+    <rect x={cx-7} y={cy-7} width={14} height={14} rx={3} fill="#dc2626" stroke="#fca5a5" strokeWidth={2}/>
+    <text x={cx} y={cy+4} textAnchor="middle" fill="#fff" fontSize={8} fontWeight="900">X</text>
+    <PriceTag cx={cx} cy={cy} color="#dc2626" bg="#000" text={"LIQ " + px} above={true}/>
+  </g>);
+  if(m==="settle")return(<g>
+    <circle cx={cx} cy={cy} r={9} fill="rgba(255,159,28,0.12)" stroke={B.primary} strokeWidth={2}/>
+    <text x={cx} y={cy+4} textAnchor="middle" fontSize={11} fill={B.primary} fontWeight="900">W</text>
+  </g>);
   return null;
 }
 function AwayMarkerDot({cx,cy,payload}){
-  if(!payload||!payload.ma_marker||cx==null||cy==null)return null;const m=payload.ma_marker;
-  if(m==="entry")return(<g><circle cx={cx} cy={cy} r={6} fill="#be123c" stroke={B.pink} strokeWidth={2}/><text x={cx} y={cy-12} textAnchor="middle" fill={B.pink} fontSize={9} fontWeight="900">BUY</text></g>);
-  if(m==="exit-win")return(<g><polygon points={`${cx},${cy-8} ${cx-6},${cy+4} ${cx+6},${cy+4}`} fill={B.primary}/><text x={cx} y={cy-12} textAnchor="middle" fill={B.primary} fontSize={9} fontWeight="900">WIN</text></g>);
-  if(m==="exit-loss")return(<g><polygon points={`${cx},${cy+8} ${cx-6},${cy-4} ${cx+6},${cy-4}`} fill={B.pink}/><text x={cx} y={cy+20} textAnchor="middle" fill={B.pink} fontSize={9} fontWeight="900">LOSS</text></g>);
-  if(m==="liquidated")return(<g><rect x={cx-7} y={cy-7} width={14} height={14} rx={3} fill="#dc2626" stroke="#fca5a5" strokeWidth={2}/><text x={cx} y={cy+4} textAnchor="middle" fill="#fff" fontSize={8} fontWeight="900">X</text></g>);
+  if(!payload||!payload.ma_marker||cx==null||cy==null)return null;
+  const m=payload.ma_marker;
+  const px = payload.ma_val ? ((1-payload.ma_val)*100).toFixed(1)+"¢" : "";
+  if(m==="entry")return(<g>
+    <circle cx={cx} cy={cy} r={6} fill="#be123c" stroke={B.pink} strokeWidth={2}/>
+    <PriceTag cx={cx} cy={cy} color={B.pink} bg="#000" text={"IN " + px} above={true}/>
+  </g>);
+  if(m==="exit-win")return(<g>
+    <polygon points={`${cx},${cy-8} ${cx-6},${cy+4} ${cx+6},${cy+4}`} fill={B.primary}/>
+    <PriceTag cx={cx} cy={cy} color={B.primary} bg="#000" text={"OUT " + px} above={true}/>
+  </g>);
+  if(m==="exit-loss")return(<g>
+    <polygon points={`${cx},${cy+8} ${cx-6},${cy-4} ${cx+6},${cy-4}`} fill={B.pink}/>
+    <PriceTag cx={cx} cy={cy} color={B.pink} bg="#000" text={"OUT " + px} above={false}/>
+  </g>);
+  if(m==="liquidated")return(<g>
+    <rect x={cx-7} y={cy-7} width={14} height={14} rx={3} fill="#dc2626" stroke="#fca5a5" strokeWidth={2}/>
+    <text x={cx} y={cy+4} textAnchor="middle" fill="#fff" fontSize={8} fontWeight="900">X</text>
+    <PriceTag cx={cx} cy={cy} color="#dc2626" bg="#000" text={"LIQ " + px} above={true}/>
+  </g>);
   return null;
-}
-function ChartTip({active,payload}){
-  if(!active||!payload||!payload[0])return null;const d=payload[0].payload;
-  const markerLabels={entry:"Entered",["exit-win"]:"Closed (Win)",["exit-loss"]:"Closed (Loss)",liquidated:"Liquidated",settle:"Settled"};
-  return(<div style={{background:"#000",border:"1px solid "+B.border2,borderRadius:8,padding:"8px 14px",minWidth:120}}>
-    <div style={{display:"flex",gap:16,marginBottom:d.mh_marker||d.ma_marker?6:0}}>
-      <span style={{color:B.primary,fontWeight:900,fontSize:15,fontFamily:fm}}>{((d.ph||0)*100).toFixed(1)}%</span>
-      <span style={{color:B.pink,fontWeight:900,fontSize:15,fontFamily:fm}}>{((d.pa||0)*100).toFixed(1)}%</span>
-    </div>
-    {d.mh_marker&&<div style={{fontSize:11,fontWeight:700,color:d.mh_marker==="entry"?B.green:d.mh_marker.includes("loss")||d.mh_marker==="liquidated"?B.red:B.primary,borderTop:"1px solid #222",paddingTop:4,marginTop:2}}>
-      {markerLabels[d.mh_marker]||d.mh_marker} @ {(d.mh_val*100).toFixed(1)}¢
-    </div>}
-    {d.ma_marker&&<div style={{fontSize:11,fontWeight:700,color:d.ma_marker==="entry"?B.green:d.ma_marker.includes("loss")||d.ma_marker==="liquidated"?B.red:B.primary,borderTop:"1px solid #222",paddingTop:4,marginTop:2}}>
-      {markerLabels[d.ma_marker]||d.ma_marker} @ {((1-d.ma_val)*100).toFixed(1)}¢
-    </div>}
-  </div>);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1323,7 +1382,7 @@ function TrendingPage({ liveGames, espnData={}, onTrade }) {
     if (!backendBySport[key]) backendBySport[key] = [];
     backendBySport[key].push({
       id: g.id, isLive: true, isFinal: false, isScheduled: false, isHalf: g.status==="halftime", isDelayed: false,
-      detail: g.clock && g.period ? `${g.clock} · Q${g.period}` : "",
+      detail: periodLabel(g.league, g.period, g.clock, g.statusDetail),
       home: { name: g.home.name||"", abbr: g.home.abbreviation||"", logo: g.home.logo||"", score: g.home.score??null },
       away: { name: g.away.name||"", abbr: g.away.abbreviation||"", logo: g.away.logo||"", score: g.away.score??null },
       _backendGame: g,
@@ -1681,8 +1740,8 @@ function BasketballPage({ liveGames, onTrade }) {
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             {isLive && <span style={{width:7,height:7,borderRadius:"50%",background:B.green,display:"inline-block",animation:"pulse 2s infinite",flexShrink:0}}/>}
             <span style={{fontSize:11,fontWeight:700,color:statusColor,fontFamily:fm,letterSpacing:"0.08em"}}>{statusLabel}</span>
-            {(isLive || isHalf) && g.clock && g.period && (
-              <span style={{fontSize:11,color:"#555",fontFamily:fm}}>{g.clock} · Q{g.period}</span>
+            {(isLive || isHalf) && g.period && (
+              <span style={{fontSize:11,color:"#555",fontFamily:fm}}>{periodLabel(g.league, g.period, g.clock, g.statusDetail)}</span>
             )}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
@@ -2552,7 +2611,6 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         addMark(chartNow, avgPx, 'entry', orderSide);
         setBottomTab('positions');
         notify(tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
-        setTradeCard({ type:'open', side:orderSide, teamName:tn.name, teamLogo:orderSide==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:orderSide==='home'?HOME.light:AWAY.light, entryPx:avgPx, leverage:lev, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:g.period?`Q${g.period} ${g.clock}`:g.statusDetail||'' });
       } else if (result.status === 'resting') {
         notify('Limit '+tn.name+' @ '+limitCents+'¢', 'info');
       }
@@ -2589,7 +2647,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
         addMark(chartNow, avgPx, pnl>=0?'exit-win':'exit-loss', pos.side);
         const tn = pos.side==='home' ? HOME : AWAY;
         notify('Closed '+tn.name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
-        setTradeCard({ type:'close', side:pos.side, teamName:tn.name, teamLogo:pos.side==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:pos.side==='home'?HOME.light:AWAY.light, entryPx:pos.entry||pos.entryPx, exitPx:avgPx, leverage:pos.leverage, pnl, pnlPct:pos.roe||0, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:g.period?`Q${g.period} ${g.clock}`:g.statusDetail||'' });
+        setTradeCard({ type:'close', side:pos.side, teamName:tn.name, teamLogo:pos.side==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:pos.side==='home'?HOME.light:AWAY.light, entryPx:pos.entry||pos.entryPx, exitPx:avgPx, leverage:pos.leverage, pnl, pnlPct:pos.roe||0, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:periodLabel(g.league, g.period, g.clock, g.statusDetail) });
       } else if (result.status === 'rejected') {
         notify('Close rejected: '+(result.reason||''), 'red');
       }
@@ -2650,7 +2708,8 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
       </div>
 
       {/* HEADER — full terminal nav */}
-      <div style={{padding:isMobile?'0 10px':'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
+      <div style={{padding:isMobile?'0 10px':'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'center',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',maxWidth:1400}}>
         <div style={{display:'flex',alignItems:'center',gap:5}}>
           <img src={LOGO_NAV} style={{height:130,width:'auto',margin:'-30px 0',marginRight:-10}} alt="pd"/>
           <img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>
@@ -2676,6 +2735,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
           </span>
           <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#fe4202,#fe4202)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
           <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14}}>👤</div>
+        </div>
         </div>
       </div>
 
@@ -2706,7 +2766,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                   style={{padding:'10px 12px',marginBottom:6,background:'#111',borderRadius:10,border:'1px solid #1f1f1f',fontSize:11,fontFamily:fm,cursor:onTrade?'pointer':'default'}}>
                   <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
                     <span style={{color:'#fff',fontWeight:600}}>{lg._emoji?lg._emoji+' ':''}{lg.home.abbreviation||lg.home.name?.slice(0,3).toUpperCase()||'HOME'} <span style={{color:'#555'}}>vs</span> {lg.away.abbreviation||lg.away.name?.slice(0,3).toUpperCase()||'AWAY'}</span>
-                    <span style={{color:B.green,fontSize:10}}>{lg.period?`Q${lg.period} `:''}{lg.clock||lg.statusDetail||'LIVE'}</span>
+                    <span style={{color:B.green,fontSize:10}}>{periodLabel(lg.league||lg._sport, lg.period, lg.clock, lg.statusDetail)||'LIVE'}</span>
                   </div>
                   <div style={{display:'flex',justifyContent:'space-between'}}>
                     <span style={{color:'#888'}}>{lg.home.score??0} – {lg.away.score??0}</span>
@@ -2842,9 +2902,8 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                       tickFormatter={v=>v+'m'}
                       ticks={(()=>{const mT=merged.length?Math.ceil(merged[merged.length-1].t):60;const s=mT>80?20:mT>40?10:mT>20?5:2;const ts=[];for(let t=0;t<=mT+s;t+=s)ts.push(t);return ts;})()}/>
                     <YAxis domain={[0,1]} tick={{fill:'#555',fontSize:10}} tickFormatter={v=>(v*100)+'%'} axisLine={false} tickLine={false} width={32} orientation="right"/>
-                    <Tooltip content={<ChartTip/>} cursor={{stroke:'#ffffff06'}}/>
                     <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
-                    {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3" label={{value:`LIQ ${ll.liqPriceCents}¢`,position:"right",fill:B.red,fontSize:9,fontWeight:700}}/>))}
+                    {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
                     {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?HOME.light:AWAY.light;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                     <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#lhg)" dot={false} animationDuration={0} baseValue={0}/>
                     <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
@@ -3170,45 +3229,47 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             const maxCum=Math.max(book.asks[book.asks.length-1].cum,book.bids[book.bids.length-1].cum);
             const displayAsks=[...book.asks].reverse().slice(0,6);
             const displayBids=book.bids.slice(0,6);
+            const homeBright=brighten(HOME.light);
+            const awayBright=brighten(AWAY.light);
             return(
-            <div style={{background:'#d4d4d4',borderRadius:16,border:'1px solid #bbb',padding:'14px 12px'}}>
+            <div style={{background:'#0a0a0a',borderRadius:16,border:'1px solid #1f1f1f',padding:'14px 12px'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                <span style={{fontSize:13,fontWeight:600,color:'#333'}}>Order Book</span>
-                <span style={{fontSize:10,color:'#555'}}>Spread <span style={{color:'#111',fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
+                <span style={{fontSize:13,fontWeight:700,color:'#fff'}}>Order Book</span>
+                <span style={{fontSize:10,color:'#888'}}>Spread <span style={{color:'#fff',fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',padding:'0 4px 6px',fontSize:9,fontWeight:700,color:'#444',letterSpacing:'0.06em'}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',padding:'0 4px 6px',fontSize:9,fontWeight:700,color:'#666',letterSpacing:'0.06em'}}>
                 <span>PRICE ({HOME.short}%)</span><span style={{textAlign:'center'}}>{AWAY.short} equiv</span><span style={{textAlign:'right'}}>SIZE</span>
               </div>
               <div style={{marginBottom:2}}>
-                <div style={{fontSize:9,fontWeight:700,color:AWAY.light,letterSpacing:'0.08em',padding:'2px 4px 4px',opacity:0.7}}>SELL {HOME.short.toUpperCase()} · BUY {AWAY.short.toUpperCase()}</div>
+                <div style={{fontSize:9,fontWeight:700,color:awayBright,letterSpacing:'0.08em',padding:'2px 4px 4px'}}>SELL {HOME.short.toUpperCase()} · BUY {AWAY.short.toUpperCase()}</div>
                 {displayAsks.map((a,i)=>{const dp=(a.cum/maxCum)*100;const ce=((1-a.price)*100).toFixed(1);return(
                   <div key={'a'+i} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',fontSize:11,height:24,alignItems:'center',position:'relative',fontFamily:fm,padding:'0 4px',borderRadius:3,cursor:'pointer'}}
                     onClick={()=>{setOrderSide('away');setLimitCents(Math.round((1-a.price)*100));setOrderType('limit');setRightTab('order');}}>
-                    <div style={{position:'absolute',right:0,top:0,bottom:0,borderRadius:3,background:AWAY.light+'12',width:dp+'%',transition:'width .3s'}}/>
-                    <span style={{color:AWAY.light,position:'relative',zIndex:1,fontWeight:600}}>{(a.price*100).toFixed(1)}¢</span>
-                    <span style={{color:'#444',position:'relative',zIndex:1,textAlign:'center',fontSize:10}}>{ce}¢</span>
-                    <span style={{color:'#555',position:'relative',zIndex:1,textAlign:'right',fontSize:10}}>{a.size}</span>
+                    <div style={{position:'absolute',right:0,top:0,bottom:0,borderRadius:3,background:awayBright+'25',width:dp+'%',transition:'width .3s'}}/>
+                    <span style={{color:awayBright,position:'relative',zIndex:1,fontWeight:800}}>{(a.price*100).toFixed(1)}¢</span>
+                    <span style={{color:'#888',position:'relative',zIndex:1,textAlign:'center',fontSize:10}}>{ce}¢</span>
+                    <span style={{color:'#aaa',position:'relative',zIndex:1,textAlign:'right',fontSize:10}}>{a.size}</span>
                   </div>);})}
               </div>
-              <div style={{margin:'6px 0',padding:'6px 4px',borderTop:'1px solid #1f1f1f',borderBottom:'1px solid #1f1f1f',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',alignItems:'center'}}>
+              <div style={{margin:'6px 0',padding:'6px 4px',borderTop:'1px solid #2a2a2a',borderBottom:'1px solid #2a2a2a',display:'grid',gridTemplateColumns:'1fr 1fr 1fr',alignItems:'center'}}>
                 <span style={{fontSize:13,fontWeight:800,color:'#fff',fontFamily:fm}}>{(oPrice*100).toFixed(1)}¢</span>
-                <span style={{fontSize:10,color:'#444',textAlign:'center'}}>mid · {spread}¢</span>
-                <span style={{fontSize:10,color:'#444',textAlign:'right'}}>{((1-oPrice)*100).toFixed(1)}¢</span>
+                <span style={{fontSize:10,color:'#888',textAlign:'center'}}>mid · {spread}¢</span>
+                <span style={{fontSize:10,color:'#888',textAlign:'right'}}>{((1-oPrice)*100).toFixed(1)}¢</span>
               </div>
               <div style={{marginTop:2}}>
                 {displayBids.map((b,i)=>{const dp=(b.cum/maxCum)*100;const ce=((1-b.price)*100).toFixed(1);return(
                   <div key={'b'+i} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',fontSize:11,height:24,alignItems:'center',position:'relative',fontFamily:fm,padding:'0 4px',borderRadius:3,cursor:'pointer'}}
                     onClick={()=>{setOrderSide('home');setLimitCents(Math.round(b.price*100));setOrderType('limit');setRightTab('order');}}>
-                    <div style={{position:'absolute',left:0,top:0,bottom:0,borderRadius:3,background:HOME.light+'12',width:dp+'%',transition:'width .3s'}}/>
-                    <span style={{color:HOME.light,position:'relative',zIndex:1,fontWeight:600}}>{(b.price*100).toFixed(1)}¢</span>
-                    <span style={{color:'#444',position:'relative',zIndex:1,textAlign:'center',fontSize:10}}>{ce}¢</span>
-                    <span style={{color:'#555',position:'relative',zIndex:1,textAlign:'right',fontSize:10}}>{b.size}</span>
+                    <div style={{position:'absolute',left:0,top:0,bottom:0,borderRadius:3,background:homeBright+'25',width:dp+'%',transition:'width .3s'}}/>
+                    <span style={{color:homeBright,position:'relative',zIndex:1,fontWeight:800}}>{(b.price*100).toFixed(1)}¢</span>
+                    <span style={{color:'#888',position:'relative',zIndex:1,textAlign:'center',fontSize:10}}>{ce}¢</span>
+                    <span style={{color:'#aaa',position:'relative',zIndex:1,textAlign:'right',fontSize:10}}>{b.size}</span>
                   </div>);})}
-                <div style={{fontSize:9,fontWeight:700,color:HOME.light,letterSpacing:'0.08em',padding:'4px 4px 0',opacity:0.7}}>BUY {HOME.short.toUpperCase()} · SELL {AWAY.short.toUpperCase()}</div>
+                <div style={{fontSize:9,fontWeight:700,color:homeBright,letterSpacing:'0.08em',padding:'4px 4px 0'}}>BUY {HOME.short.toUpperCase()} · SELL {AWAY.short.toUpperCase()}</div>
               </div>
-              <div style={{marginTop:10,paddingTop:8,borderTop:'1px solid #1a1a1a',fontSize:10,color:'#444',lineHeight:1.6}}>
+              <div style={{marginTop:10,paddingTop:8,borderTop:'1px solid #1f1f1f',fontSize:10,color:'#666',lineHeight:1.6}}>
                 Buy {HOME.short} at P¢ matches Sell {AWAY.short} at (100−P)¢
-                <div style={{marginTop:2,color:'#333'}}>Click any level to set a limit order</div>
+                <div style={{marginTop:2,color:'#555'}}>Click any level to set a limit order</div>
               </div>
             </div>
           );})()}
@@ -3534,10 +3595,11 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
       </div>
 
       {/* HEADER */}
-      <div style={{padding:isMobile?"0 12px":"0 24px",height:56,display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid #1a1a1a",background:"#0a0a0a",position:"sticky",top:0,zIndex:30}}>
+      <div style={{padding:isMobile?"0 12px":"0 24px",height:56,display:"flex",alignItems:"center",justifyContent:"center",borderBottom:"1px solid #1a1a1a",background:"#0a0a0a",position:"sticky",top:0,zIndex:30}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",maxWidth:1400}}>
         <div style={{display:"flex",alignItems:"center",gap:isMobile?8:16}}>
           <button onClick={onChangeGame} style={{background:"none",border:"none",cursor:"pointer",color:"#666",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:600,fontFamily:fb,padding:0}}>
-            <ChevronRight size={16} style={{transform:"rotate(180deg)"}}/> 
+            <ChevronRight size={16} style={{transform:"rotate(180deg)"}}/>
           </button>
           <div style={{display:"flex",alignItems:"center",gap:isMobile?3:5}}>
             <img src={LOGO_NAV} style={{height:isMobile?110:140,width:"auto",margin:"-30px 0",marginRight:isMobile?-8:-10}} alt="pd"/>
@@ -3583,6 +3645,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
           <div onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
             <span style={{fontSize:14,color:"#888"}}>👤</span>
           </div>
+        </div>
         </div>
       </div>
 
@@ -3656,7 +3719,7 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
                       </span>
                       <span style={{fontSize:9,color:"#444",fontFamily:fm}}>{lg.leagueDisplay||"NBA"}</span>
                     </div>
-                    <span style={{fontSize:9,color:"#555",fontFamily:fm}}>{lg.clock&&lg.period?`Q${lg.period} ${lg.clock}`:""}</span>
+                    <span style={{fontSize:9,color:"#555",fontFamily:fm}}>{periodLabel(lg.league||lg._sport, lg.period, lg.clock, lg.statusDetail)}</span>
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
                     <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -3802,9 +3865,8 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
                   <CartesianGrid strokeDasharray="2 6" stroke="#ffffff04" vertical={false}/>
                   <XAxis dataKey="t" tick={{fill:"#555",fontSize:10}} tickFormatter={G.xTick} axisLine={{stroke:"#1f1f1f"}} tickLine={false}/>
                   <YAxis domain={[0,1]} tick={{fill:"#555",fontSize:10}} tickFormatter={v=>(v*100)+"%"} axisLine={false} tickLine={false} width={32} orientation="right"/>
-                  <Tooltip content={<ChartTip/>} cursor={{stroke:"#ffffff06"}}/>
                   <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
-                  {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1} strokeDasharray="3 3" label={{value:`LIQ ${ll.liqPriceCents}¢`,position:"right",fill:B.red,fontSize:9,fontWeight:700}}/>))}
+                  {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
                   {limitOrders.map(lo=>{const ly=lo.side==="home"?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==="home"?HOME.light:AWAY.light;return(<ReferenceLine key={"lo-"+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+"¢ LIMIT",position:"insideTopLeft",fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                   <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#hg)" dot={false} animationDuration={0} baseValue={0}/>
                   <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#ag)" dot={false} animationDuration={0} baseValue={0}/>
@@ -4234,12 +4296,12 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
             const displayAsks=[...book.asks].reverse().slice(0,6); // show 6 asks, closest to mid at bottom
             const displayBids=book.bids.slice(0,6);                // show 6 bids, closest to mid at top
             return(
-            <div style={{background:"#d4d4d4",borderRadius:16,border:"1px solid #bbb",padding:"14px 12px"}}>
+            <div style={{background:"#0a0a0a",borderRadius:16,border:"1px solid #1f1f1f",padding:"14px 12px"}}>
               {/* Header */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                <span style={{fontSize:13,fontWeight:600,color:"#333"}}>Order Book</span>
+                <span style={{fontSize:13,fontWeight:700,color:"#fff"}}>Order Book</span>
                 <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                  <span style={{fontSize:10,color:"#555"}}>Spread <span style={{color:"#111",fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
+                  <span style={{fontSize:10,color:"#888"}}>Spread <span style={{color:"#fff",fontWeight:700,fontFamily:fm}}>{spread}¢</span></span>
                 </div>
               </div>
 
@@ -4251,8 +4313,9 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
               </div>
 
               {/* Asks — Sell Home / Buy Away — away color */}
+              {(()=>{const homeBright=brighten(HOME.light);const awayBright=brighten(AWAY.light);return(<>
               <div style={{marginBottom:2}}>
-                <div style={{fontSize:9,fontWeight:700,color:AWAY.light,letterSpacing:"0.08em",padding:"2px 4px 4px",opacity:0.7}}>
+                <div style={{fontSize:9,fontWeight:700,color:awayBright,letterSpacing:"0.08em",padding:"2px 4px 4px"}}>
                   SELL {HOME.short.toUpperCase()} · BUY {AWAY.short.toUpperCase()}
                 </div>
                 {displayAsks.map((a,i)=>{
@@ -4261,20 +4324,20 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
                   return(
                     <div key={"a"+i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",fontSize:11,height:24,alignItems:"center",position:"relative",fontFamily:fm,padding:"0 4px",borderRadius:3,cursor:"pointer"}}
                       onClick={()=>{setOrderSide("away");setLimitCents(Math.round((1-a.price)*100));setOrderType("limit");setRightTab("order");}}>
-                      <div style={{position:"absolute",right:0,top:0,bottom:0,borderRadius:3,background:AWAY.light+"12",width:depthPct+"%",transition:"width .3s"}}/>
-                      <span style={{color:AWAY.light,position:"relative",zIndex:1,fontWeight:600}}>{(a.price*100).toFixed(1)}¢</span>
-                      <span style={{color:"#444",position:"relative",zIndex:1,textAlign:"center",fontSize:10}}>{chiefsEquiv}¢</span>
-                      <span style={{color:"#555",position:"relative",zIndex:1,textAlign:"right",fontSize:10}}>{a.size}</span>
+                      <div style={{position:"absolute",right:0,top:0,bottom:0,borderRadius:3,background:awayBright+"25",width:depthPct+"%",transition:"width .3s"}}/>
+                      <span style={{color:awayBright,position:"relative",zIndex:1,fontWeight:800}}>{(a.price*100).toFixed(1)}¢</span>
+                      <span style={{color:"#888",position:"relative",zIndex:1,textAlign:"center",fontSize:10}}>{chiefsEquiv}¢</span>
+                      <span style={{color:"#aaa",position:"relative",zIndex:1,textAlign:"right",fontSize:10}}>{a.size}</span>
                     </div>
                   );
                 })}
               </div>
 
               {/* Mid / spread row */}
-              <div style={{margin:"6px 0",padding:"6px 4px",borderTop:"1px solid #999",borderBottom:"1px solid #999",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",alignItems:"center"}}>
-                <span style={{fontSize:13,fontWeight:800,color:"#111",fontFamily:fm}}>{(oracle.price*100).toFixed(1)}¢</span>
-                <span style={{fontSize:10,color:"#555",textAlign:"center"}}>mid · {spread}¢ spread</span>
-                <span style={{fontSize:10,color:"#555",textAlign:"right"}}>{((1-oracle.price)*100).toFixed(1)}¢</span>
+              <div style={{margin:"6px 0",padding:"6px 4px",borderTop:"1px solid #2a2a2a",borderBottom:"1px solid #2a2a2a",display:"grid",gridTemplateColumns:"1fr 1fr 1fr",alignItems:"center"}}>
+                <span style={{fontSize:13,fontWeight:800,color:"#fff",fontFamily:fm}}>{(oracle.price*100).toFixed(1)}¢</span>
+                <span style={{fontSize:10,color:"#888",textAlign:"center"}}>mid · {spread}¢ spread</span>
+                <span style={{fontSize:10,color:"#888",textAlign:"right"}}>{((1-oracle.price)*100).toFixed(1)}¢</span>
               </div>
 
               {/* Bids — Buy Home / Sell Away — home color */}
@@ -4285,23 +4348,24 @@ function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], 
                   return(
                     <div key={"b"+i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",fontSize:11,height:24,alignItems:"center",position:"relative",fontFamily:fm,padding:"0 4px",borderRadius:3,cursor:"pointer"}}
                       onClick={()=>{setOrderSide("home");setLimitCents(Math.round(b.price*100));setOrderType("limit");setRightTab("order");}}>
-                      <div style={{position:"absolute",left:0,top:0,bottom:0,borderRadius:3,background:HOME.light+"12",width:depthPct+"%",transition:"width .3s"}}/>
-                      <span style={{color:HOME.light,position:"relative",zIndex:1,fontWeight:600}}>{(b.price*100).toFixed(1)}¢</span>
-                      <span style={{color:"#444",position:"relative",zIndex:1,textAlign:"center",fontSize:10}}>{chiefsEquiv}¢</span>
-                      <span style={{color:"#555",position:"relative",zIndex:1,textAlign:"right",fontSize:10}}>{b.size}</span>
+                      <div style={{position:"absolute",left:0,top:0,bottom:0,borderRadius:3,background:homeBright+"25",width:depthPct+"%",transition:"width .3s"}}/>
+                      <span style={{color:homeBright,position:"relative",zIndex:1,fontWeight:800}}>{(b.price*100).toFixed(1)}¢</span>
+                      <span style={{color:"#888",position:"relative",zIndex:1,textAlign:"center",fontSize:10}}>{chiefsEquiv}¢</span>
+                      <span style={{color:"#aaa",position:"relative",zIndex:1,textAlign:"right",fontSize:10}}>{b.size}</span>
                     </div>
                   );
                 })}
-                <div style={{fontSize:9,fontWeight:700,color:HOME.light,letterSpacing:"0.08em",padding:"4px 4px 0",opacity:0.7}}>
+                <div style={{fontSize:9,fontWeight:700,color:homeBright,letterSpacing:"0.08em",padding:"4px 4px 0"}}>
                   BUY {HOME.short.toUpperCase()} · SELL {AWAY.short.toUpperCase()}
                 </div>
               </div>
 
               {/* Footer legend */}
-              <div style={{marginTop:10,paddingTop:8,borderTop:"1px solid #999",fontSize:10,color:"#555",lineHeight:1.6}}>
-                <div>A <span style={{color:HOME.light}}>Buy {HOME.short}</span> order at <span style={{fontFamily:fm}}>P¢</span> matches a <span style={{color:AWAY.light}}>Buy {AWAY.short}</span> order at <span style={{fontFamily:fm}}>(100−P)¢</span></div>
-                <div style={{marginTop:2,color:"#666"}}>Click any level to set a limit order</div>
+              <div style={{marginTop:10,paddingTop:8,borderTop:"1px solid #1f1f1f",fontSize:10,color:"#666",lineHeight:1.6}}>
+                <div>A <span style={{color:homeBright}}>Buy {HOME.short}</span> order at <span style={{fontFamily:fm}}>P¢</span> matches a <span style={{color:awayBright}}>Buy {AWAY.short}</span> order at <span style={{fontFamily:fm}}>(100−P)¢</span></div>
+                <div style={{marginTop:2,color:"#555"}}>Click any level to set a limit order</div>
               </div>
+              </>);})()}
             </div>
           );})()}
 
