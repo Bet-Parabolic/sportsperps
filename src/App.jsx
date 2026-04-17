@@ -207,17 +207,30 @@ function makeBook(mid){
 }
 function maxLev(p){const d=Math.min(p,1-p);if(d>=.2)return 10;if(d>=.1)return 5;if(d>=.05)return 3;return 2;}
 function liqPrice(side,entry,lev){return side==="home"?entry*(1-1/lev):entry*(1+1/lev);}
-/* Return sport-appropriate period label: "Q3" for football/basketball, "P2" for hockey, "T7" (top of 7th) or "B7" for baseball, "45'" for soccer */
+/* Return sport-appropriate period label: "Q3" for football/basketball, "P2" for hockey,
+   "Top 7th" / "Bot 4th" for baseball, "45'" for soccer */
 function periodLabel(league, period, clock, statusDetail){
-  if(period==null||period==="")return clock||statusDetail||"";
   const lg=(league||"").toLowerCase();
+  // Baseball: ESPN provides "Top 4th, 2 outs" or "Bottom 7th" in statusDetail — strip suffix
   if(lg==="mlb"||lg.includes("baseball")){
-    // Baseball: prefer ESPN status detail (e.g. "Top 7th", "Bot 3rd"); fall back to "Inn N"
-    if(statusDetail&&/^(top|bot|mid|end)\s/i.test(statusDetail))return statusDetail;
-    return "Inn "+period;
+    if(statusDetail){
+      // Strip ", X outs" or similar suffix
+      const cleaned=statusDetail.split(",")[0].trim();
+      if(/^(top|bottom|bot|mid|middle|end)\s+\d/i.test(cleaned)){
+        // Normalize "Bottom" -> "Bot" for compactness
+        return cleaned.replace(/^Bottom/i,"Bot").replace(/^Middle/i,"Mid");
+      }
+    }
+    if(period){
+      const ord=period==1?"st":period==2?"nd":period==3?"rd":"th";
+      return "Inn "+period+ord;
+    }
+    return statusDetail||clock||"";
   }
+  if(period==null||period==="")return clock||statusDetail||"";
   if(lg==="nhl"||lg.includes("hockey")){
-    return "P"+period+(clock?" "+clock:"");
+    const ord=period==1?"st":period==2?"nd":period==3?"rd":period==4?"OT":"th";
+    return period>=4?"OT"+(period>4?period-3:"")+(clock?" "+clock:""):period+ord+" P"+(clock?" "+clock:"");
   }
   if(lg==="mls"||lg==="ucl"||lg.includes("soccer")){
     return clock||(period==1?"1H":"2H");
@@ -2752,7 +2765,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:22,fontWeight:900,fontFamily:fm,color:'#fff'}}>{g.home.score ?? '–'} <span style={{color:'#333',fontSize:14}}>–</span> {g.away.score ?? '–'}</span>
               <span style={{fontSize:10,color:B.green,fontWeight:700,fontFamily:fm}}>
-                {g.status==='halftime'?'HALF':g.period?'Q'+g.period+' '+g.clock:g.statusDetail||''}
+                {g.status==='halftime'?'HALF':g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||''}
               </span>
             </div>
           </div>
@@ -2802,7 +2815,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                     </div>
                     <div style={{fontSize:10,fontWeight:600,marginTop:3,
                       color:g.status==='final'?'#4ade80':g.status==='halftime'?'#ff9f1c':B.green}}>
-                      {g.status==='final'?'Final':g.status==='halftime'?'Half':g.period?'Q'+g.period+' · '+g.clock:g.statusDetail||'Live'}
+                      {g.status==='final'?'Final':g.status==='halftime'?'Half':g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||'Live'}
                     </div>
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',minWidth:0}}>
@@ -2840,7 +2853,7 @@ function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTra
                     <span style={{fontSize:12,fontWeight:600,padding:'4px 16px',borderRadius:20,
                       background:g.status==='final'?'#22c55e18':g.status==='halftime'?'#ff9f1c18':'#1a1a1a',
                       color:g.status==='final'?'#4ade80':g.status==='halftime'?'#ff9f1c':B.green}}>
-                      {g.status==='final'?'Final':g.status==='halftime'?'Halftime':g.period?'Q'+g.period+' · '+g.clock:g.statusDetail||'Live'}
+                      {g.status==='final'?'Final':g.status==='halftime'?'Halftime':g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||'Live'}
                     </span>
                   </div>
                   <div style={{fontSize:11,color:'#555',marginTop:6}}>{g.shortName||g.name}</div>
