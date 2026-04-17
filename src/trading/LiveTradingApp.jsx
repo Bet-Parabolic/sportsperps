@@ -483,15 +483,20 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         ))}
       </div>
 
-      {/* HEADER — full terminal nav */}
-      <div style={{padding:isMobile?'0 10px':'0 24px',height:56,display:'flex',alignItems:'center',justifyContent:'center',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%',maxWidth:1400}}>
-        <div style={{display:'flex',alignItems:'center',gap:5}}>
-          <img src={LOGO_NAV} style={{height:130,width:'auto',margin:'-30px 0',marginRight:-10}} alt="pd"/>
-          <img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>
+      {/* HEADER — left corner: back+logo, center: tabs, right corner: live+deposit+profile */}
+      <div style={{padding:isMobile?'0 10px':'0 24px',height:56,display:'grid',gridTemplateColumns:'auto 1fr auto',alignItems:'center',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
+        {/* LEFT — back arrow + pd emblem + wordmark */}
+        <div style={{display:'flex',alignItems:'center',gap:isMobile?8:16,justifySelf:'start'}}>
+          <button onClick={onBack} style={{background:'none',border:'none',cursor:'pointer',color:'#666',display:'flex',alignItems:'center',gap:4,fontSize:13,fontWeight:600,fontFamily:fb,padding:0}}>
+            <span style={{fontSize:18,lineHeight:1}}>‹</span>
+          </button>
+          <div style={{display:'flex',alignItems:'center',gap:isMobile?3:5}}>
+            <img src={LOGO_NAV} style={{height:isMobile?110:140,width:'auto',margin:'-30px 0',marginRight:isMobile?-8:-10}} alt="pd"/>
+            {!isMobile&&<img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>}
+          </div>
         </div>
-        {/* Center — sport tabs (same as TradingApp) */}
-        <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',flex:1,marginLeft:isMobile?8:16,marginRight:isMobile?8:16,minWidth:0}}>
+        {/* CENTER — sport tabs */}
+        <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
           {[['demos','Demos',null],['trending','Live',sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.ucl],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.ucl],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='trending'
@@ -504,14 +509,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </button>
           ))}
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-          <span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 10px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
+        {/* RIGHT — live indicator + deposit + profile */}
+        <div style={{display:'flex',alignItems:'center',gap:10,justifySelf:'end'}}>
+          {!isMobile&&<span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 10px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
             LIVE
-          </span>
+          </span>}
           <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#fe4202,#fe4202)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
           <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14}}>👤</div>
-        </div>
         </div>
       </div>
 

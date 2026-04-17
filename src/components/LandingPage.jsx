@@ -51,12 +51,15 @@ export function LandingPage({ onLaunch, onDocs }) {
       <div style={{position:"relative",zIndex:1}}>
         {/* NAV */}
         <div style={{...a(0),padding:isMobile?"10px 12px":"16px 32px",display:"flex",justifyContent:"center"}}>
-          <nav style={{width:"100%",maxWidth:900,padding:isMobile?"8px 16px":"8px 28px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0a0a0acc",backdropFilter:"blur(20px)",borderRadius:isMobile?12:16,border:"1px solid #1f1f1f"}}>
-            <div style={{display:"flex",alignItems:"center",gap:0,marginLeft:isMobile?-10:-30}}>
+          <nav style={{width:"100%",maxWidth:900,padding:isMobile?"8px 16px":"8px 28px",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",background:"#0a0a0acc",backdropFilter:"blur(20px)",borderRadius:isMobile?12:16,border:"1px solid #1f1f1f"}}>
+            {/* LEFT — pd emblem */}
+            <div style={{display:"flex",alignItems:"center",justifySelf:"start",marginLeft:isMobile?-10:-30}}>
               <img src={LOGO_NAV} style={{height:isMobile?100:252,width:"auto",margin:isMobile?"-28px 0":"-80px 0",marginLeft:isMobile?-16:-45,marginRight:isMobile?-16:-48}} alt="Perpdictions"/>
-              <img src={LOGO_WORDMARK} style={{height:isMobile?24:54,width:"auto"}} alt="Perpdictions"/>
             </div>
-            <button onClick={onLaunch} style={{padding:isMobile?"10px 20px":"12px 30px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:18,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:10}}>
+            {/* CENTER — wordmark */}
+            <img src={LOGO_WORDMARK} style={{height:isMobile?24:54,width:"auto",justifySelf:"center"}} alt="Perpdictions"/>
+            {/* RIGHT — Launch App */}
+            <button onClick={onLaunch} style={{padding:isMobile?"10px 20px":"12px 30px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:18,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:10,justifySelf:"end"}}>
               Launch App
             </button>
           </nav>

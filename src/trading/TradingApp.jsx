@@ -218,10 +218,10 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
           color:n.type==="green"?"#4ade80":n.type==="red"?"#f87171":"#999",animation:"slideIn .3s ease-out"}}>{n.msg}</div>))}
       </div>
 
-      {/* HEADER */}
-      <div style={{padding:isMobile?"0 12px":"0 24px",height:56,display:"flex",alignItems:"center",justifyContent:"center",borderBottom:"1px solid #1a1a1a",background:"#0a0a0a",position:"sticky",top:0,zIndex:30}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",maxWidth:1400}}>
-        <div style={{display:"flex",alignItems:"center",gap:isMobile?8:16}}>
+      {/* HEADER — left corner: back+logo, center: tabs, right corner: deposit+profile */}
+      <div style={{padding:isMobile?"0 12px":"0 24px",height:56,display:"grid",gridTemplateColumns:"auto 1fr auto",alignItems:"center",borderBottom:"1px solid #1a1a1a",background:"#0a0a0a",position:"sticky",top:0,zIndex:30}}>
+        {/* LEFT — back arrow + pd emblem + wordmark */}
+        <div style={{display:"flex",alignItems:"center",gap:isMobile?8:16,justifySelf:"start"}}>
           <button onClick={onChangeGame} style={{background:"none",border:"none",cursor:"pointer",color:"#666",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:600,fontFamily:fb,padding:0}}>
             <ChevronRight size={16} style={{transform:"rotate(180deg)"}}/>
           </button>
@@ -231,8 +231,8 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
           </div>
         </div>
 
-        {/* Center — sport tabs */}
-        <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",flex:1,marginLeft:isMobile?8:16,marginRight:isMobile?8:16,minWidth:0}}>
+        {/* CENTER — sport tabs (natural width, centered) */}
+        <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",justifySelf:"center",maxWidth:"100%",minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
           {["Demos","Live","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"].map((sport)=>{
             const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Live"?terminalPage==="trending":sport==="Leaderboard"?terminalPage==="leaderboard":terminalPage==="game"&&sportTab===sport;
             return (
@@ -261,15 +261,14 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
           );})}
         </div>
 
-        {/* Right — deposit + profile */}
-        <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+        {/* RIGHT — deposit + profile */}
+        <div style={{display:"flex",alignItems:"center",gap:10,justifySelf:"end"}}>
           <button style={{padding:"8px 20px",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:10,background:B.green,color:"#fff"}}>
             Deposit
           </button>
           <div onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
             <span style={{fontSize:14,color:"#888"}}>👤</span>
           </div>
-        </div>
         </div>
       </div>
 

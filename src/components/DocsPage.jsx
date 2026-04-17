@@ -49,23 +49,27 @@ export function DocsPage({ onBack, onLaunch }) {
 
   return (
     <div style={{background:"#030303",minHeight:"100vh",fontFamily:fb,color:"#fff"}}>
-      <div style={{...a(0),padding:isMobile?"10px 12px":"16px 32px",display:"flex",justifyContent:"center",position:"fixed",top:0,left:0,right:0,zIndex:20}}>
-        <nav style={{width:"100%",maxWidth:900,padding:isMobile?"8px 14px":"10px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#0a0a0aee",backdropFilter:"blur(20px)",borderRadius:isMobile?12:16,border:"1px solid #1f1f1f"}}>
-          <div style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer"}} onClick={onBack}>
-            <img src={LOGO_NAV} style={{height:isMobile?80:130,width:"auto",margin:isMobile?"-20px 0":"-30px 0",marginRight:isMobile?-6:-10}} alt="Perpdictions"/>
-            {!isMobile&&<img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>}
+      <div style={{...a(0),padding:isMobile?"6px 12px":"8px 32px",display:"flex",justifyContent:"center",position:"fixed",top:0,left:0,right:0,zIndex:20}}>
+        <nav style={{width:"100%",maxWidth:900,height:isMobile?44:52,padding:isMobile?"0 14px":"0 20px",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",background:"#0a0a0aee",backdropFilter:"blur(20px)",borderRadius:isMobile?10:12,border:"1px solid #1f1f1f"}}>
+          {/* LEFT — pd emblem */}
+          <div style={{display:"flex",alignItems:"center",justifySelf:"start",cursor:"pointer",marginLeft:isMobile?-8:-20}} onClick={onBack}>
+            <img src={LOGO_NAV} style={{height:isMobile?70:140,width:"auto",margin:isMobile?"-18px 0":"-44px 0",marginLeft:isMobile?-12:-30,marginRight:isMobile?-10:-25}} alt="Perpdictions"/>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            {isMobile&&<button onClick={()=>setShowNav(n=>!n)} style={{background:"none",border:"1px solid #333",borderRadius:8,padding:"6px 12px",color:"#888",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:fb}}>{showNav?"Close":"Sections"}</button>}
-            <span style={{fontSize:isMobile?12:14,color:B.primary,fontWeight:600,padding:"6px 14px",cursor:"pointer"}} onClick={onBack}>Home</span>
-            {!isMobile&&<button onClick={onLaunch} style={{padding:"9px 22px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,background:`linear-gradient(135deg, ${R}, ${T})`,color:"#fff",borderRadius:10}}>Launch App</button>}
+          {/* CENTER — wordmark */}
+          {!isMobile&&<img src={LOGO_WORDMARK} style={{height:30,width:"auto",justifySelf:"center",cursor:"pointer"}} alt="Perpdictions" onClick={onBack}/>}
+          {isMobile&&<div/>}
+          {/* RIGHT — actions */}
+          <div style={{display:"flex",alignItems:"center",gap:8,justifySelf:"end"}}>
+            {isMobile&&<button onClick={()=>setShowNav(n=>!n)} style={{background:"none",border:"1px solid #333",borderRadius:8,padding:"5px 10px",color:"#888",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:fb}}>{showNav?"Close":"Sections"}</button>}
+            <span style={{fontSize:isMobile?12:13,color:B.primary,fontWeight:600,padding:"5px 12px",cursor:"pointer"}} onClick={onBack}>Home</span>
+            {!isMobile&&<button onClick={onLaunch} style={{padding:"7px 18px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:12,background:`linear-gradient(135deg, ${R}, ${T})`,color:"#fff",borderRadius:8}}>Launch App</button>}
           </div>
         </nav>
       </div>
 
       {/* Mobile section nav dropdown */}
       {isMobile&&showNav&&(
-        <div style={{position:"fixed",top:60,left:0,right:0,zIndex:19,padding:"8px 12px",background:"#0a0a0aee",backdropFilter:"blur(20px)",borderBottom:"1px solid #1f1f1f",maxHeight:"60vh",overflowY:"auto"}}>
+        <div style={{position:"fixed",top:56,left:0,right:0,zIndex:19,padding:"8px 12px",background:"#0a0a0aee",backdropFilter:"blur(20px)",borderBottom:"1px solid #1f1f1f",maxHeight:"60vh",overflowY:"auto"}}>
           {sections.map(s=>(
             <a key={s.id} href={"#"+s.id} onClick={(e)=>{e.preventDefault();setActiveSection(s.id);setShowNav(false);document.getElementById(s.id)?.scrollIntoView({behavior:"smooth",block:"start"});}}
               style={{display:"block",padding:"10px 16px",fontSize:13,fontWeight:activeSection===s.id?600:400,color:activeSection===s.id?T:"#888",
@@ -75,8 +79,8 @@ export function DocsPage({ onBack, onLaunch }) {
         </div>
       )}
 
-      <div style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"80px 16px 0":"100px 32px 0",display:"flex",gap:isMobile?0:48}}>
-        {!isMobile&&<div style={{...a(0.05),width:200,flexShrink:0,position:"sticky",top:88,alignSelf:"flex-start",maxHeight:"calc(100vh - 120px)",overflow:"auto"}}>
+      <div style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"68px 16px 0":"80px 32px 0",display:"flex",gap:isMobile?0:48}}>
+        {!isMobile&&<div style={{...a(0.05),width:200,flexShrink:0,position:"sticky",top:80,alignSelf:"flex-start",maxHeight:"calc(100vh - 100px)",overflow:"auto"}}>
           <div style={{fontSize:13,fontWeight:700,color:"#555",marginBottom:16}}>Documentation</div>
           {sections.map(s=>(
             <a key={s.id} href={"#"+s.id} onClick={(e)=>{e.preventDefault();setActiveSection(s.id);document.getElementById(s.id)?.scrollIntoView({behavior:"smooth",block:"start"});}}
