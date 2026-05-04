@@ -51,7 +51,7 @@ export function LandingPage({ onLaunch, onDocs }) {
         {/* CENTERED LOGO AT TOP — no nav bar */}
         <div style={{...a(0),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isMobile?"24px 16px 0":"40px 32px 0"}}>
           <div style={{display:"flex",alignItems:"center",gap:0,cursor:"pointer"}} onClick={onLaunch}>
-            <img src={LOGO_NAV} style={{height:isMobile?120:200,width:"auto",margin:isMobile?"-32px 0":"-58px 0",marginRight:isMobile?-18:-32}} alt="Perpdictions emblem"/>
+            <img src={LOGO_NAV} style={{height:isMobile?120:200,width:"auto",margin:isMobile?"-32px 0":"-58px 0",marginRight:isMobile?-32:-58}} alt="Perpdictions emblem"/>
             <img src={LOGO_WORDMARK} style={{height:isMobile?28:46,width:"auto"}} alt="Perpdictions"/>
           </div>
         </div>
