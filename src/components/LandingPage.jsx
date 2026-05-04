@@ -66,14 +66,14 @@ export function LandingPage({ onLaunch, onDocs }) {
           </div>
           <h1 style={{...a(0.1),fontFamily:fd,fontSize:isMobile?38:72,fontWeight:800,lineHeight:1.0,letterSpacing:"-0.04em",margin:isMobile?"0 0 16px":"0 0 24px"}}>
             Leveraged sports<br/>
-            <span style={{background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>perpetuals.</span>
+            <span style={{color:R}}>perpetuals.</span>
           </h1>
           <p style={{...a(0.15),fontSize:isMobile?15:18,lineHeight:1.7,color:"#888",maxWidth:560,margin:isMobile?"0 auto 24px":"0 auto 36px",fontWeight:400}}>
             Trade live win probability with up to 10x leverage. Multi-oracle pricing. Trustless settlement. No counterparty risk.
           </p>
           <div style={{...a(0.2),display:"flex",gap:12,justifyContent:"center"}}>
             <button onClick={onLaunch} style={{padding:isMobile?"12px 28px":"14px 36px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:12}}>
-              Try Demo
+              Launch App
             </button>
             <button onClick={onDocs} style={{padding:isMobile?"12px 28px":"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:600,fontSize:isMobile?14:15,background:"transparent",color:"#888",borderRadius:12}}>
               Read Docs
@@ -102,7 +102,7 @@ export function LandingPage({ onLaunch, onDocs }) {
             {/* Scoreboard strip */}
             <div style={{padding:isMobile?"12px 14px":"14px 20px",borderBottom:"1px solid #1a1a1a",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:12,background:"#070707"}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:isMobile?28:34,height:isMobile?28:34,borderRadius:8,background:"#22c55e22",border:"1px solid #22c55e44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isMobile?14:18}}>🦅</div>
+                <img src="https://a.espncdn.com/i/teamlogos/nfl/500/phi.png" alt="PHI" style={{width:isMobile?28:34,height:isMobile?28:34,borderRadius:6,objectFit:"contain"}}/>
                 <div>
                   <div style={{fontSize:isMobile?13:14,fontWeight:800,color:"#fff"}}>PHI</div>
                   <div style={{fontSize:9,color:"#666",fontFamily:fm}}>Eagles</div>
@@ -117,7 +117,7 @@ export function LandingPage({ onLaunch, onDocs }) {
                   <div style={{fontSize:isMobile?13:14,fontWeight:800,color:"#aaa"}}>KC</div>
                   <div style={{fontSize:9,color:"#666",fontFamily:fm}}>Chiefs</div>
                 </div>
-                <div style={{width:isMobile?28:34,height:isMobile?28:34,borderRadius:8,background:"#ef444422",border:"1px solid #ef444444",display:"flex",alignItems:"center",justifyContent:"center",fontSize:isMobile?14:18}}>🏹</div>
+                <img src="https://a.espncdn.com/i/teamlogos/nfl/500/kc.png" alt="KC" style={{width:isMobile?28:34,height:isMobile?28:34,borderRadius:6,objectFit:"contain"}}/>
               </div>
             </div>
 
@@ -267,7 +267,7 @@ export function LandingPage({ onLaunch, onDocs }) {
         {/* HOW IT WORKS — with visuals */}
         <section style={{maxWidth:1200,margin:"0 auto",padding:isMobile?"60px 16px":"100px 32px"}}>
           <div style={{...a(0.35),textAlign:"center",marginBottom:isMobile?40:72}}>
-            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.03em",background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>How it works</span>
+            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.03em",color:R}}>How it works</span>
             <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.03em",marginTop:12,lineHeight:1.1,color:"#fff"}}>Three steps. Zero complexity.</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:isMobile?20:24}}>
@@ -277,12 +277,12 @@ export function LandingPage({ onLaunch, onDocs }) {
                 <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:"0.08em",fontFamily:fm}}>SELECT YOUR SIDE</div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                   <div style={{background:"#22c55e15",border:"2px solid #22c55e",borderRadius:10,padding:"12px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:24,marginBottom:4}}>🦅</div>
+                    <img src="https://a.espncdn.com/i/teamlogos/nfl/500/phi.png" alt="PHI" style={{width:32,height:32,objectFit:"contain",marginBottom:4}}/>
                     <div style={{fontSize:13,fontWeight:800,color:"#22c55e"}}>PHI</div>
                     <div style={{fontSize:10,color:"#22c55e",fontFamily:fm,fontWeight:700,marginTop:2}}>58.2¢</div>
                   </div>
                   <div style={{background:"#1a1a1a",border:"2px solid #2a2a2a",borderRadius:10,padding:"12px 8px",textAlign:"center",opacity:0.6}}>
-                    <div style={{fontSize:24,marginBottom:4}}>🏹</div>
+                    <img src="https://a.espncdn.com/i/teamlogos/nfl/500/kc.png" alt="KC" style={{width:32,height:32,objectFit:"contain",marginBottom:4,opacity:0.5}}/>
                     <div style={{fontSize:13,fontWeight:800,color:"#888"}}>KC</div>
                     <div style={{fontSize:10,color:"#666",fontFamily:fm,fontWeight:700,marginTop:2}}>41.8¢</div>
                   </div>
@@ -357,7 +357,7 @@ export function LandingPage({ onLaunch, onDocs }) {
         {/* Architecture */}
         <section style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"0 16px 60px":"0 32px 100px"}}>
           <div style={{...a(0.55),textAlign:"center",marginBottom:isMobile?32:64}}>
-            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.03em",background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Architecture</span>
+            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.03em",color:R}}>Architecture</span>
             <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.03em",marginTop:12,lineHeight:1.1,color:"#fff"}}>DeFi-grade infrastructure.</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:isMobile?12:16}}>
@@ -377,11 +377,11 @@ export function LandingPage({ onLaunch, onDocs }) {
             <div style={{position:"absolute",top:"-50%",left:"-20%",width:"140%",height:"200%",background:`radial-gradient(ellipse at 30% 50%, ${R}08 0%, transparent 50%), radial-gradient(ellipse at 70% 50%, ${T}08 0%, transparent 50%)`,pointerEvents:"none"}}/>
             <div style={{position:"relative"}}>
               <h2 style={{fontFamily:fd,fontSize:isMobile?32:48,fontWeight:800,letterSpacing:"-0.03em",marginBottom:14}}>
-                See it <span style={{background:logoGrad,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>live.</span>
+                See it <span style={{color:R}}>live.</span>
               </h2>
               <p style={{fontSize:isMobile?14:16,color:"#888",marginBottom:isMobile?24:32,fontWeight:400}}>Replay real championship games with the full trading engine.</p>
               <button onClick={onLaunch} style={{padding:isMobile?"14px 36px":"16px 48px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:16,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:12}}>
-                Launch Demo →
+                Launch App →
               </button>
             </div>
           </div>
@@ -390,9 +390,15 @@ export function LandingPage({ onLaunch, onDocs }) {
         {/* Footer */}
         <footer style={{borderTop:"1px solid #1a1a1a",padding:isMobile?"20px 16px":"24px 48px",display:"flex",flexDirection:isMobile?"column":"row",justifyContent:"space-between",alignItems:"center",gap:isMobile?12:0}}>
           <span style={{fontSize:isMobile?12:13,color:"#444",display:"flex",alignItems:"center",gap:8}}><img src={LOGO_NAV} style={{height:isMobile?32:64,width:"auto",opacity:0.5,margin:isMobile?"-8px 0":0}} alt=""/>© 2026 Perpdictions</span>
-          <div style={{display:"flex",gap:isMobile?16:24}}>
-            {["Twitter","Discord","GitHub","Docs"].map(t => (<span key={t} style={{fontSize:isMobile?12:13,color:"#555",cursor:"pointer"}}>{t}</span>))}
-          </div>
+          <a href="https://x.com/perpdictions" target="_blank" rel="noopener noreferrer" aria-label="Follow @perpdictions on X"
+            style={{display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?32:36,height:isMobile?32:36,borderRadius:8,background:"transparent",border:"1px solid #2a2a2a",cursor:"pointer",transition:"all .15s",color:"#888"}}
+            onMouseOver={(e)=>{e.currentTarget.style.color="#fff";e.currentTarget.style.borderColor="#444";}}
+            onMouseOut={(e)=>{e.currentTarget.style.color="#888";e.currentTarget.style.borderColor="#2a2a2a";}}>
+            {/* Official X logo */}
+            <svg viewBox="0 0 24 24" width={isMobile?14:16} height={isMobile?14:16} fill="currentColor" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+          </a>
         </footer>
       </div>
     </div>
