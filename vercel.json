@@ -1,9 +1,0 @@
-{
-  "redirects": [
-    {
-      "source": "/:path*",
-      "destination": "https://app.hyperliquid.xyz/join/PERPSIO",
-      "permanent": false
-    }
-  ]
-}
