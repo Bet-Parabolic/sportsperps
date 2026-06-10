@@ -1,12 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 
 import { FONT_URL } from "./lib/theme.js";
 import { API_URL } from "./lib/constants.js";
 import { PROC_GAMES } from "./lib/games.js";
+import { LOGO_MARK } from "./lib/logos.js";
 
 import { LandingPage } from "./components/LandingPage.jsx";
-import { TradingApp } from "./trading/TradingApp.jsx";
-import { LiveTradingApp } from "./trading/LiveTradingApp.jsx";
+const TradingApp = lazy(() => import("./trading/TradingApp.jsx").then(m => ({ default: m.TradingApp })));
+const LiveTradingApp = lazy(() => import("./trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
+
+const Splash = () => (
+  <div style={{minHeight:"100vh",background:"#000",display:"flex",alignItems:"center",justifyContent:"center"}}>
+    <img src={LOGO_MARK} alt="" style={{width:64,height:64,animation:"pulse 1.4s ease-in-out infinite"}}/>
+  </div>
+);
 
 /* ═══════════════════════════════════════════════════════════
    ROOT — page router + global styles
@@ -55,9 +62,15 @@ export default function App() {
         button:hover:not(:disabled){filter:brightness(1.15);}button:active:not(:disabled){transform:scale(0.98);}
         *{box-sizing:border-box;margin:0;padding:0;}
       `}</style>
-      {page==="landing"?<LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>window.open("https://docs.perpdictions.com/docs","_blank","noopener,noreferrer")}/>
-      :page==="live-trading"&&liveGame?<LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
-      :sel?<TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>:null}
+      {page==="landing"
+        ? <LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>window.open("https://docs.perpdictions.com/docs","_blank","noopener,noreferrer")}/>
+        : <Suspense fallback={<Splash/>}>
+            {page==="live-trading"&&liveGame
+              ? <LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
+              : sel
+                ? <TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>
+                : null}
+          </Suspense>}
     </div>
   );
 }
