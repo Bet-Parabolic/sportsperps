@@ -418,12 +418,19 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       });
       const result = await res.json();
       if (result.fills?.length > 0) {
-        const avgPx = result.fills.reduce((s,f)=>s+f.px*f.size,0) / result.fills.reduce((s,f)=>s+f.size,0);
-        const pnl = pos.pnl || 0;
+        const totalSize = result.fills.reduce((s,f)=>s+f.size,0);
+        const avgPx = result.fills.reduce((s,f)=>s+f.px*f.size,0) / totalSize;
+        const entryPx = pos.entry || pos.entryPx;
+        const pnl = pos.side === 'home'
+          ? (avgPx - entryPx) * totalSize
+          : (entryPx - avgPx) * totalSize;
+        const pnlPct = pos.margin > 0 ? (pnl / pos.margin) * 100 : 0;
         addMark(chartNow, avgPx, pnl>=0?'exit-win':'exit-loss', pos.side);
         const tn = pos.side==='home' ? HOME : AWAY;
         notify('Closed '+tn.name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
-        setTradeCard({ type:'close', side:pos.side, teamName:tn.name, teamLogo:pos.side==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:pos.side==='home'?HOME.light:AWAY.light, entryPx:pos.entry||pos.entryPx, exitPx:avgPx, leverage:pos.leverage, pnl, pnlPct:pos.roe||0, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:periodLabel(g.league, g.period, g.clock, g.statusDetail) });
+        setClosedPos(pr => [{...pos, closedAt: chartNow, exitPx: avgPx, pnl, pnlPct, closeType: 'CLOSED'}, ...pr]);
+        setClosedPnL(p => p + pnl);
+        setTradeCard({ type:'close', side:pos.side, teamName:tn.name, teamLogo:pos.side==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:pos.side==='home'?HOME.light:AWAY.light, entryPx, exitPx:avgPx, leverage:pos.leverage, pnl, pnlPct, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:periodLabel(g.league, g.period, g.clock, g.statusDetail) });
       } else if (result.status === 'rejected') {
         notify('Close rejected: '+(result.reason||''), 'red');
       }
