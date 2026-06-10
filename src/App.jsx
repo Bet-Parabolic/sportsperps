@@ -55,7 +55,7 @@ export default function App() {
         button:hover:not(:disabled){filter:brightness(1.15);}button:active:not(:disabled){transform:scale(0.98);}
         *{box-sizing:border-box;margin:0;padding:0;}
       `}</style>
-      {page==="landing"?<LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>window.open("https://perpdictions-docs.vercel.app/docs","_blank","noopener,noreferrer")}/>
+      {page==="landing"?<LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>window.open("https://docs.perpdictions.com/docs","_blank","noopener,noreferrer")}/>
       :page==="live-trading"&&liveGame?<LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
       :sel?<TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>:null}
     </div>
