@@ -3,7 +3,7 @@ import { ComposedChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, 
 import { Play, Pause, RotateCcw, ChevronRight } from "lucide-react";
 import { B, brighten, fb, fm } from "../lib/theme.js";
 import { API_URL, ESPN_SOURCES, LIVE_STATUS } from "../lib/constants.js";
-import { calcPnL, clamp, fmt3, fmtPct, fmtUsd, getGameState, liqPrice, makeBook, makeSources, maxLev, pctClr, periodLabel, weightedMedian } from "../lib/helpers.js";
+import { calcPnL, clamp, fmt3, fmtPct, fmtShares, fmtUsd, getGameState, liqPrice, makeBook, makeSources, maxLev, pctClr, periodLabel, weightedMedian } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { BOX } from "../lib/games.js";
 import { AwayMarkerDot, HomeMarkerDot } from "../lib/markers.jsx";
@@ -882,11 +882,12 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
             </div>
 
             {/* Submit */}
-            <button onClick={placeOrder} disabled={settled||eM<10} style={{width:"100%",padding:"14px 0",fontWeight:700,fontSize:14,border:"none",
+            <button onClick={placeOrder} disabled={settled||eM<10} style={{width:"100%",padding:"14px 0",fontWeight:700,fontSize:14,
+              border:settled?"2px solid #333":"2px solid "+B.green,
               cursor:settled||eM<10?"not-allowed":"pointer",fontFamily:fb,borderRadius:12,transition:"all .15s",
               background:settled?"#222":orderSide==="home"?HOME.light:AWAY.light,
-              color:settled?"#666":"#fff",opacity:settled||eM<10?0.4:1}}>
-              {settled?"Market Settled":orderType==="limit"?`Limit ${team.name} @ ${limitCents}¢ · ${shareCount} shares`:`Buy ${team.name} · ${shareCount} shares`}
+              color:"#fff",opacity:settled||eM<10?0.4:1}}>
+              {settled?"Market Settled":orderType==="limit"?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
 
             {/* Account */}
@@ -1084,9 +1085,11 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
                       </div>
                     </div>
                     {/* Submit */}
-                    <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||eM<10} style={{width:"100%",padding:"16px 0",fontWeight:700,fontSize:16,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:14,
-                      background:settled?"#222":orderSide==="home"?HOME.light:AWAY.light,color:settled?"#666":"#000",opacity:settled||eM<10?0.4:1}}>
-                      {settled?"Settled":`Buy ${team.name} · ${shareCount} shares`}
+                    <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||eM<10} style={{width:"100%",padding:"16px 0",fontWeight:700,fontSize:16,
+                      border:settled?"2px solid #333":"2px solid "+B.green,
+                      cursor:"pointer",fontFamily:fb,borderRadius:14,
+                      background:settled?"#222":orderSide==="home"?HOME.light:AWAY.light,color:"#fff",opacity:settled||eM<10?0.4:1}}>
+                      {settled?"Settled":`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:"flex",justifyContent:"space-between",fontSize:12,color:"#555"}}>
                       <span>Balance <span style={{color:"#fff",fontFamily:fm}}>{fmtUsd(balance)}</span></span>

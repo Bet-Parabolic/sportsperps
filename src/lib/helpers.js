@@ -8,6 +8,7 @@ export const noise = r => (Math.random()-.5)*2*r;
 export const fmt3 = n => n.toFixed(3);
 export const fmtUsd = n => (n<0?"-":"")+"$"+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0});
 export const fmtPct = n => (n>=0?"+":"")+n.toFixed(1)+"%";
+export const fmtShares = n => n>9999 ? "9,999+" : n.toLocaleString("en-US");
 export const pctClr = n => n>0?B.green:n<0?B.pink:"#7a8599";
 
 export function weightedMedian(items) {

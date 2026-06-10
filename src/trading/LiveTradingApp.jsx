@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ComposedChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, ReferenceLine, Scatter } from "recharts";
 import { B, brighten, fb, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
-import { calcPnL, clamp, fmtPct, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
+import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive, parseESPNEvent } from "../lib/espn.js";
 import { AwayMarkerDot, HomeMarkerDot } from "../lib/markers.jsx";
@@ -988,7 +988,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
               background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,
               color:'#fff',opacity:settled||eM<10?0.4:1}}>
-              {settled?'Game Settled':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${shareCount} shares`:`Buy ${team.name} · ${shareCount} shares`}
+              {settled?'Game Settled':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
             {/* Account */}
             <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid #1f1f1f',display:'flex',justifyContent:'space-between',fontSize:11}}>
@@ -1144,7 +1144,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||eM<10} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
                       border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
                       background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,color:'#fff',opacity:settled||eM<10?0.4:1}}>
-                      {settled?'Game Settled':`Buy ${team.name} · ${shareCount} shares`}
+                      {settled?'Game Settled':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>
                       <span>Balance <span style={{color:'#fff',fontFamily:fm,fontWeight:700}}>{fmtUsd(balance)}</span></span>
