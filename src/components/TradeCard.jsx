@@ -38,7 +38,7 @@ export function TradeCard({ card, onClose }) {
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:20}}>
           <img src={LOGO_MARK} style={{height:20,width:20}} alt=""/>
           <span style={{fontSize:13,fontWeight:700,color:'#888'}}>Perpdictions</span>
-          <span style={{marginLeft:'auto',fontSize:10,color:'#444',fontFamily:fm}}>perps.io</span>
+          <span style={{marginLeft:'auto',fontSize:10,color:'#444',fontFamily:fm}}>perpdictions.com</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
           {card.teamLogo
