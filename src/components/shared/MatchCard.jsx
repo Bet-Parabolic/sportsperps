@@ -1,5 +1,6 @@
 import { B, fb, fm } from "../../lib/theme.js";
 import { findBackendGame } from "../../lib/espn.js";
+import { fmtGameTime } from "../../lib/helpers.js";
 
 export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }) {
   const homeScore = parseFloat(g.home.score) || 0;
@@ -34,7 +35,7 @@ export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }
           </div>
         ))}
       </div>
-      {g.isScheduled&&g.detail&&<div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:10}}>{g.detail}</div>}
+      {g.isScheduled&&(()=>{const when=fmtGameTime(g.date);return(when||g.detail)?(<div style={{fontSize:11,color:"#888",fontFamily:fm,marginTop:10,letterSpacing:"0.04em"}}>{when}{when&&g.detail?" · ":""}{g.detail||""}</div>):null;})()}
       {(g.isLive||g.isHalf)&&(()=>{const bg=liveGames?findBackendGame(liveGames,g,_espnKey):null;const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
         {wp&&<div style={{marginTop:8}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>

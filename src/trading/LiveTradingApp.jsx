@@ -4,7 +4,7 @@ import { B, brighten, fb, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
-import { normalizeEspnToLive, parseESPNEvent } from "../lib/espn.js";
+import { normalizeEspnToLive } from "../lib/espn.js";
 import { AwayMarkerDot, HomeMarkerDot } from "../lib/markers.jsx";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
@@ -93,53 +93,22 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     setMarkers(prev => [...prev, {t: +chartT.toFixed(2), p, markerType: mt, line: side||'home'}]);
   }, []);
 
-  // ── fetch ESPN live games for sidebar (all sports) ──────────────────────
-  const [espnSidebarGames, setEspnSidebarGames] = useState([]);
-  useEffect(() => {
-    const SIDEBAR_SPORTS = [
-      {key:'nfl',path:'football/nfl',emoji:'🏈'},
-      {key:'mlb',path:'baseball/mlb',emoji:'⚾'},
-      {key:'nhl',path:'hockey/nhl',emoji:'🏒'},
-      {key:'ucl',path:'soccer/uefa.champions',emoji:'⚽'},
-    ];
-    const fetchEspnSidebar = async () => {
-      const allLive = [];
-      for (const s of SIDEBAR_SPORTS) {
-        try {
-          const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${s.path}/scoreboard`);
-          if (!res.ok) continue;
-          const d = await res.json();
-          for (const ev of (d.events||[])) {
-            const parsed = parseESPNEvent(ev);
-            if (parsed.isLive) {
-              const norm = normalizeEspnToLive(ev, s.key);
-              if (norm) allLive.push({...norm, _emoji: s.emoji, _sport: s.key});
-            }
-          }
-        } catch(e) {}
-      }
-      setEspnSidebarGames(allLive);
+  // Sidebar games: single source = backend liveGames (no more ESPN-direct duplication)
+  const allSidebarGames = useMemo(() => (
+    liveGames.filter(lg => lg.id !== initGame.id && (lg.status === 'live' || lg.status === 'halftime'))
+  ), [liveGames, initGame.id]);
+
+  // Sport counts for nav tabs — backend covers all 7 leagues (NBA, NCAAM, MLB, NFL, NHL, MLS, WCUP)
+  const sportCounts = useMemo(() => {
+    const live = liveGames.filter(g => g.status === 'live' || g.status === 'halftime');
+    return {
+      nba: live.filter(g => !g.league || g.league === 'nba' || g.league === 'ncaam').length,
+      nfl: live.filter(g => g.league === 'nfl').length,
+      mlb: live.filter(g => g.league === 'mlb').length,
+      nhl: live.filter(g => g.league === 'nhl').length,
+      soccer: live.filter(g => g.league === 'mls' || g.league === 'wcup').length,
     };
-    fetchEspnSidebar();
-    const iv = setInterval(fetchEspnSidebar, 30000);
-    return () => clearInterval(iv);
-  }, []);
-
-  // Combined sidebar games: backend + ESPN
-  const allSidebarGames = useMemo(() => {
-    const backend = liveGames.filter(lg => lg.id!==initGame.id && (lg.status==='live'||lg.status==='halftime'));
-    const espn = espnSidebarGames.filter(g => g.id !== initGame.id && g.id !== initGame.espnId);
-    return [...backend, ...espn];
-  }, [liveGames, espnSidebarGames, initGame.id, initGame.espnId]);
-
-  // Sport counts for nav tabs
-  const sportCounts = useMemo(() => ({
-    nba: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&(!g.league||g.league==='nba'||g.league==='ncaam')).length,
-    nfl: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&g.league==='nfl').length || espnSidebarGames.filter(g=>g._sport==='nfl').length,
-    mlb: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&g.league==='mlb').length || espnSidebarGames.filter(g=>g._sport==='mlb').length,
-    nhl: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&g.league==='nhl').length || espnSidebarGames.filter(g=>g._sport==='nhl').length,
-    ucl: liveGames.filter(g=>(g.status==='live'||g.status==='halftime')&&g.league==='mls').length || espnSidebarGames.filter(g=>g._sport==='ucl').length,
-  }), [liveGames, espnSidebarGames]);
+  }, [liveGames]);
 
   // ── fetch oracle history on mount (backend only) ────────────────────────
   useEffect(() => {
@@ -196,7 +165,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       try {
         // ESPN game: poll ESPN scoreboard directly
         if (initGame._espnKey) {
-          const espnUrls = {nhl:'hockey/nhl',nfl:'football/nfl',mlb:'baseball/mlb',ucl:'soccer/uefa.champions',nba:'basketball/nba'};
+          const espnUrls = {nhl:'hockey/nhl',nfl:'football/nfl',mlb:'baseball/mlb',wcup:'soccer/fifa.world',mls:'soccer/usa.1',nba:'basketball/nba'};
           const path = espnUrls[initGame._espnKey];
           if (!path) return;
           const res2 = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/scoreboard`);
@@ -504,7 +473,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         </div>
         {/* CENTER — sport tabs */}
         <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
-          {[['demos','Demos',null],['trending','Live',sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.ucl],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.ucl],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
+          {[['demos','Demos',null],['trending','Live',sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.soccer],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.soccer],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='trending'
                 ? <span style={{display:'flex',alignItems:'center',gap:5}}>

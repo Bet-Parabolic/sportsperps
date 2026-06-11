@@ -65,7 +65,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
       nfl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="nfl").length || countLive(espnData.nfl?.events),
       mlb: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="mlb").length || countLive(espnData.mlb?.events),
       nhl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="nhl").length || countLive(espnData.nhl?.events),
-      ucl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="mls").length || countLive(espnData.ucl?.events),
+      soccer: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && (g.league==="mls"||g.league==="wcup")).length || countLive(espnData.wcup?.events),
       ufc: countLive(espnData.ufc?.events),
     };
   }, [espnData, liveGames]);
@@ -255,7 +255,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
                     Live
                   </span>
                 : sport}{(() => {
-                  const c = sport==="Live"?(sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.ucl+(sportCounts.ufc||0)):sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.ucl:sport==="MMA"?sportCounts.ufc:null;
+                  const c = sport==="Live"?(sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.soccer+(sportCounts.ufc||0)):sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.soccer:sport==="MMA"?sportCounts.ufc:null;
                   return c>0?<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({c})</span>:null;
                 })()}</button>
           );})}
@@ -278,7 +278,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
         {terminalPage==="demos"?<DemosPage onSelectGame={(g)=>{onSwitchGame(g);setTerminalPage("game");}} currentGameId={G.id}/>
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade} liveGames={liveGames}/>
-        :terminalPage==="soccer"?<SoccerPage data={espnData.ucl} onTrade={onTrade} liveGames={liveGames}/>
+        :terminalPage==="soccer"?<SoccerPage data={espnData.wcup} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="hockey"?<HockeyPage data={espnData.nhl} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
         :terminalPage==="nfl"?<NFLPage data={espnData.nfl} onTrade={onTrade} liveGames={liveGames}/>

@@ -58,7 +58,7 @@ export function normalizeEspnToLive(ev, sportKey) {
   const stype = ev.status?.type?.name||"";
   const status = (stype==="STATUS_IN_PROGRESS"||stype==="STATUS_FIRST_HALF"||stype==="STATUS_SECOND_HALF"||stype==="STATUS_OVERTIME")?"live"
     :stype==="STATUS_HALFTIME"?"halftime":(stype.includes("FINAL")||stype==="STATUS_FULL_TIME")?"final":"scheduled";
-  const labelMap = {nhl:"NHL",nfl:"NFL",mlb:"MLB",ucl:"UCL",nba:"NBA",mls:"MLS"};
+  const labelMap = {nhl:"NHL",nfl:"NFL",mlb:"MLB",wcup:"World Cup",nba:"NBA",mls:"MLS"};
   return {
     id: sportKey+"_"+ev.id,
     espnId: ev.id,

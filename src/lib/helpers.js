@@ -73,10 +73,25 @@ export function periodLabel(league, period, clock, statusDetail){
     const ord=period==1?"st":period==2?"nd":period==3?"rd":period==4?"OT":"th";
     return period>=4?"OT"+(period>4?period-3:"")+(clock?" "+clock:""):period+ord+" P"+(clock?" "+clock:"");
   }
-  if(lg==="mls"||lg==="ucl"||lg.includes("soccer")){
+  if(lg==="mls"||lg==="wcup"||lg.includes("soccer")){
     return clock||(period==1?"1H":"2H");
   }
   return "Q"+period+(clock?" "+clock:"");
+}
+
+/* Format a game start time as "Today 7:30 PM" / "Tomorrow 1:05 PM" / "Sat · 4:10 PM" */
+export function fmtGameTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay = (a, b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  const tomorrow = new Date(now); tomorrow.setDate(now.getDate()+1);
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  if (sameDay(d, now)) return "Today · " + time;
+  if (sameDay(d, tomorrow)) return "Tomorrow · " + time;
+  const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return day + " · " + time;
 }
 
 /* Returns true if a game's scheduled start was within the last N hours */
