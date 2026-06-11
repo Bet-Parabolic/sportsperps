@@ -1,5 +1,5 @@
 import { B, fb, fd, fm } from "../../lib/theme.js";
-import { byDate, isRecent } from "../../lib/helpers.js";
+import { byDate, fmtGameTime, isRecent } from "../../lib/helpers.js";
 import { findBackendGame, parseESPNEvent } from "../../lib/espn.js";
 import { EmptyState } from "../../components/shared/SportPageShell.jsx";
 
@@ -55,9 +55,9 @@ export function BaseballPage({ data={events:[],loading:true,error:false}, onTrad
         </div>
 
         {/* Scheduled time */}
-        {g.isScheduled && g.detail && (
-          <div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:4}}>{g.detail}</div>
-        )}
+        {g.isScheduled && (()=>{const when=fmtGameTime(g.date);return(when||g.detail)?(
+          <div style={{fontSize:11,color:"#888",fontFamily:fm,marginTop:8,letterSpacing:"0.04em"}}>{when}{when&&g.detail?" · ":""}{g.detail||""}</div>
+        ):null;})()}
         {g.isLive&&(()=>{const bg=findBackendGame(liveGames,g,'mlb');const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
           {wp&&<div style={{marginTop:8}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>

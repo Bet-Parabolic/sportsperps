@@ -1,5 +1,5 @@
 import { B, fb, fd, fm } from "../../lib/theme.js";
-import { isRecent, periodLabel } from "../../lib/helpers.js";
+import { fmtGameTime, isRecent, periodLabel } from "../../lib/helpers.js";
 import { EmptyState } from "../../components/shared/SportPageShell.jsx";
 
 export function BasketballPage({ liveGames, onTrade }) {
@@ -99,9 +99,9 @@ export function BasketballPage({ liveGames, onTrade }) {
         )}
 
         {/* Scheduled time */}
-        {g.status==="scheduled" && g.statusDetail && (
-          <div style={{fontSize:11,color:"#555",fontFamily:fm,marginTop:4}}>{g.statusDetail}</div>
-        )}
+        {g.status==="scheduled" && (()=>{const when=fmtGameTime(g.startTime||g.date);return(when||g.statusDetail)?(
+          <div style={{fontSize:11,color:"#888",fontFamily:fm,marginTop:8,letterSpacing:"0.04em"}}>{when}{when&&g.statusDetail?" · ":""}{g.statusDetail||""}</div>
+        ):null;})()}
       </div>
     );
   };
