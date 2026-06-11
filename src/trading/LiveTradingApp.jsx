@@ -571,11 +571,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   </div>
                 </div>
                 <div style={{marginTop:8,height:3,background:'#1a1a1a',borderRadius:3,overflow:'hidden'}}>
-                  <div style={{height:'100%',width:(oPrice*100)+'%',background:'linear-gradient(90deg,'+HOME.light+','+HOME.light+'99)',transition:'width .5s'}}/>
+                  <div style={{height:'100%',width:(oPrice*100)+'%',background:'linear-gradient(90deg,'+B.green+','+B.green+'99)',transition:'width .5s'}}/>
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',marginTop:3}}>
-                  <span style={{fontSize:9,color:HOME.light,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(0)}% {HOME.short}</span>
-                  <span style={{fontSize:9,color:AWAY.light,fontWeight:700,fontFamily:fm}}>{((1-oPrice)*100).toFixed(0)}% {AWAY.short}</span>
+                  <span style={{fontSize:9,color:B.green,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(0)}% {HOME.short}</span>
+                  <span style={{fontSize:9,color:B.red,fontWeight:700,fontFamily:fm}}>{((1-oPrice)*100).toFixed(0)}% {AWAY.short}</span>
                 </div>
               </div>
             ) : (
@@ -635,13 +635,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <span style={{fontSize:13,fontWeight:600,color:'#888'}}>Win Probability</span>
               <div style={{display:'flex',gap:16}}>
                 <span style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>
-                  <span style={{width:12,height:3,borderRadius:2,background:HOME.light,display:'inline-block'}}/>
-                  <span style={{color:HOME.light,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(1)}%</span>
+                  <span style={{width:12,height:3,borderRadius:2,background:B.green,display:'inline-block'}}/>
+                  <span style={{color:B.green,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(1)}%</span>
                   <span style={{color:'#666'}}>{HOME.short}</span>
                 </span>
                 <span style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>
-                  <span style={{width:12,height:3,borderRadius:2,background:AWAY.light,display:'inline-block'}}/>
-                  <span style={{color:AWAY.light,fontWeight:700,fontFamily:fm}}>{(awayProb*100).toFixed(1)}%</span>
+                  <span style={{width:12,height:3,borderRadius:2,background:B.red,display:'inline-block'}}/>
+                  <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>{(awayProb*100).toFixed(1)}%</span>
                   <span style={{color:'#666'}}>{AWAY.short}</span>
                 </span>
               </div>
@@ -651,8 +651,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={merged} margin={{top:8,right:8,bottom:4,left:8}}>
                     <defs>
-                      <linearGradient id="lhg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={HOME.light} stopOpacity={0.12}/><stop offset="100%" stopColor={HOME.light} stopOpacity={0.01}/></linearGradient>
-                      <linearGradient id="lag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={AWAY.light} stopOpacity={0.08}/><stop offset="100%" stopColor={AWAY.light} stopOpacity={0.01}/></linearGradient>
+                      <linearGradient id="lhg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={B.green} stopOpacity={0.18}/><stop offset="100%" stopColor={B.green} stopOpacity={0.01}/></linearGradient>
+                      <linearGradient id="lag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={B.red} stopOpacity={0.12}/><stop offset="100%" stopColor={B.red} stopOpacity={0.01}/></linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="2 6" stroke="#ffffff04" vertical={false}/>
                     <XAxis dataKey="t" tick={{fill:'#555',fontSize:9}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
@@ -661,9 +661,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <YAxis domain={[0,1]} tick={{fill:'#555',fontSize:10}} tickFormatter={v=>(v*100)+'%'} axisLine={false} tickLine={false} width={32} orientation="right"/>
                     <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
                     {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
-                    {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?HOME.light:AWAY.light;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
-                    <Area type="natural" dataKey="ph" stroke={HOME.light} strokeWidth={2} fill="url(#lhg)" dot={false} animationDuration={0} baseValue={0}/>
-                    <Area type="natural" dataKey="pa" stroke={AWAY.light} strokeWidth={1.5} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
+                    {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?B.green:B.red;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
+                    <Area type="natural" dataKey="ph" stroke={B.green} strokeWidth={2.25} fill="url(#lhg)" dot={false} animationDuration={0} baseValue={0}/>
+                    <Area type="natural" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
                     <Scatter dataKey="mh_val" shape={<HomeMarkerDot/>} isAnimationActive={false}/>
                     <Scatter dataKey="ma_val" shape={<AwayMarkerDot/>} isAnimationActive={false}/>
                   </ComposedChart>
