@@ -1,22 +1,29 @@
 /* ═══════════════════════════════════════════════════════════
-   BRAND — AGGRESSIVE FINTECH
+   PARABOLIC — twin-parabola brand
+   Accent green = #1fd182 (replaces orange)
    ═══════════════════════════════════════════════════════════ */
 export const B = {
-  primary: "#fe4202", primaryLight: "#ff6b2b", warm: "#fe4202",
-  green: "#22c55e", greenLight: "#4ade80",
-  pink: "#ff2d6f", red: "#ef4444",
+  // Brand accent (mint green) — single source of truth for "Parabolic green"
+  primary: "#1fd182", primaryLight: "#52e0a3", warm: "#1fd182",
+  // Win/loss semantic. Green and primary are now the same hue (intentional).
+  green: "#1fd182", greenLight: "#52e0a3",
+  pink: "#ff5247", red: "#ff5247",
+  // Cool accents (untouched — used sparingly in oracle source pills, etc.)
   cyan: "#00d4ff", ice: "#5ce1ff", blue: "#0088cc",
-  white: "#f0f0f0", dim: "#888888", mute: "#444444",
-  bg: "#000000", card: "#0a0a0a", surface: "#111111",
-  border: "#1a1a1a", border2: "#252525",
-  grad: "linear-gradient(135deg, #fe4202, #ff6b2b, #ff9f1c, #ffffff, #5ce1ff, #00d4ff)",
-  gradText: "linear-gradient(90deg, #fe4202, #ff6b2b, #ff9f1c, #5ce1ff)",
+  // Carbon surfaces (from Parabolic brand spec)
+  white: "#eef1f6", dim: "#949aa6", mute: "#5e636e",
+  bg: "#06070a", card: "#0b0d11", surface: "#11141a",
+  border: "#181b22", border2: "#1f2329",
+  grad: "linear-gradient(135deg, #1fd182, #52e0a3, #b8f5d6, #eef1f6, #5ce1ff, #00d4ff)",
+  gradText: "linear-gradient(90deg, #1fd182, #52e0a3, #b8f5d6, #5ce1ff)",
 };
 
-export const fd = "'Plus Jakarta Sans',sans-serif";
-export const fb = "'DM Sans',sans-serif";
+// Display = Clash Display (fontshare). Body = Hanken Grotesk. Mono = JetBrains Mono.
+export const fd = "'Clash Display','Hanken Grotesk',sans-serif";
+export const fb = "'Hanken Grotesk',system-ui,sans-serif";
 export const fm = "'JetBrains Mono','SF Mono',monospace";
-export const FONT_URL = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap";
+// Two stylesheets: Google Fonts for Hanken + Mono, Fontshare for Clash Display
+export const FONT_URL = "https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');@import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap";
 
 /* Brighten a hex color toward white for dark-background readability */
 export function brighten(hex, factor=0.45){

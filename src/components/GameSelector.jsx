@@ -19,8 +19,8 @@ export function GameSelector({ onSelect, onBack }) {
           </button>
           <div style={{width:1,height:16,background:B.border}}/>
           <div style={{display:"flex",alignItems:"center",gap:4}}>
-            <img src={LOGO_NAV} style={{height:120,width:"auto",margin:"-26px 0",marginRight:-8}} alt="Perpdictions"/>
-            <img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>
+            <img src={LOGO_NAV} style={{height:32,width:"auto"}} alt="Parabolic mark"/>
+            <img src={LOGO_WORDMARK} style={{height:22,width:"auto",marginLeft:8}} alt="Parabolic"/>
           </div>
         </nav>
 

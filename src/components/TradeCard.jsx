@@ -18,10 +18,10 @@ export function TradeCard({ card, onClose }) {
           try{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);}catch(e){}
         },'image/png');
       } else if(action==='download'){
-        const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='perpdictions-trade.png';a.click();
+        const a=document.createElement('a');a.href=canvas.toDataURL('image/png');a.download='parabolic-trade.png';a.click();
       } else if(action==='share'&&navigator.share){
         canvas.toBlob(async blob=>{
-          try{await navigator.share({files:[new File([blob],'perpdictions-trade.png',{type:'image/png'})]});}catch(e){}
+          try{await navigator.share({files:[new File([blob],'parabolic-trade.png',{type:'image/png'})]});}catch(e){}
         },'image/png');
       }
     } catch(e){ console.log('Trade card capture error:', e); }
@@ -37,7 +37,7 @@ export function TradeCard({ card, onClose }) {
       <div ref={cardRef} onClick={e=>e.stopPropagation()} style={{width:400,background:'linear-gradient(180deg,#0a0a0a,#111)',borderRadius:20,border:'1px solid #1f1f1f',borderLeft:'4px solid '+(card.teamColor||B.primary),padding:'28px 32px',fontFamily:fb}}>
         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:20}}>
           <img src={LOGO_MARK} style={{height:20,width:20}} alt=""/>
-          <span style={{fontSize:13,fontWeight:700,color:'#888'}}>Perpdictions</span>
+          <span style={{fontSize:13,fontWeight:700,color:'#888'}}>Parabolic</span>
           <span style={{marginLeft:'auto',fontSize:10,color:'#444',fontFamily:fm}}>perpdictions.com</span>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>

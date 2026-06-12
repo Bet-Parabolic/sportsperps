@@ -123,7 +123,7 @@ export function BasketballPage({ liveGames, onTrade }) {
         </h2>
         <p style={{fontSize:13,color:"#666",lineHeight:1.6}}>
           {hasGames
-            ? `${live.length + sched.length + final.length} game${live.length + sched.length + final.length !== 1 ? "s" : ""} — live data from ESPN via Perpdictions backend`
+            ? `${live.length + sched.length + final.length} game${live.length + sched.length + final.length !== 1 ? "s" : ""} — live data from ESPN via Parabolic backend`
             : "Connecting to backend…"}
         </p>
       </div>

@@ -226,8 +226,8 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
             <ChevronRight size={16} style={{transform:"rotate(180deg)"}}/>
           </button>
           <div style={{display:"flex",alignItems:"center",gap:isMobile?3:5}}>
-            <img src={LOGO_NAV} style={{height:isMobile?110:140,width:"auto",margin:"-30px 0",marginRight:isMobile?-8:-10}} alt="pd"/>
-            {!isMobile&&<img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>}
+            <img src={LOGO_NAV} style={{height:isMobile?28:32,width:"auto"}} alt="Parabolic mark"/>
+            {!isMobile&&<img src={LOGO_WORDMARK} style={{height:22,width:"auto",marginLeft:8}} alt="Parabolic"/>}
           </div>
         </div>
 
@@ -871,7 +871,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
             </div>
 
             {/* Reduce Only toggle */}
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 10px",background:reduceOnly?"#fe420210":"#0a0a0a",borderRadius:10,border:"1px solid "+(reduceOnly?B.primary+"30":"#1a1a1a"),cursor:"pointer"}} onClick={()=>setReduceOnly(r=>!r)}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 10px",background:reduceOnly?"#1fd18210":"#0a0a0a",borderRadius:10,border:"1px solid "+(reduceOnly?B.primary+"30":"#1a1a1a"),cursor:"pointer"}} onClick={()=>setReduceOnly(r=>!r)}>
               <div style={{width:16,height:16,borderRadius:4,border:"1.5px solid "+(reduceOnly?B.primary:"#333"),background:reduceOnly?B.primary:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
                 {reduceOnly&&<span style={{fontSize:10,color:"#000",fontWeight:900,lineHeight:1}}>✓</span>}
               </div>
@@ -1121,7 +1121,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
               <span style={{color:"#666"}}>Return </span><span style={{fontWeight:700,color:pctClr(totalEq-10000)}}>{fmtPct((totalEq-10000)/100)}</span>
             </div>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button onClick={resetAll} style={{padding:"14px 32px",fontWeight:700,fontSize:15,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:12,background:"linear-gradient(135deg, #fe4202, #fe4202)",color:"#fff"}}>Replay</button>
+              <button onClick={resetAll} style={{padding:"14px 32px",fontWeight:700,fontSize:15,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:12,background:"linear-gradient(135deg, #1fd182, #1fd182)",color:"#fff"}}>Replay</button>
               <button onClick={onChangeGame} style={{padding:"14px 32px",fontWeight:700,fontSize:15,border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,borderRadius:12,background:"transparent",color:"#888"}}>Other Games</button>
             </div>
           </div>

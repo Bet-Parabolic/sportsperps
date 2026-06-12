@@ -10,8 +10,8 @@ export function LandingPage({ onLaunch, onDocs }) {
   useEffect(() => { const iv = setInterval(() => setTick(t => t+1), 2000); return () => clearInterval(iv); }, []);
   useEffect(() => { const h = () => setIsMobile(window.innerWidth < 768); window.addEventListener("resize", h); return () => window.removeEventListener("resize", h); }, []);
 
-  const R = "#fe4202", T = "#fe4202", TL = "#ff6b2b";
-  const logoGrad = "linear-gradient(90deg, #fe4202, #ff6b2b, #ff9f1c, #ffffff, #5ce1ff, #00d4ff)";
+  const R = "#1fd182", T = "#1fd182", TL = "#52e0a3";
+  const logoGrad = "linear-gradient(90deg, #1fd182, #52e0a3, #b8f5d6, #eef1f6, #5ce1ff, #00d4ff)";
   const a = (d) => ({
     opacity: vis ? 1 : 0, transform: vis ? "translateY(0)" : "translateY(24px)",
     transition: `all 0.8s cubic-bezier(0.16,1,0.3,1) ${d}s`,
@@ -31,11 +31,11 @@ export function LandingPage({ onLaunch, onDocs }) {
       <div style={{position:"fixed",inset:0,pointerEvents:"none",overflow:"hidden"}}>
         <svg viewBox="0 0 1440 900" style={{width:"100%",height:"100%",position:"absolute"}} preserveAspectRatio="xMidYMid slice">
           <defs>
-            <linearGradient id="gW" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#ff1744" stopOpacity="0.07"/><stop offset="50%" stopColor="#ff6b2b" stopOpacity="0.04"/><stop offset="100%" stopColor="#ff9f1c" stopOpacity="0"/></linearGradient>
-            <linearGradient id="gC" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#ff9f1c" stopOpacity="0.05"/><stop offset="50%" stopColor="#fe4202" stopOpacity="0.03"/><stop offset="100%" stopColor="#ff6b2b" stopOpacity="0"/></linearGradient>
-            <linearGradient id="gM" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="0%" stopColor="#ff1744" stopOpacity="0"/><stop offset="30%" stopColor="#ff6b2b" stopOpacity="0.04"/><stop offset="70%" stopColor="#5ce1ff" stopOpacity="0.04"/><stop offset="100%" stopColor="#00b8d4" stopOpacity="0"/></linearGradient>
-            <radialGradient id="rR" cx="25%" cy="30%" r="40%"><stop offset="0%" stopColor="#ff1744" stopOpacity="0.06"/><stop offset="100%" stopColor="#ff1744" stopOpacity="0"/></radialGradient>
-            <radialGradient id="rT" cx="75%" cy="60%" r="40%"><stop offset="0%" stopColor="#ff6b2b" stopOpacity="0.04"/><stop offset="100%" stopColor="#ff6b2b" stopOpacity="0"/></radialGradient>
+            <linearGradient id="gW" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#1fd182" stopOpacity="0.07"/><stop offset="50%" stopColor="#52e0a3" stopOpacity="0.04"/><stop offset="100%" stopColor="#52e0a3" stopOpacity="0"/></linearGradient>
+            <linearGradient id="gC" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stopColor="#52e0a3" stopOpacity="0.05"/><stop offset="50%" stopColor="#1fd182" stopOpacity="0.03"/><stop offset="100%" stopColor="#52e0a3" stopOpacity="0"/></linearGradient>
+            <linearGradient id="gM" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="0%" stopColor="#1fd182" stopOpacity="0"/><stop offset="30%" stopColor="#52e0a3" stopOpacity="0.04"/><stop offset="70%" stopColor="#5ce1ff" stopOpacity="0.04"/><stop offset="100%" stopColor="#00b8d4" stopOpacity="0"/></linearGradient>
+            <radialGradient id="rR" cx="25%" cy="30%" r="40%"><stop offset="0%" stopColor="#1fd182" stopOpacity="0.06"/><stop offset="100%" stopColor="#1fd182" stopOpacity="0"/></radialGradient>
+            <radialGradient id="rT" cx="75%" cy="60%" r="40%"><stop offset="0%" stopColor="#52e0a3" stopOpacity="0.04"/><stop offset="100%" stopColor="#52e0a3" stopOpacity="0"/></radialGradient>
           </defs>
           <rect width="1440" height="900" fill="url(#rR)"/>
           <rect width="1440" height="900" fill="url(#rT)"/>
@@ -51,8 +51,8 @@ export function LandingPage({ onLaunch, onDocs }) {
         {/* CENTERED LOGO AT TOP — no nav bar */}
         <div style={{...a(0),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isMobile?"24px 16px 0":"40px 32px 0"}}>
           <div style={{display:"flex",alignItems:"center",gap:0,cursor:"pointer"}} onClick={onLaunch}>
-            <img src={LOGO_NAV} style={{height:isMobile?120:200,width:"auto",margin:isMobile?"-32px 0":"-58px 0",marginRight:isMobile?-32:-58}} alt="Perpdictions emblem"/>
-            <img src={LOGO_WORDMARK} style={{height:isMobile?28:46,width:"auto"}} alt="Perpdictions"/>
+            <img src={LOGO_NAV} style={{height:isMobile?96:160,width:"auto"}} alt="Parabolic mark"/>
+            <img src={LOGO_WORDMARK} style={{height:isMobile?28:46,width:"auto",marginLeft:isMobile?6:12}} alt="Parabolic"/>
           </div>
         </div>
 
@@ -64,7 +64,7 @@ export function LandingPage({ onLaunch, onDocs }) {
               Leveraged Sports Markets
             </span>
           </div>
-          <h1 style={{...a(0.1),fontFamily:fd,fontSize:isMobile?38:72,fontWeight:800,lineHeight:1.0,letterSpacing:"-0.04em",margin:isMobile?"0 0 16px":"0 0 24px"}}>
+          <h1 style={{...a(0.1),fontFamily:fd,fontSize:isMobile?38:72,fontWeight:800,lineHeight:1.0,letterSpacing:"-0.01em",wordSpacing:"0.12em",margin:isMobile?"0 0 16px":"0 0 24px"}}>
             Leveraged sports<br/>
             <span style={{color:R}}>perpetuals.</span>
           </h1>
@@ -72,7 +72,7 @@ export function LandingPage({ onLaunch, onDocs }) {
             Trade live win probability with up to 10x leverage. Multi-oracle pricing. Trustless settlement. No counterparty risk.
           </p>
           <div style={{...a(0.2),display:"flex",gap:12,justifyContent:"center"}}>
-            <button onClick={onLaunch} style={{padding:isMobile?"12px 28px":"14px 36px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:12}}>
+            <button onClick={onLaunch} style={{padding:isMobile?"12px 28px":"14px 36px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:`linear-gradient(135deg, ${R}, ${TL})`,color:"#fff",borderRadius:12}}>
               Launch App
             </button>
             <button onClick={onDocs} style={{padding:isMobile?"12px 28px":"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:600,fontSize:isMobile?14:15,background:"transparent",color:"#888",borderRadius:12}}>
@@ -92,7 +92,7 @@ export function LandingPage({ onLaunch, onDocs }) {
                   <span style={{width:9,height:9,borderRadius:"50%",background:"#ffbd2e",display:"inline-block"}}/>
                   <span style={{width:9,height:9,borderRadius:"50%",background:"#27c93f",display:"inline-block"}}/>
                 </div>
-                <span style={{color:"#666",fontWeight:600,fontSize:11,fontFamily:fm,letterSpacing:"0.05em"}}>perpdictions terminal · NFL Super Bowl LIX</span>
+                <span style={{color:"#666",fontWeight:600,fontSize:11,fontFamily:fm,letterSpacing:"0.05em"}}>parabolic terminal · NFL Super Bowl LIX</span>
               </div>
               <span style={{color:B.green,fontSize:10,display:"flex",alignItems:"center",gap:6,fontFamily:fm,fontWeight:700,letterSpacing:"0.06em"}}>
                 <span style={{width:6,height:6,borderRadius:"50%",background:B.green,display:"inline-block",animation:"pulse 1.5s infinite"}}/>LIVE
@@ -155,8 +155,8 @@ export function LandingPage({ onLaunch, onDocs }) {
                     </g>
                     {/* Scoring play marker */}
                     <g>
-                      <circle cx="200" cy="30" r="3" fill="#ff9f1c"/>
-                      <text x="200" y="14" textAnchor="middle" fill="#ff9f1c" fontSize="8" fontWeight="700" fontFamily="ui-monospace,monospace">⚡ TD</text>
+                      <circle cx="200" cy="30" r="3" fill="#52e0a3"/>
+                      <text x="200" y="14" textAnchor="middle" fill="#52e0a3" fontSize="8" fontWeight="700" fontFamily="ui-monospace,monospace">⚡ TD</text>
                     </g>
                     {/* Liquidation reference line */}
                     <line x1="0" y1="120" x2="400" y2="120" stroke="#ef4444" strokeWidth="1" strokeDasharray="4 4" opacity="0.4"/>
@@ -267,8 +267,8 @@ export function LandingPage({ onLaunch, onDocs }) {
         {/* HOW IT WORKS — with visuals */}
         <section style={{maxWidth:1200,margin:"0 auto",padding:isMobile?"60px 16px":"100px 32px"}}>
           <div style={{...a(0.35),textAlign:"center",marginBottom:isMobile?40:72}}>
-            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.03em",color:R}}>How it works</span>
-            <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.03em",marginTop:12,lineHeight:1.1,color:"#fff"}}>Three steps. Zero complexity.</h2>
+            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.01em",wordSpacing:"0.1em",color:R}}>How it works</span>
+            <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.01em",wordSpacing:"0.1em",marginTop:12,lineHeight:1.1,color:"#fff"}}>Three steps. Zero complexity.</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:isMobile?20:24}}>
             {/* STEP 1 — Pick a Side */}
@@ -301,23 +301,23 @@ export function LandingPage({ onLaunch, onDocs }) {
               <div style={{height:isMobile?140:180,background:"#050505",borderRadius:12,marginBottom:18,padding:14,display:"flex",flexDirection:"column",justifyContent:"center",gap:14,border:"1px solid #1a1a1a"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
                   <span style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:"0.08em",fontFamily:fm}}>LEVERAGE</span>
-                  <span style={{fontSize:24,fontWeight:900,color:"#ff9f1c",fontFamily:fm,lineHeight:1}}>5<span style={{fontSize:14,color:"#666"}}>×</span></span>
+                  <span style={{fontSize:24,fontWeight:900,color:"#52e0a3",fontFamily:fm,lineHeight:1}}>5<span style={{fontSize:14,color:"#666"}}>×</span></span>
                 </div>
                 {/* Slider */}
                 <div style={{position:"relative",height:6,background:"#1a1a1a",borderRadius:3}}>
-                  <div style={{position:"absolute",left:0,top:0,bottom:0,width:"45%",borderRadius:3,background:"linear-gradient(90deg, #fe4202, #ff9f1c)"}}/>
-                  <div style={{position:"absolute",left:"45%",top:-5,width:16,height:16,borderRadius:"50%",background:"#ff9f1c",border:"2px solid #fff",transform:"translateX(-50%)",boxShadow:"0 0 12px #ff9f1c80"}}/>
+                  <div style={{position:"absolute",left:0,top:0,bottom:0,width:"45%",borderRadius:3,background:"linear-gradient(90deg, #1fd182, #52e0a3)"}}/>
+                  <div style={{position:"absolute",left:"45%",top:-5,width:16,height:16,borderRadius:"50%",background:"#52e0a3",border:"2px solid #fff",transform:"translateX(-50%)",boxShadow:"0 0 12px #52e0a380"}}/>
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#555",fontFamily:fm}}>
                   <span>1×</span><span>3×</span><span>5×</span><span>7×</span><span>10×</span>
                 </div>
                 <div style={{display:"flex",gap:6}}>
                   {[2,3,5,10].map(v=>(
-                    <span key={v} style={{flex:1,padding:"4px 0",textAlign:"center",fontSize:10,fontWeight:700,fontFamily:fm,background:v===5?"#ff9f1c20":"#0a0a0a",color:v===5?"#ff9f1c":"#666",borderRadius:5,border:"1px solid "+(v===5?"#ff9f1c40":"#1a1a1a")}}>{v}×</span>
+                    <span key={v} style={{flex:1,padding:"4px 0",textAlign:"center",fontSize:10,fontWeight:700,fontFamily:fm,background:v===5?"#52e0a320":"#0a0a0a",color:v===5?"#52e0a3":"#666",borderRadius:5,border:"1px solid "+(v===5?"#52e0a340":"#1a1a1a")}}>{v}×</span>
                   ))}
                 </div>
               </div>
-              <div style={{fontSize:isMobile?32:42,fontWeight:800,color:"#ff9f1c",lineHeight:1,marginBottom:10,fontFamily:fm}}>02</div>
+              <div style={{fontSize:isMobile?32:42,fontWeight:800,color:"#52e0a3",lineHeight:1,marginBottom:10,fontFamily:fm}}>02</div>
               <h3 style={{fontFamily:fd,fontSize:isMobile?17:20,fontWeight:700,marginBottom:8,color:"#fff"}}>Set Leverage</h3>
               <p style={{fontSize:isMobile?13:14,lineHeight:1.6,color:"#888"}}>1× to 10×. Higher leverage amplifies gains and losses. Dynamic liquidation engine protects the pool.</p>
             </div>
@@ -357,11 +357,11 @@ export function LandingPage({ onLaunch, onDocs }) {
         {/* Architecture */}
         <section style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"0 16px 60px":"0 32px 100px"}}>
           <div style={{...a(0.55),textAlign:"center",marginBottom:isMobile?32:64}}>
-            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.03em",color:R}}>Architecture</span>
-            <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.03em",marginTop:12,lineHeight:1.1,color:"#fff"}}>DeFi-grade infrastructure.</h2>
+            <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.01em",wordSpacing:"0.1em",color:R}}>Architecture</span>
+            <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.01em",wordSpacing:"0.1em",marginTop:12,lineHeight:1.1,color:"#fff"}}>DeFi-grade infrastructure.</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:isMobile?12:16}}>
-            {[{title:"Multi-Oracle Consensus",desc:"Weighted median across Polymarket, Kalshi, sportsbooks, ESPN and our internal model. Manipulation-resistant fair price discovery.",icon:"◉",c:R},{title:"Perpetual Futures",desc:"Continuous price exposure to win probability. Not a binary bet — trade in, trade out at any point during the live game.",icon:"∞",c:"#ff9f1c"},{title:"Liquidation Engine",desc:"Real-time mark-to-market. Dynamic max leverage based on oracle confidence. Automatic liquidation protects the pool.",icon:"⚡",c:TL},{title:"Trustless Settlement",desc:"Every trade, funding payment, and liquidation settles trustlessly. Transparent, verifiable, zero counterparty risk.",icon:"◆",c:T}].map((f,i) => (
+            {[{title:"Multi-Oracle Consensus",desc:"Weighted median across Polymarket, Kalshi, sportsbooks, ESPN and our internal model. Manipulation-resistant fair price discovery.",icon:"◉",c:R},{title:"Perpetual Futures",desc:"Continuous price exposure to win probability. Not a binary bet — trade in, trade out at any point during the live game.",icon:"∞",c:"#52e0a3"},{title:"Liquidation Engine",desc:"Real-time mark-to-market. Dynamic max leverage based on oracle confidence. Automatic liquidation protects the pool.",icon:"⚡",c:TL},{title:"Trustless Settlement",desc:"Every trade, funding payment, and liquidation settles trustlessly. Transparent, verifiable, zero counterparty risk.",icon:"◆",c:T}].map((f,i) => (
               <div key={f.title} style={{...a(0.6+i*0.05),background:"#0a0a0a",borderRadius:16,border:"1px solid #1f1f1f",padding:isMobile?"24px 20px":"32px 28px"}}>
                 <div style={{fontSize:isMobile?20:24,color:f.c,marginBottom:isMobile?12:16}}>{f.icon}</div>
                 <h4 style={{fontFamily:fd,fontSize:isMobile?15:16,fontWeight:700,marginBottom:10}}>{f.title}</h4>
@@ -376,11 +376,11 @@ export function LandingPage({ onLaunch, onDocs }) {
           <div style={{maxWidth:700,margin:"0 auto",padding:isMobile?"40px 20px":"60px 40px",background:"#0a0a0a",borderRadius:isMobile?16:24,border:"1px solid #1f1f1f",position:"relative",overflow:"hidden"}}>
             <div style={{position:"absolute",top:"-50%",left:"-20%",width:"140%",height:"200%",background:`radial-gradient(ellipse at 30% 50%, ${R}08 0%, transparent 50%), radial-gradient(ellipse at 70% 50%, ${T}08 0%, transparent 50%)`,pointerEvents:"none"}}/>
             <div style={{position:"relative"}}>
-              <h2 style={{fontFamily:fd,fontSize:isMobile?32:48,fontWeight:800,letterSpacing:"-0.03em",marginBottom:14}}>
+              <h2 style={{fontFamily:fd,fontSize:isMobile?32:48,fontWeight:800,letterSpacing:"-0.01em",wordSpacing:"0.1em",marginBottom:14}}>
                 See it <span style={{color:R}}>live.</span>
               </h2>
               <p style={{fontSize:isMobile?14:16,color:"#888",marginBottom:isMobile?24:32,fontWeight:400}}>Replay real championship games with the full trading engine.</p>
-              <button onClick={onLaunch} style={{padding:isMobile?"14px 36px":"16px 48px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:16,background:`linear-gradient(135deg, ${R}, #ff6b2b)`,color:"#fff",borderRadius:12}}>
+              <button onClick={onLaunch} style={{padding:isMobile?"14px 36px":"16px 48px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:16,background:`linear-gradient(135deg, ${R}, ${TL})`,color:"#fff",borderRadius:12}}>
                 Launch App →
               </button>
             </div>
@@ -389,8 +389,8 @@ export function LandingPage({ onLaunch, onDocs }) {
 
         {/* Footer */}
         <footer style={{borderTop:"1px solid #1a1a1a",padding:isMobile?"20px 16px":"24px 48px",display:"flex",flexDirection:isMobile?"column":"row",justifyContent:"space-between",alignItems:"center",gap:isMobile?12:0}}>
-          <span style={{fontSize:isMobile?12:13,color:"#444",display:"flex",alignItems:"center",gap:8}}><img src={LOGO_NAV} style={{height:isMobile?32:64,width:"auto",opacity:0.5,margin:isMobile?"-8px 0":0}} alt=""/>© 2026 Perpdictions</span>
-          <a href="https://x.com/perpdictions" target="_blank" rel="noopener noreferrer" aria-label="Follow @perpdictions on X"
+          <span style={{fontSize:isMobile?12:13,color:"#444",display:"flex",alignItems:"center",gap:10}}><img src={LOGO_NAV} style={{height:isMobile?24:32,width:"auto",opacity:0.55}} alt=""/>© 2026 Parabolic</span>
+          <a href="https://x.com/parabolic" target="_blank" rel="noopener noreferrer" aria-label="Follow @parabolic on X"
             style={{display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?32:36,height:isMobile?32:36,borderRadius:8,background:"transparent",border:"1px solid #2a2a2a",cursor:"pointer",transition:"all .15s",color:"#888"}}
             onMouseOver={(e)=>{e.currentTarget.style.color="#fff";e.currentTarget.style.borderColor="#444";}}
             onMouseOut={(e)=>{e.currentTarget.style.color="#888";e.currentTarget.style.borderColor="#2a2a2a";}}>

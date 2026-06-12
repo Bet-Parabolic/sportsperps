@@ -467,8 +467,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <span style={{fontSize:18,lineHeight:1}}>‹</span>
           </button>
           <div style={{display:'flex',alignItems:'center',gap:isMobile?3:5}}>
-            <img src={LOGO_NAV} style={{height:isMobile?110:140,width:'auto',margin:'-30px 0',marginRight:isMobile?-8:-10}} alt="pd"/>
-            {!isMobile&&<img src={LOGO_WORDMARK} style={{height:28,width:"auto"}} alt="Perpdictions"/>}
+            <img src={LOGO_NAV} style={{height:isMobile?28:32,width:'auto'}} alt="Parabolic mark"/>
+            {!isMobile&&<img src={LOGO_WORDMARK} style={{height:22,width:"auto",marginLeft:8}} alt="Parabolic"/>}
           </div>
         </div>
         {/* CENTER — sport tabs */}
@@ -491,7 +491,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
             LIVE
           </span>}
-          <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#fe4202,#fe4202)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
+          <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
           <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14}}>👤</div>
         </div>
       </div>
@@ -1141,7 +1141,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <div style={{fontSize:15,marginBottom:36}}>
               <span style={{color:'#666'}}>Return </span><span style={{fontWeight:700,color:pctClr(totalEq-10000)}}>{fmtPct((totalEq-10000)/100)}</span>
             </div>
-            <button onClick={onBack} style={{padding:'14px 32px',fontWeight:700,fontSize:15,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:12,background:'linear-gradient(135deg,#fe4202,#fe4202)',color:'#fff'}}>Back to Games</button>
+            <button onClick={onBack} style={{padding:'14px 32px',fontWeight:700,fontSize:15,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:12,background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff'}}>Back to Games</button>
           </div>
         </div>
       )}
