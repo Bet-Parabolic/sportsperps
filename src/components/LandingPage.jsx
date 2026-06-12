@@ -390,7 +390,7 @@ export function LandingPage({ onLaunch, onDocs }) {
         {/* Footer */}
         <footer style={{borderTop:"1px solid #1a1a1a",padding:isMobile?"20px 16px":"24px 48px",display:"flex",flexDirection:isMobile?"column":"row",justifyContent:"space-between",alignItems:"center",gap:isMobile?12:0}}>
           <span style={{fontSize:isMobile?12:13,color:"#444",display:"flex",alignItems:"center",gap:10}}><img src={LOGO_NAV} style={{height:isMobile?24:32,width:"auto",opacity:0.55}} alt=""/>© 2026 Parabolic</span>
-          <a href="https://x.com/parabolic" target="_blank" rel="noopener noreferrer" aria-label="Follow @parabolic on X"
+          <a href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Follow @betparabolic on X"
             style={{display:"flex",alignItems:"center",justifyContent:"center",width:isMobile?32:36,height:isMobile?32:36,borderRadius:8,background:"transparent",border:"1px solid #2a2a2a",cursor:"pointer",transition:"all .15s",color:"#888"}}
             onMouseOver={(e)=>{e.currentTarget.style.color="#fff";e.currentTarget.style.borderColor="#444";}}
             onMouseOut={(e)=>{e.currentTarget.style.color="#888";e.currentTarget.style.borderColor="#2a2a2a";}}>
