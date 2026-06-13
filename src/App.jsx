@@ -63,7 +63,7 @@ export default function App() {
         *{box-sizing:border-box;margin:0;padding:0;}
       `}</style>
       {page==="landing"
-        ? <LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>window.open("https://docs.perpdictions.com/docs","_blank","noopener,noreferrer")}/>
+        ? <LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>window.open("https://docs.parabolic.gg/docs","_blank","noopener,noreferrer")}/>
         : <Suspense fallback={<Splash/>}>
             {page==="live-trading"&&liveGame
               ? <LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
