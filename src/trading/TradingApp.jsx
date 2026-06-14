@@ -852,9 +852,10 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
               </div>
             </div>
 
-            {/* Summary */}
-            <div style={{background:"#0a0a0a",borderRadius:12,padding:"10px 12px",marginBottom:14,fontSize:12}}>
-              {[["Entry",(entryP*100).toFixed(1)+"¢","#fff"],["Exposure",fmtUsd(expo),"#fff"],["Liquidation",(liqP*100).toFixed(1)+"¢",B.red]].map(([l,v,c])=>(
+            {/* Summary + liquidation callout + warnings */}
+            {(()=>{const estFee=expo*0.001;const liqDist=oracle.price>0?Math.abs(oracle.price-liqP)/oracle.price*100:0;const liqCol=liqDist>15?B.green:liqDist>5?"#ff9f1c":B.red;const balPct=balance>0?eM/balance*100:0;return(<>
+            <div style={{background:"#0a0a0a",borderRadius:12,padding:"10px 12px",marginBottom:10,fontSize:12}}>
+              {[["Entry",(entryP*100).toFixed(1)+"¢","#fff"],["Exposure",fmtUsd(expo),"#fff"],["Est. Fee (10 bps)",fmtUsd(estFee),"#888"]].map(([l,v,c])=>(
                 <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 0"}}>
                   <span style={{color:"#555"}}>{l}</span><span style={{color:c,fontWeight:600,fontFamily:fm}}>{v}</span>
                 </div>
@@ -869,6 +870,22 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
                 <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>-{fmtUsd(eM)}</span>
               </div>
             </div>
+            {/* Liquidation callout */}
+            <div style={{background:liqCol+"10",border:"1px solid "+liqCol+"30",borderRadius:10,padding:"10px 12px",marginBottom:10,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{fontSize:18,flexShrink:0}}>{liqDist>15?"🟢":liqDist>5?"🟡":"🔴"}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:liqCol,fontFamily:fm}}>Liquidation @ {(liqP*100).toFixed(1)}¢</div>
+                <div style={{fontSize:10,color:"#888",marginTop:2}}>{liqDist.toFixed(1)}% from current price</div>
+              </div>
+            </div>
+            {/* Warnings */}
+            {balPct>50&&<div style={{fontSize:11,color:"#ff9f1c",marginBottom:8,padding:"6px 10px",background:"#ff9f1c10",borderRadius:8,border:"1px solid #ff9f1c22"}}>
+              Using {balPct.toFixed(0)}% of your balance
+            </div>}
+            {eL>=ml&&ml<10&&<div style={{fontSize:11,color:B.red,marginBottom:8,padding:"6px 10px",background:B.red+"10",borderRadius:8,border:"1px solid "+B.red+"22"}}>
+              Maximum leverage — higher liquidation risk
+            </div>}
+            </>);})()}
 
             {/* Reduce Only toggle */}
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 10px",background:reduceOnly?"#1fd18210":"#0a0a0a",borderRadius:10,border:"1px solid "+(reduceOnly?B.primary+"30":"#1a1a1a"),cursor:"pointer"}} onClick={()=>setReduceOnly(r=>!r)}>
