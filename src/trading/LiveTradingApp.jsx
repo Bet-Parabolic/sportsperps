@@ -5,6 +5,7 @@ import { API_URL } from "../lib/constants.js";
 import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
+import { subscribeLive } from "../lib/liveSocket.js";
 import { AwayMarkerDot, HomeMarkerDot } from "../lib/markers.jsx";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
@@ -67,6 +68,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const mR   = useRef(oMark);    mR.current   = oMark;
   const posR = useRef(positions); posR.current = positions;
   const limR = useRef(limitOrders); limR.current = limitOrders;
+  const pollRef = useRef(null);  // latest poll() — lets WS events trigger reconciliation early
 
   // ── derived team objects ────────────────────────────────────────────────
   const HOME = useMemo(() => ({
@@ -307,10 +309,28 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       } catch(e) {}
     };
 
+    pollRef.current = poll;
     poll();
     const iv = setInterval(poll, 5000);
     return () => clearInterval(iv);
   }, [initGame.id, settled, userId]);
+
+  // ── real-time push: instant liquidation + settlement via shared WS ────────
+  // Backend broadcasts these from its 5s block loop; without this they'd only
+  // surface on the next local poll (up to 5s late, and liquidations were silent).
+  useEffect(() => {
+    if (initGame._espnKey) return; // ESPN-only games aren't backed by the CLOB
+    const unsub = subscribeLive((msg) => {
+      if (msg.gameId !== g.id) return;
+      if (msg.type === 'liquidation' && msg.userId === userId) {
+        notify('☠ LIQUIDATED — ' + fmtUsd(msg.pnl ?? 0), 'red');
+        pollRef.current?.(); // reconcile positions/balance immediately
+      } else if (msg.type === 'settlement') {
+        pollRef.current?.(); // poll() detects final state + settles
+      }
+    });
+    return unsub;
+  }, [g.id, userId, initGame._espnKey, notify]);
 
   // ── placeOrder (backend CLOB) ────────────────────────────────────────────
   const placeOrder = useCallback(async () => {
