@@ -1,5 +1,7 @@
 /* ─── Backend API ─── */
 export const API_URL = "https://perpdictions-backend-production.up.railway.app/api";
+/* WebSocket — derived from API_URL: https→wss, /api→/ws */
+export const WS_URL = API_URL.replace(/^http/, "ws").replace(/\/api$/, "/ws");
 
 /* ─── ESPN scoreboard sources for sidebar / sport tabs ─── */
 export const ESPN_SOURCES = [

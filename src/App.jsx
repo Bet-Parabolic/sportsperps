@@ -1,9 +1,9 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, lazy, Suspense } from "react";
 
 import { FONT_URL } from "./lib/theme.js";
-import { API_URL } from "./lib/constants.js";
 import { PROC_GAMES } from "./lib/games.js";
 import { LOGO_MARK } from "./lib/logos.js";
+import { useLiveGames } from "./lib/useLiveGames.js";
 
 import { LandingPage } from "./components/LandingPage.jsx";
 const TradingApp = lazy(() => import("./trading/TradingApp.jsx").then(m => ({ default: m.TradingApp })));
@@ -21,29 +21,14 @@ const Splash = () => (
 export default function App() {
   const [page, setPage] = useState("landing");
   const [sel, setSel] = useState(PROC_GAMES[0]);
-  const [liveGames, setLiveGames] = useState([]);
   const [liveGame, setLiveGame] = useState(null);
   const [tradingTab, setTradingTab] = useState("game");
   const pick = (g) => { setSel(g); setPage("trading"); };
   const tradeLive = (g) => { setLiveGame(g); setPage("live-trading"); };
   const navTo = (tab) => { setTradingTab(tab); setPage("trading"); };
 
-  // Poll backend every 15s for live games (NBA, NCAAM, MLB, NFL, NHL, MLS)
-  useEffect(() => {
-    const fetchGames = async () => {
-      try {
-        const res = await fetch(`${API_URL}/games`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setLiveGames(data.games || []);
-      } catch (err) {
-        console.log("[API] Backend not available, using demo games only");
-      }
-    };
-    fetchGames();
-    const iv = setInterval(fetchGames, 15000);
-    return () => clearInterval(iv);
-  }, []);
+  // Real-time games over WebSocket (init + game_update push), REST fallback.
+  const liveGames = useLiveGames();
 
   return (
     <div>
