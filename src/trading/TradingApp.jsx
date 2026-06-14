@@ -6,7 +6,7 @@ import { API_URL, ESPN_SOURCES, LIVE_STATUS } from "../lib/constants.js";
 import { calcPnL, clamp, fmt3, fmtPct, fmtShares, fmtUsd, getGameState, liqPrice, makeBook, makeSources, maxLev, pctClr, periodLabel, weightedMedian } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { BOX } from "../lib/games.js";
-import { AwayMarkerDot, HomeMarkerDot } from "../lib/markers.jsx";
+import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { LeaderboardPage } from "../components/LeaderboardPage.jsx";
 import { BasketballPage } from "../components/sports/BasketballPage.jsx";
@@ -93,15 +93,29 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
   const notify=useCallback((msg,type)=>{const id=Date.now()+Math.random();setNotifs(p=>[...p.slice(-3),{id,msg,type:type||"info"}]);setTimeout(()=>setNotifs(p=>p.filter(n=>n.id!==id)),5000);},[]);
   const addMark=useCallback((t,p,mt,line)=>{setMarkers(prev=>[...prev,{t:+t.toFixed(2),p,markerType:mt,line:line||"home"}]);},[]);
   const liqLines=useMemo(()=>positions.map(pos=>({id:pos.id,side:pos.side,liq:pos.liq,liqOnChart:pos.side==="home"?pos.liq:1-pos.liq})),[positions]);
+  // Determine which team scored on each scoring play (for chart markers)
+  const scoringTeams=useMemo(()=>{
+    const m={};let ph=0,pa=0;
+    [...SCORING_PLAYS].sort((a,b)=>a.t-b.t).forEach(sp=>{
+      const team=sp.hs>ph?"home":sp.as>pa?"away":"home";
+      const pts=team==="home"?sp.hs-ph:sp.as-pa;
+      m[sp.t]={team,label:pts>0?"+"+pts:"●"};ph=sp.hs;pa=sp.as;
+    });
+    return m;
+  },[SCORING_PLAYS]);
   const merged=useMemo(()=>{
-    const data=chartData.map(d=>({...d,mh_val:null,mh_marker:null,ma_val:null,ma_marker:null}));
+    const data=chartData.map(d=>({...d,mh_val:null,mh_marker:null,ma_val:null,ma_marker:null,score_val:null,score_marker:null}));
     for(const m of markers){let best=0;for(let i=1;i<data.length;i++){if(Math.abs(data[i].t-m.t)<Math.abs(data[best].t-m.t))best=i;}
     if(Math.abs(data[best].t-m.t)<0.5){if(m.line==="away"){data[best].ma_val=1-m.p;data[best].ma_marker=m.markerType;}else{data[best].mh_val=m.p;data[best].mh_marker=m.markerType;}}
     else{const idx=data.findIndex(d=>d.t>m.t);const refI=Math.max(0,(idx===-1?data.length:idx)-1);const ref=data[refI];
-    const pt={t:m.t,ph:m.p,pa:1-m.p,floor:ref.floor,ceil:ref.ceil,mh_val:null,mh_marker:null,ma_val:null,ma_marker:null};
+    const pt={t:m.t,ph:m.p,pa:1-m.p,floor:ref.floor,ceil:ref.ceil,mh_val:null,mh_marker:null,ma_val:null,ma_marker:null,score_val:null,score_marker:null};
     if(m.line==="away"){pt.ma_val=1-m.p;pt.ma_marker=m.markerType;}else{pt.mh_val=m.p;pt.mh_marker=m.markerType;}
-    if(idx===-1)data.push(pt);else data.splice(idx,0,pt);}} return data;
-  },[chartData,markers]);
+    if(idx===-1)data.push(pt);else data.splice(idx,0,pt);}}
+    // tag scoring-play markers on the nearest point
+    for(const sp of visScoring){if(!data.length)break;let best=0;for(let i=1;i<data.length;i++){if(Math.abs(data[i].t-sp.t)<Math.abs(data[best].t-sp.t))best=i;}
+      if(Math.abs(data[best].t-sp.t)<1){data[best].score_val=data[best].ph;data[best].score_marker=scoringTeams[sp.t]||{team:"home",label:"●"};}}
+    return data;
+  },[chartData,markers,visScoring,scoringTeams]);
 
   useEffect(()=>{if(!playing||settled)return;const iv=setInterval(()=>{setGameTime(prev=>{
     const dt=(0.1*speed)/60,next=Math.min(prev+dt,60),gst=getGameState(next,PLAYS),sources=makeSources(gst.prob);
@@ -495,6 +509,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
                   <Area type="natural" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#ag)" dot={false} animationDuration={0} baseValue={0}/>
                   <Scatter dataKey="mh_val" shape={<HomeMarkerDot/>} isAnimationActive={false}/>
                   <Scatter dataKey="ma_val" shape={<AwayMarkerDot/>} isAnimationActive={false}/>
+                  <Scatter dataKey="score_val" shape={<ScoreMarkerDot/>} isAnimationActive={false}/>
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

@@ -41,6 +41,19 @@ export function HomeMarkerDot({cx,cy,payload}){
   return null;
 }
 
+/* Scoring-play marker: a colored bolt above the price line at the moment a
+   team scored. payload.score_marker = { team:'home'|'away', label:'+7' }. */
+export function ScoreMarkerDot({cx,cy,payload}){
+  if(!payload||!payload.score_marker||cx==null||cy==null)return null;
+  const m=payload.score_marker;
+  const col=m.team==="home"?"#1fd182":"#ff5247";
+  return(<g>
+    <line x1={cx} y1={cy} x2={cx} y2={cy-20} stroke={col} strokeWidth={1} strokeDasharray="2 2" opacity={0.45}/>
+    <circle cx={cx} cy={cy} r={3.5} fill={col} stroke="#06070a" strokeWidth={1.5}/>
+    <text x={cx} y={cy-24} textAnchor="middle" fontSize={9} fontWeight={800} fill={col} fontFamily="ui-monospace,monospace">⚡{m.label}</text>
+  </g>);
+}
+
 export function AwayMarkerDot({cx,cy,payload}){
   if(!payload||!payload.ma_marker||cx==null||cy==null)return null;
   const m=payload.ma_marker;

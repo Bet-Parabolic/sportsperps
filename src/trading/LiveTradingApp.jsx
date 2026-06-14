@@ -6,7 +6,7 @@ import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, 
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
 import { subscribeLive } from "../lib/liveSocket.js";
-import { AwayMarkerDot, HomeMarkerDot } from "../lib/markers.jsx";
+import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
 
@@ -69,6 +69,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const posR = useRef(positions); posR.current = positions;
   const limR = useRef(limitOrders); limR.current = limitOrders;
   const pollRef = useRef(null);  // latest poll() — lets WS events trigger reconciliation early
+  const lastScoreIdRef = useRef(null);          // dedupe scoring plays across polls
+  const prevScoreRef = useRef({ h: 0, a: 0 });  // detect which team just scored
 
   // ── derived team objects ────────────────────────────────────────────────
   const HOME = useMemo(() => ({
@@ -156,6 +158,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     setSettled(false);
     setSettledWinner(null);
     setLimitOrders([]);
+    lastScoreIdRef.current = null;
+    prevScoreRef.current = { h: 0, a: 0 };
     // positions, balance, closedPos, closedPnL preserved intentionally
   }, [initGame.id, initGame]);
 
@@ -223,6 +227,17 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           setOSrcs(upd.oracle.sources || []);
           setOConf(upd.oracle.confidence || 0.5);
 
+          // detect a fresh scoring play to mark on the chart
+          let scoreMarker = null;
+          const lp = upd.latestPlay;
+          if (lp?.scoringPlay && lp.id !== lastScoreIdRef.current) {
+            lastScoreIdRef.current = lp.id;
+            const team = (lp.homeScore||0) > prevScoreRef.current.h ? 'home'
+                       : (lp.awayScore||0) > prevScoreRef.current.a ? 'away' : 'home';
+            scoreMarker = { team, label: lp.scoreValue>0 ? '+'+lp.scoreValue : '●' };
+          }
+          if (lp) prevScoreRef.current = { h: lp.homeScore||0, a: lp.awayScore||0 };
+
           // append chart point
           setChartT0(prev => {
             const ref = prev || Date.now();
@@ -233,6 +248,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               t, ph: op, pa: 1-op, mp,
               floor: clamp(op-0.2,0.01,0.99), ceil: clamp(op+0.2,0.01,0.99),
               mh_val:null, mh_marker:null, ma_val:null, ma_marker:null,
+              score_val: scoreMarker ? op : null, score_marker: scoreMarker,
             }]);
             return prev || ref;
           });
@@ -686,6 +702,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <Area type="natural" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
                     <Scatter dataKey="mh_val" shape={<HomeMarkerDot/>} isAnimationActive={false}/>
                     <Scatter dataKey="ma_val" shape={<AwayMarkerDot/>} isAnimationActive={false}/>
+                    <Scatter dataKey="score_val" shape={<ScoreMarkerDot/>} isAnimationActive={false}/>
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
