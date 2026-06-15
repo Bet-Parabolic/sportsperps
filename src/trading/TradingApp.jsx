@@ -1143,9 +1143,9 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
       {settled&&(
         <div style={{position:"fixed",inset:0,zIndex:40,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,.85)",backdropFilter:"blur(20px)"}}>
           <div style={{textAlign:"center",padding:"48px 56px",maxWidth:440,background:"#111",borderRadius:24,border:"1px solid #2a2a2a"}}>
-            {(()=>{const wT=gs.hs>=gs.as?HOME:AWAY;const lT=gs.hs>=gs.as?AWAY:HOME;return(<>
-            <div style={{fontSize:56,marginBottom:16}}>{wT.logo}</div>
-            <div style={{fontSize:28,fontWeight:800,color:wT.light,marginBottom:6}}>{wT.name} defeat {lT.name}</div>
+            {(()=>{const draw=gs.hs===gs.as;const wT=gs.hs>=gs.as?HOME:AWAY;const lT=gs.hs>=gs.as?AWAY:HOME;return(<>
+            <div style={{fontSize:56,marginBottom:16}}>{draw?"🤝":wT.logo}</div>
+            <div style={{fontSize:28,fontWeight:800,color:draw?"#fff":wT.light,marginBottom:6}}>{draw?`${HOME.name} draw ${AWAY.name}`:`${wT.name} defeat ${lT.name}`}</div>
             <div style={{fontSize:18,color:"#888",fontFamily:fm,marginBottom:4}}>{gs.hs} – {gs.as}</div></>);})()}
             <div style={{fontSize:13,color:"#555",marginBottom:24}}>{G.label}</div>
             <div style={{fontSize:40,fontWeight:800,color:totalEq>=10000?B.green:"#ef4444",fontFamily:fm,marginBottom:4}}>{fmtUsd(totalEq)}</div>
