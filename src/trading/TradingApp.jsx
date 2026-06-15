@@ -15,14 +15,14 @@ import { NFLPage } from "../components/sports/NFLPage.jsx";
 import { HockeyPage } from "../components/sports/HockeyPage.jsx";
 import { SoccerPage } from "../components/sports/SoccerPage.jsx";
 import { MMAPage } from "../components/sports/MMAPage.jsx";
-import { TrendingPage } from "../components/sports/TrendingPage.jsx";
+import { HomePage } from "../components/sports/HomePage.jsx";
 import { DemosPage } from "../components/sports/DemosPage.jsx";
 
 export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames = [], onTrade, initialTab }) {
   const G=game,HOME=G.home,AWAY=G.away,PLAYS=G.plays,SCORING_PLAYS=G.scoringPlays,initProb=PLAYS[0].p;
   const [gameTime,setGameTime]=useState(0);const [playing,setPlaying]=useState(false);const [speed,setSpeed]=useState(10);
   const [sportTab,setSportTab]=useState("Live");
-  const [terminalPage,setTerminalPage]=useState(initialTab||"game");
+  const [terminalPage,setTerminalPage]=useState(initialTab||"home");
   const [showProfile, setShowProfile] = useState(false);
   const [userId] = useState(() => {
     let id = localStorage.getItem('perpdictions_userId');
@@ -248,29 +248,29 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
 
         {/* CENTER — sport tabs (natural width, centered) */}
         <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",justifySelf:"center",maxWidth:"100%",minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
-          {["Demos","Live","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"].map((sport)=>{
-            const isActive = sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Live"?terminalPage==="trending":sport==="Leaderboard"?terminalPage==="leaderboard":terminalPage==="game"&&sportTab===sport;
+          {["Home","Demos","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"].map((sport)=>{
+            const isActive = sport==="Home"?terminalPage==="home":sport==="Demos"?terminalPage==="demos":sport==="Basketball"?terminalPage==="basketball":sport==="Baseball"?terminalPage==="baseball":sport==="Soccer"?terminalPage==="soccer":sport==="Hockey"?terminalPage==="hockey":sport==="MMA"?terminalPage==="mma":sport==="Football"?terminalPage==="nfl":sport==="Leaderboard"?terminalPage==="leaderboard":terminalPage==="game"&&sportTab===sport;
             return (
             <button key={sport} onClick={()=>{
-              if(sport==="Demos"){setTerminalPage("demos");}
+              if(sport==="Home"){setTerminalPage("home");}
+              else if(sport==="Demos"){setTerminalPage("demos");}
               else if(sport==="Basketball"){setTerminalPage("basketball");}
               else if(sport==="Baseball"){setTerminalPage("baseball");}
               else if(sport==="Soccer"){setTerminalPage("soccer");}
               else if(sport==="Hockey"){setTerminalPage("hockey");}
               else if(sport==="MMA"){setTerminalPage("mma");}
               else if(sport==="Football"){setTerminalPage("nfl");}
-              else if(sport==="Live"){setTerminalPage("trending");}
               else if(sport==="Leaderboard"){setTerminalPage("leaderboard");}
               else{setTerminalPage("game");setSportTab(sport);}
             }} style={{padding:isMobile?"4px 8px":"6px 14px",fontSize:isMobile?10:12,fontWeight:isActive?600:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
               background:isActive?B.primary+"20":"transparent",color:isActive?"#fff":"#666"}}>
-              {sport==="Live"
+              {sport==="Home"
                 ? <span style={{display:"flex",alignItems:"center",gap:5}}>
-                    <span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite",flexShrink:0}}/>
-                    Live
+                    {sportCounts.live>0&&<span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite",flexShrink:0}}/>}
+                    Home
                   </span>
                 : sport}{(() => {
-                  const c = sport==="Live"?sportCounts.live:sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.soccer:sport==="MMA"?sportCounts.ufc:null;
+                  const c = sport==="Home"?sportCounts.live:sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.soccer:sport==="MMA"?sportCounts.ufc:null;
                   return c>0?<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({c})</span>:null;
                 })()}</button>
           );})}
@@ -290,14 +290,14 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
       {/* BODY */}
       <div style={{display:"flex",height:isMobile?"auto":"calc(100vh - 56px)",flexDirection:isMobile?"column":"row",minHeight:isMobile?"calc(100vh - 56px)":"auto"}}>
 
-        {terminalPage==="demos"?<DemosPage onSelectGame={(g)=>{onSwitchGame(g);setTerminalPage("game");}} currentGameId={G.id}/>
+        {terminalPage==="home"?<HomePage liveGames={liveGames} onTrade={onTrade}/>
+        :terminalPage==="demos"?<DemosPage onSelectGame={(g)=>{onSwitchGame(g);setTerminalPage("game");}} currentGameId={G.id}/>
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="soccer"?<SoccerPage data={espnData.wcup} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="hockey"?<HockeyPage data={espnData.nhl} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
         :terminalPage==="nfl"?<NFLPage data={espnData.nfl} onTrade={onTrade} liveGames={liveGames}/>
-        :terminalPage==="trending"?<TrendingPage liveGames={liveGames} espnData={espnData} onTrade={onTrade}/>
         :terminalPage==="leaderboard"?<LeaderboardPage userId={userId}/>
         :<>
 

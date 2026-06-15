@@ -19,13 +19,30 @@ const Splash = () => (
    ROOT — page router + global styles
    ═══════════════════════════════════════════════════════════ */
 export default function App() {
-  const [page, setPage] = useState("landing");
+  // Domain split: app.parabolic.gg → terminal; parabolic.gg → landing.
+  // Same deploy serves both; on localhost / *.vercel.app we stay single-origin.
+  const host = typeof window !== "undefined" ? window.location.hostname : "";
+  const isAppDomain = /^app\./.test(host);
+  const isProdLanding = host === "parabolic.gg" || host === "www.parabolic.gg";
+
+  const [page, setPage] = useState(isAppDomain ? "trading" : "landing");
   const [sel, setSel] = useState(PROC_GAMES[0]);
   const [liveGame, setLiveGame] = useState(null);
-  const [tradingTab, setTradingTab] = useState("game");
+  const [tradingTab, setTradingTab] = useState("home");
   const pick = (g) => { setSel(g); setPage("trading"); };
   const tradeLive = (g) => { setLiveGame(g); setPage("live-trading"); };
   const navTo = (tab) => { setTradingTab(tab); setPage("trading"); };
+
+  // Launch App: from the marketing domain, cross over to the app subdomain.
+  const launchApp = () => {
+    if (isProdLanding) window.location.href = "https://app.parabolic.gg";
+    else setPage("trading");
+  };
+  // Exit terminal: on the app subdomain, go back to the marketing site.
+  const goLanding = () => {
+    if (isAppDomain) window.location.href = "https://parabolic.gg";
+    else setPage("landing");
+  };
 
   // Real-time games over WebSocket (init + game_update push), REST fallback.
   const liveGames = useLiveGames();
@@ -48,12 +65,12 @@ export default function App() {
         *{box-sizing:border-box;margin:0;padding:0;}
       `}</style>
       {page==="landing"
-        ? <LandingPage onLaunch={()=>setPage("trading")} onDocs={()=>window.open("https://docs.parabolic.gg/docs","_blank","noopener,noreferrer")}/>
+        ? <LandingPage onLaunch={launchApp} onDocs={()=>window.open("https://docs.parabolic.gg/docs","_blank","noopener,noreferrer")}/>
         : <Suspense fallback={<Splash/>}>
             {page==="live-trading"&&liveGame
               ? <LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
               : sel
-                ? <TradingApp game={sel} onBack={()=>setPage("landing")} onChangeGame={()=>setPage("landing")} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>
+                ? <TradingApp game={sel} onBack={goLanding} onChangeGame={goLanding} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>
                 : null}
           </Suspense>}
     </div>
