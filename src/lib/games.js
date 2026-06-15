@@ -85,6 +85,27 @@ export const GAMES = [
       [60,1.0,111,110,4,"FINAL","🏆 PACERS 111-110!!",true],
     ],
   },
+  {
+    id: "wc-ned-jpn", sport: "Soccer", label: "World Cup Round of 16",
+    subtitle: "Jun 28, 2026 · New York", tagline: "Netherlands roar back from 2-0 down to stun Japan",
+    emoji: "⚽",
+    home: { name: "Netherlands", short: "NED", logo: "🇳🇱", light: "#f97316" },
+    away: { name: "Japan", short: "JPN", logo: "🇯🇵", light: "#3b82f6" },
+    xTick: v => { if(v>=60)return"FT"; const m=Math.round(v*1.5); return m+"'"; },
+    periodLabel: q => q===0?"HT":q===1?"1H":"2H", playsLabel: "KEY MOMENTS",
+    raw: [
+      [0,.70,0,0,1,"1'","Kick-off — Oranje the favorites",false],[4,.68,0,0,1,"9'","Depay drags an effort wide",false],
+      [8,.50,0,1,1,"19'","⚡ JPN GOAL — Mitoma slots it!",true],[12,.46,0,1,1,"28'","Netherlands chase the equalizer",false],
+      [16,.31,0,2,1,"39'","⚡ JPN GOAL — Kubo curls it in!",true],[20,.30,0,2,1,"45'+1","Japan see out the half",false],
+      [22,.30,0,2,0,"HT","HALFTIME — Japan stun Oranje 2-0",false],[24,.34,0,2,2,"48'","Netherlands come out flying",false],
+      [28,.48,1,2,2,"56'","⚡ NED GOAL — Gakpo heads home!",true],[32,.53,1,2,2,"64'","Oranje pour forward",false],
+      [36,.67,2,2,2,"72'","⚡ NED GOAL — Depay levels it!",true],[40,.64,2,2,2,"78'","End to end at MetLife",false],
+      [44,.58,2,2,2,"83'","Verbruggen denies Kamada!",false],[48,.73,2,2,2,"88'","Netherlands win a corner...",false],
+      [52,.91,3,2,2,"90'","⚡⚡ WEGHORST WINNER!! 3-2!!",true],[56,.93,3,2,2,"90+3'","Japan throw bodies forward",false],
+      [58,.97,3,2,2,"90+6'","Verbruggen claims the cross",false],
+      [60,1.0,3,2,2,"FT","🏆 NETHERLANDS WIN 3-2!!",true],
+    ],
+  },
 ];
 
 export function processGame(g) {
@@ -119,5 +140,12 @@ export const BOX = {
     pass:{h:[["T. Haliburton","22 pts","8 reb","10 ast","GW"],["B. Mathurin","27 pts","3 reb","2 ast",""],["P. Siakam","20 pts","7 reb","4 ast",""],["M. Turner","18 pts","11 reb","2 blk",""]],a:[["S. Gilgeous-Alexander","38 pts","5 reb","8 ast",""],["J. Williams","19 pts","8 reb","5 ast",""],["C. Holmgren","15 pts","12 reb","5 blk",""],["A. Caruso","12 pts","3 reb","4 stl",""]]},
     rush:{h:[],a:[]},rec:{h:[],a:[]},def:{h:[],a:[]},
     passH:["Player","PTS","REB","AST","Note"],rushH:[],recH:[],defH:[]
+  },
+  "wc-ned-jpn": {
+    qtr:[{q:"1H",h:0,a:2},{q:"2H",h:3,a:0}],
+    team:[["Possession","58%","42%"],["Shots","17","9"],["On Target","8","5"],["Corners","7","3"],["Fouls","11","14"],["Offsides","2","1"],["Saves","3","5"]],
+    pass:{h:[["C. Gakpo","56'","Header",""],["M. Depay","72'","Right foot",""],["W. Weghorst","90'","Left foot","GW"]],a:[["K. Mitoma","19'","Left foot",""],["T. Kubo","39'","Curler",""]]},
+    rush:{h:[],a:[]},rec:{h:[],a:[]},def:{h:[],a:[]},
+    passH:["Scorer","Min","Type","Note"],rushH:[],recH:[],defH:[]
   }
 };
