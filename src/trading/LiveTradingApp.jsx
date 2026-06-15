@@ -837,9 +837,39 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   ))}
                 </div>
               ))}
-              {bottomTab==='boxscore'&&(
-                <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>Box score available after game ends</div>
-              )}
+              {bottomTab==='boxscore'&&(()=>{
+                const teams = g.boxscore?.teams || [];
+                if (teams.length < 2) return (
+                  <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>
+                    {settled ? 'Box score unavailable for this game.' : 'Box score updates as the game progresses…'}
+                  </div>
+                );
+                const homeT = teams.find(t=>t.team===HOME.name) || teams[0];
+                const awayT = teams.find(t=>t.team===AWAY.name) || teams[1];
+                const awayByName = Object.fromEntries((awayT.stats||[]).map(s=>[s.name, s.value]));
+                const rows = (homeT.stats||[]).filter(s=>awayByName[s.name]!==undefined);
+                if (!rows.length) return (
+                  <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>Box score updates as the game progresses…</div>
+                );
+                return (
+                  <div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2px 8px 10px'}}>
+                      <span style={{fontSize:12,fontWeight:800,color:HOME.light,fontFamily:fm}}>{HOME.short}</span>
+                      {!settled&&<span style={{display:'flex',alignItems:'center',gap:5,fontSize:9,fontWeight:700,color:B.green,fontFamily:fm,letterSpacing:'0.06em'}}>
+                        <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>LIVE
+                      </span>}
+                      <span style={{fontSize:12,fontWeight:800,color:AWAY.light,fontFamily:fm}}>{AWAY.short}</span>
+                    </div>
+                    {rows.map((s,i)=>(
+                      <div key={s.name} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 8px',background:i%2===0?'#0a0a0a':'transparent',borderRadius:8}}>
+                        <span style={{flex:'0 0 72px',fontSize:13,fontWeight:700,color:'#fff',fontFamily:fm,textAlign:'left'}}>{s.value}</span>
+                        <span style={{flex:1,fontSize:11,color:'#888',textAlign:'center'}}>{s.displayName||s.name}</span>
+                        <span style={{flex:'0 0 72px',fontSize:13,fontWeight:700,color:'#fff',fontFamily:fm,textAlign:'right'}}>{awayByName[s.name]}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
