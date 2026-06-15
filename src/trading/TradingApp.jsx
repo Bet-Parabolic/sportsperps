@@ -111,9 +111,9 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
     const pt={t:m.t,ph:m.p,pa:1-m.p,floor:ref.floor,ceil:ref.ceil,mh_val:null,mh_marker:null,ma_val:null,ma_marker:null,score_val:null,score_marker:null};
     if(m.line==="away"){pt.ma_val=1-m.p;pt.ma_marker=m.markerType;}else{pt.mh_val=m.p;pt.mh_marker=m.markerType;}
     if(idx===-1)data.push(pt);else data.splice(idx,0,pt);}}
-    // tag scoring-play markers on the nearest point
+    // tag scoring-play markers on the nearest point — on the scoring team's own line
     for(const sp of visScoring){if(!data.length)break;let best=0;for(let i=1;i<data.length;i++){if(Math.abs(data[i].t-sp.t)<Math.abs(data[best].t-sp.t))best=i;}
-      if(Math.abs(data[best].t-sp.t)<1){data[best].score_val=data[best].ph;data[best].score_marker=scoringTeams[sp.t]||{team:"home",label:"●"};}}
+      if(Math.abs(data[best].t-sp.t)<1){const sm=scoringTeams[sp.t]||{team:"home",label:"●"};data[best].score_val=sm.team==="away"?data[best].pa:data[best].ph;data[best].score_marker=sm;}}
     return data;
   },[chartData,markers,visScoring,scoringTeams]);
 

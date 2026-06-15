@@ -248,7 +248,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               t, ph: op, pa: 1-op, mp,
               floor: clamp(op-0.2,0.01,0.99), ceil: clamp(op+0.2,0.01,0.99),
               mh_val:null, mh_marker:null, ma_val:null, ma_marker:null,
-              score_val: scoreMarker ? op : null, score_marker: scoreMarker,
+              score_val: scoreMarker ? (scoreMarker.team==='away' ? 1-op : op) : null, score_marker: scoreMarker,
             }]);
             return prev || ref;
           });
