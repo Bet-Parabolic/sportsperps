@@ -3,7 +3,7 @@ import { ESPN_SOURCES } from "../../lib/constants.js";
 import { periodLabel } from "../../lib/helpers.js";
 import { parseESPNEvent } from "../../lib/espn.js";
 import { MatchCard } from "../../components/shared/MatchCard.jsx";
-import { Grid, SectionHeader } from "../../components/shared/SportPageShell.jsx";
+import { Grid, SectionHeader, SkeletonCard } from "../../components/shared/SportPageShell.jsx";
 
 export function TrendingPage({ liveGames, espnData={}, onTrade }) {
   const loading = ESPN_SOURCES.some(s => espnData[s.key]?.loading !== false);
@@ -11,8 +11,8 @@ export function TrendingPage({ liveGames, espnData={}, onTrade }) {
   // Group backend live games by sport
   const backendLive = liveGames.filter(g => g.status==="live" || g.status==="halftime");
   const backendBySport = {};
-  const sportEmoji = {nba:"🏀",ncaam:"🏀",mlb:"⚾",nfl:"🏈",nhl:"🏒",mls:"⚽"};
-  const sportLabel = {nba:"BASKETBALL",ncaam:"BASKETBALL",mlb:"BASEBALL",nfl:"FOOTBALL",nhl:"HOCKEY",mls:"SOCCER"};
+  const sportEmoji = {nba:"🏀",ncaam:"🏀",mlb:"⚾",nfl:"🏈",nhl:"🏒",mls:"⚽",wcup:"🏆"};
+  const sportLabel = {nba:"BASKETBALL",ncaam:"BASKETBALL",mlb:"BASEBALL",nfl:"FOOTBALL",nhl:"HOCKEY",mls:"SOCCER",wcup:"WORLD CUP"};
   backendLive.forEach(g => {
     const key = g.league || "nba";
     if (!backendBySport[key]) backendBySport[key] = [];
@@ -42,11 +42,11 @@ export function TrendingPage({ liveGames, espnData={}, onTrade }) {
         </div>
         <h2 style={{fontFamily:fd,fontSize:28,fontWeight:800,letterSpacing:"-0.03em",color:"#fff",marginBottom:8}}>Live Right Now</h2>
         <p style={{fontSize:13,color:"#666",lineHeight:1.6}}>
-          {loading?"Fetching live games…":`All live action across NFL, NBA, MLB, NHL, and Champions League`}
+          {loading?"Fetching live games…":`All live action across the NFL, NBA, MLB, NHL, MLS, and World Cup`}
         </p>
       </div>
 
-      {loading&&<div style={{textAlign:"center",padding:"60px 0"}}><div style={{fontSize:36,marginBottom:12}}>📡</div><div style={{fontSize:13,color:"#555"}}>Loading live games…</div></div>}
+      {loading&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>{[0,1,2,3].map(i=><SkeletonCard key={i}/>)}</div>}
 
       {!loading&&totalLive===0&&(
         <div style={{textAlign:"center",padding:"60px 0"}}>

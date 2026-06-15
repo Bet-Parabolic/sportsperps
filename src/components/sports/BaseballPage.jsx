@@ -1,7 +1,7 @@
 import { B, fb, fd, fm } from "../../lib/theme.js";
 import { byDate, fmtGameTime, isRecent } from "../../lib/helpers.js";
 import { findBackendGame, parseESPNEvent } from "../../lib/espn.js";
-import { EmptyState } from "../../components/shared/SportPageShell.jsx";
+import { EmptyState, SkeletonCard } from "../../components/shared/SportPageShell.jsx";
 
 export function BaseballPage({ data={events:[],loading:true,error:false}, onTrade, liveGames=[] }) {
   const games  = data.events.map(parseESPNEvent);
@@ -99,9 +99,8 @@ export function BaseballPage({ data={events:[],loading:true,error:false}, onTrad
       </div>
 
       {data.loading && (
-        <div style={{textAlign:"center",padding:"60px 0"}}>
-          <div style={{fontSize:32,marginBottom:16}}>⚾</div>
-          <div style={{fontSize:13,color:"#555"}}>Loading MLB schedule…</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
+          {[0,1,2,3].map(i=><SkeletonCard key={i}/>)}
         </div>
       )}
 
