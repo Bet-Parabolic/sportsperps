@@ -106,6 +106,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const sportCounts = useMemo(() => {
     const live = liveGames.filter(g => g.status === 'live' || g.status === 'halftime');
     return {
+      live: live.length,
       nba: live.filter(g => !g.league || g.league === 'nba' || g.league === 'ncaam').length,
       nfl: live.filter(g => g.league === 'nfl').length,
       mlb: live.filter(g => g.league === 'mlb').length,
@@ -509,7 +510,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         </div>
         {/* CENTER — sport tabs */}
         <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
-          {[['demos','Demos',null],['trending','Live',sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.soccer],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.soccer],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
+          {[['demos','Demos',null],['trending','Live',sportCounts.live],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.soccer],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='trending'
                 ? <span style={{display:'flex',alignItems:'center',gap:5}}>

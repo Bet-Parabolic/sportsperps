@@ -1,15 +1,16 @@
 import { B, fd, fm } from "../../lib/theme.js";
 import { ESPN_SOURCES } from "../../lib/constants.js";
 import { periodLabel } from "../../lib/helpers.js";
-import { parseESPNEvent } from "../../lib/espn.js";
 import { MatchCard } from "../../components/shared/MatchCard.jsx";
 import { Grid, SectionHeader, SkeletonCard } from "../../components/shared/SportPageShell.jsx";
 
 export function TrendingPage({ liveGames, espnData={}, onTrade }) {
-  const loading = ESPN_SOURCES.some(s => espnData[s.key]?.loading !== false);
+  // The Live tab renders backend games only (they carry real odds + are tradeable).
+  const backendLive = liveGames.filter(g => g.status==="live" || g.status==="halftime");
+  // Only show skeletons before we have any backend games AND ESPN is still loading.
+  const loading = backendLive.length===0 && ESPN_SOURCES.some(s => espnData[s.key]?.loading !== false);
 
   // Group backend live games by sport
-  const backendLive = liveGames.filter(g => g.status==="live" || g.status==="halftime");
   const backendBySport = {};
   const sportEmoji = {nba:"🏀",ncaam:"🏀",mlb:"⚾",nfl:"🏈",nhl:"🏒",mls:"⚽",wcup:"🏆"};
   const sportLabel = {nba:"BASKETBALL",ncaam:"BASKETBALL",mlb:"BASEBALL",nfl:"FOOTBALL",nhl:"HOCKEY",mls:"SOCCER",wcup:"WORLD CUP"};
@@ -25,12 +26,7 @@ export function TrendingPage({ liveGames, espnData={}, onTrade }) {
     });
   });
 
-  const espnLive = ESPN_SOURCES.flatMap(s => {
-    const events = (espnData[s.key]?.events||[]).map(parseESPNEvent).filter(g => g.isLive);
-    return events.map(g => ({...g, _emoji: s.emoji, _label: s.label, _key: s.key}));
-  });
-
-  const totalLive = espnLive.length + backendLive.length;
+  const totalLive = backendLive.length;
 
   return (
     <div style={{flex:1,overflow:"auto",background:"#0a0a0a",padding:"32px 40px"}}>

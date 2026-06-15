@@ -61,6 +61,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
   const sportCounts = useMemo(() => {
     const countLive = evts => (evts||[]).filter(ev => LIVE_STATUS.includes(ev.status?.type?.name)).length;
     return {
+      live: liveGames.filter(g => g.status==="live"||g.status==="halftime").length,
       nba: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && (!g.league || g.league==="nba" || g.league==="ncaam")).length,
       nfl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="nfl").length || countLive(espnData.nfl?.events),
       mlb: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="mlb").length || countLive(espnData.mlb?.events),
@@ -269,7 +270,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
                     Live
                   </span>
                 : sport}{(() => {
-                  const c = sport==="Live"?(sportCounts.nba+sportCounts.nfl+sportCounts.mlb+sportCounts.nhl+sportCounts.soccer+(sportCounts.ufc||0)):sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.soccer:sport==="MMA"?sportCounts.ufc:null;
+                  const c = sport==="Live"?sportCounts.live:sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.soccer:sport==="MMA"?sportCounts.ufc:null;
                   return c>0?<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({c})</span>:null;
                 })()}</button>
           );})}
