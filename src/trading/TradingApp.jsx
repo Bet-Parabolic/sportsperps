@@ -240,9 +240,10 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
           <button onClick={onChangeGame} style={{background:"none",border:"none",cursor:"pointer",color:"#666",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:600,fontFamily:fb,padding:0}}>
             <ChevronRight size={16} style={{transform:"rotate(180deg)"}}/>
           </button>
-          <div style={{display:"flex",alignItems:"center",gap:isMobile?3:5}}>
-            <img src={LOGO_NAV} style={{height:isMobile?28:32,width:"auto"}} alt="Parabolic mark"/>
-            {!isMobile&&<img src={LOGO_WORDMARK} style={{height:22,width:"auto",marginLeft:8}} alt="Parabolic"/>}
+          <div style={{display:"flex",alignItems:"center"}}>
+            {isMobile
+              ? <img src={LOGO_NAV} style={{height:28,width:"auto"}} alt="Parabolic"/>
+              : <img src={LOGO_WORDMARK} style={{height:30,width:"auto"}} alt="Parabolic"/>}
           </div>
         </div>
 

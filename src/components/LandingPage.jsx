@@ -50,9 +50,8 @@ export function LandingPage({ onLaunch, onDocs }) {
       <div style={{position:"relative",zIndex:1}}>
         {/* CENTERED LOGO AT TOP — no nav bar */}
         <div style={{...a(0),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isMobile?"24px 16px 0":"40px 32px 0"}}>
-          <div style={{display:"flex",alignItems:"center",gap:0,cursor:"pointer"}} onClick={onLaunch}>
-            <img src={LOGO_NAV} style={{height:isMobile?96:160,width:"auto"}} alt="Parabolic mark"/>
-            <img src={LOGO_WORDMARK} style={{height:isMobile?28:46,width:"auto",marginLeft:isMobile?6:12}} alt="Parabolic"/>
+          <div style={{display:"flex",alignItems:"center",cursor:"pointer"}} onClick={onLaunch}>
+            <img src={LOGO_WORDMARK} style={{height:isMobile?40:60,width:"auto"}} alt="Parabolic"/>
           </div>
         </div>
 
