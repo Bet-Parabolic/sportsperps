@@ -118,6 +118,19 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
     return data;
   },[chartData,markers,visScoring,scoringTeams]);
 
+  // Chart zoom: time window (minutes) or 'all' + auto-scaled Y (trading-terminal framing)
+  const [zoomWin,setZoomWin]=useState('all');
+  const view=useMemo(()=>{
+    if(zoomWin==='all'||merged.length<2)return merged;
+    const last=merged[merged.length-1].t;const s=merged.filter(d=>d.t>=last-zoomWin);
+    return s.length>=2?s:merged;
+  },[merged,zoomWin]);
+  const yDomain=useMemo(()=>{
+    let lo=1,hi=0;for(const d of view){if(d.ph==null)continue;lo=Math.min(lo,d.ph,d.pa);hi=Math.max(hi,d.ph,d.pa);}
+    if(hi<=lo)return[0,1];const pad=Math.max(0.015,(hi-lo)*0.22);
+    return[Math.max(0,+(lo-pad).toFixed(4)),Math.min(1,+(hi+pad).toFixed(4))];
+  },[view]);
+
   useEffect(()=>{if(!playing||settled)return;const iv=setInterval(()=>{setGameTime(prev=>{
     const dt=(0.1*speed)/60,next=Math.min(prev+dt,60),gst=getGameState(next,PLAYS),sources=makeSources(gst.prob);
     const op=clamp(weightedMedian(sources),.01,.99),fl=clamp(op-.2,.01,.99),cl=clamp(op+.2,.01,.99);
@@ -479,36 +492,43 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
 
           {/* CHART — floating card */}
           <div style={{margin:isMobile?"8px 12px 0":"0 24px",background:"#111",borderRadius:16,border:"1px solid #1f1f1f",overflow:"hidden"}}>
-            <div style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #1f1f1f"}}>
-              <span style={{fontSize:13,fontWeight:600,color:"#888"}}>Win Probability</span>
-              <div style={{display:"flex",gap:16}}>
-                <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12}}>
+            <div style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #1f1f1f",flexWrap:"wrap",gap:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:14}}>
+                <span style={{fontSize:13,fontWeight:600,color:"#888"}}>Win Probability</span>
+                <span style={{display:"flex",alignItems:"center",gap:5,fontSize:12}}>
                   <span style={{width:12,height:3,borderRadius:2,background:B.green,display:"inline-block"}}/>
                   <span style={{color:B.green,fontWeight:700,fontFamily:fm}}>{(oracle.price*100).toFixed(1)}%</span>
                   <span style={{color:"#666"}}>{HOME.short}</span>
                 </span>
-                <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12}}>
+                <span style={{display:"flex",alignItems:"center",gap:5,fontSize:12}}>
                   <span style={{width:12,height:3,borderRadius:2,background:B.red,display:"inline-block"}}/>
                   <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>{(awayProb*100).toFixed(1)}%</span>
                   <span style={{color:"#666"}}>{AWAY.short}</span>
                 </span>
               </div>
+              <div style={{display:"flex",gap:2,background:"#0a0a0a",borderRadius:8,padding:2,border:"1px solid #1a1a1a"}}>
+                {[["5m",5],["15m",15],["1H",60],["All","all"]].map(([label,val])=>(
+                  <button key={label} onClick={()=>setZoomWin(val)} style={{padding:"3px 10px",fontSize:11,fontWeight:zoomWin===val?700:500,border:"none",cursor:"pointer",borderRadius:6,fontFamily:fm,
+                    background:zoomWin===val?B.primary+"22":"transparent",color:zoomWin===val?B.primaryLight:"#666"}}>{label}</button>
+                ))}
+              </div>
             </div>
-            <div style={{height:220,padding:"4px 8px 0"}}>
+            <div style={{height:240,padding:"4px 8px 0"}}>
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={merged} margin={{top:8,right:8,bottom:4,left:8}}>
+                <ComposedChart data={view} margin={{top:8,right:8,bottom:4,left:8}}>
                   <defs>
-                    <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={B.green} stopOpacity={0.18}/><stop offset="100%" stopColor={B.green} stopOpacity={0.01}/></linearGradient>
-                    <linearGradient id="ag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={B.red} stopOpacity={0.12}/><stop offset="100%" stopColor={B.red} stopOpacity={0.01}/></linearGradient>
+                    <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={B.green} stopOpacity={0.22}/><stop offset="100%" stopColor={B.green} stopOpacity={0.01}/></linearGradient>
+                    <linearGradient id="ag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={B.red} stopOpacity={0.14}/><stop offset="100%" stopColor={B.red} stopOpacity={0.01}/></linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="2 6" stroke="#ffffff04" vertical={false}/>
-                  <XAxis dataKey="t" tick={{fill:"#555",fontSize:10}} tickFormatter={G.xTick} axisLine={{stroke:"#1f1f1f"}} tickLine={false}/>
-                  <YAxis domain={[0,1]} tick={{fill:"#555",fontSize:10}} tickFormatter={v=>(v*100)+"%"} axisLine={false} tickLine={false} width={32} orientation="right"/>
-                  <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
-                  {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
+                  <CartesianGrid strokeDasharray="1 0" stroke="#ffffff08" vertical horizontal/>
+                  <XAxis dataKey="t" type="number" domain={['dataMin','dataMax']} tick={{fill:"#555",fontSize:9,fontFamily:fm}} tickFormatter={G.xTick} axisLine={{stroke:"#1f1f1f"}} tickLine={false}/>
+                  <YAxis domain={yDomain} tick={{fill:"#666",fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+"%"} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
+                  {yDomain[0]<0.5&&yDomain[1]>0.5&&<ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
+                  <ReferenceLine y={oracle.price} stroke={B.green} strokeWidth={1} strokeDasharray="2 3" strokeOpacity={0.6} label={(props)=>{const {viewBox}=props;const w=44;const x=viewBox.x+viewBox.width-w-1;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill={B.green}/><text x={x+w/2} y={y+3} textAnchor="middle" fill="#06070a" fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{(oracle.price*100).toFixed(1)}%</text></g>);}}/>
+                  {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
                   {limitOrders.map(lo=>{const ly=lo.side==="home"?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==="home"?B.green:B.red;return(<ReferenceLine key={"lo-"+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+"¢ LIMIT",position:"insideTopLeft",fontSize:9,fill:lc,fontFamily:fm}}/>);})}
-                  <Area type="natural" dataKey="ph" stroke={B.green} strokeWidth={2.25} fill="url(#hg)" dot={false} animationDuration={0} baseValue={0}/>
-                  <Area type="natural" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#ag)" dot={false} animationDuration={0} baseValue={0}/>
+                  <Area type="monotone" dataKey="ph" stroke={B.green} strokeWidth={2.25} fill="url(#hg)" dot={false} animationDuration={0} isAnimationActive={false}/>
+                  <Area type="monotone" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#ag)" dot={false} animationDuration={0} isAnimationActive={false}/>
                   <Scatter dataKey="mh_val" shape={<HomeMarkerDot/>} isAnimationActive={false}/>
                   <Scatter dataKey="ma_val" shape={<AwayMarkerDot/>} isAnimationActive={false}/>
                   <Scatter dataKey="score_val" shape={<ScoreMarkerDot/>} isAnimationActive={false}/>
