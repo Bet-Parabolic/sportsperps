@@ -123,7 +123,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
   },[chartData,markers,visScoring,scoringTeams]);
 
   // Chart zoom/pan — scroll wheel + drag (trading-terminal style); auto-scales Y to the window.
-  const { ref:chartRef, xDomain, yDomain, isZoomed, setWindow, bind:chartBind } = useChartZoom(merged, { yKeys:['ph','pa'] });
+  const { ref:chartRef, xDomain, yDomain, isZoomed, setWindow, bind:chartBind } = useChartZoom(merged, { lockY:true });
   const xTicks=useMemo(()=>{
     const t0=xDomain[0],t1=xDomain[1],span=t1-t0; if(!(span>0))return undefined;
     const step=span>40?10:span>16?5:span>6?2:span>2?1:0.5;
@@ -529,7 +529,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
                   <Tooltip content={<ChartTip home={HOME} away={AWAY} xFormat={G.xTick}/>} cursor={{stroke:"#ffffff22",strokeWidth:1}} isAnimationActive={false}/>
                   {yDomain[0]<0.5&&yDomain[1]>0.5&&<ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
                   <ReferenceLine y={oracle.price} stroke={B.green} strokeWidth={1} strokeDasharray="2 3" strokeOpacity={0.6} label={(props)=>{const {viewBox}=props;const w=44;const x=viewBox.x+viewBox.width-w-1;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill={B.green}/><text x={x+w/2} y={y+3} textAnchor="middle" fill="#06070a" fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{(oracle.price*100).toFixed(1)}%</text></g>);}}/>
-                  {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
+                  {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;const x=viewBox.x+viewBox.width-w-8;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
                   {limitOrders.map(lo=>{const ly=lo.side==="home"?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==="home"?B.green:B.red;return(<ReferenceLine key={"lo-"+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+"¢ LIMIT",position:"insideTopLeft",fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                   <Area type="monotone" dataKey="ph" stroke={B.green} strokeWidth={2.25} fill="url(#hg)" dot={false} animationDuration={0} isAnimationActive={false}/>
                   <Area type="monotone" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#ag)" dot={false} animationDuration={0} isAnimationActive={false}/>

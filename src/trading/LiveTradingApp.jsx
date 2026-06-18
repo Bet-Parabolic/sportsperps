@@ -12,6 +12,14 @@ import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
 
+// Minutes since kickoff for a chart point — makes the X axis reflect game time
+// (not wall-clock since the oracle started, which is skewed by pregame seeding).
+// Returns null if startTime is unknown so callers can fall back.
+function gameMinSince(startTime, wallMs) {
+  const k = new Date(startTime).getTime();
+  return (!isNaN(k) && k) ? +((wallMs - k) / 60000).toFixed(2) : null;
+}
+
 // "Pregame · starts in 42m" countdown for a scheduled game's status badge.
 function startsInLabel(startTime) {
   const ms = new Date(startTime).getTime() - Date.now();
@@ -145,7 +153,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         const t0 = data.history[0].t;
         setChartT0(t0);
         setChartData(data.history.map(h => ({
-          t:    +((h.t - t0) / 60000).toFixed(2),
+          t:    gameMinSince(initGame.startTime, h.t) ?? +((h.t - t0) / 60000).toFixed(2),
           ph:   h.ip,
           pa:   1 - h.ip,
           mp:   h.mp,
@@ -204,7 +212,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           setBook(makeBook(op));
           setChartT0(prev => {
             const ref = prev || Date.now();
-            const t = +((Date.now() - ref) / 60000).toFixed(2);
+            const t = gameMinSince(initGame.startTime, Date.now()) ?? +((Date.now() - ref) / 60000).toFixed(2);
             setChartData(cd => [...cd, {t,ph:op,pa:1-op,mp,floor:clamp(op-0.2,0.01,0.99),ceil:clamp(op+0.2,0.01,0.99),mh_val:null,mh_marker:null,ma_val:null,ma_marker:null}]);
             return prev||ref;
           });
@@ -258,7 +266,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             const ref = prev || Date.now();
             if (!prev) { t0Local = ref; }
             const tRef = prev || t0Local || Date.now();
-            const t = +((Date.now() - tRef) / 60000).toFixed(2);
+            const t = gameMinSince(initGame.startTime, Date.now()) ?? +((Date.now() - tRef) / 60000).toFixed(2);
             setChartData(cd => [...cd, {
               t, ph: op, pa: 1-op, mp,
               floor: clamp(op-0.2,0.01,0.99), ceil: clamp(op+0.2,0.01,0.99),
@@ -500,7 +508,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
   // merged chart data with markers
   const merged = useMemo(() => {
-    const data = chartData.map(d => ({...d}));
+    let data = chartData.map(d => ({...d}));
     for (const m of markers) {
       let best = 0;
       for (let i=1; i<data.length; i++) if (Math.abs(data[i].t-m.t)<Math.abs(data[best].t-m.t)) best=i;
@@ -509,7 +517,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         else                 { data[best].mh_val=m.p;   data[best].mh_marker=m.markerType; }
       }
     }
-    // Aesthetic: every chart opens at 50/50 and visually diverges to the live odds.
+    // Once the game has started, hide pregame-seed points (t<0 = before kickoff) so the
+    // chart is pure game time. Pregame (not-yet-started) games keep their pre-kickoff line.
+    if (data.some(d => d.t >= 0)) data = data.filter(d => d.t >= 0);
+    // Aesthetic: open at 50/50 and visually diverge to the live odds.
     if (data.length) {
       const f = data[0];
       data.unshift({ t:+(f.t-0.5).toFixed(2), ph:0.5, pa:0.5, mp:0.5, floor:0.3, ceil:0.7,
@@ -518,16 +529,35 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     return data;
   }, [chartData, markers]);
 
-  // Chart zoom/pan — scroll wheel + drag (trading-terminal style). Auto-scales Y
-  // to the visible window unless the user drags the Y-axis.
-  const { ref: chartRef, xDomain, yDomain, isZoomed, setWindow, bind: chartBind } = useChartZoom(merged, { yKeys:['ph','pa'] });
+  // Chart zoom/pan — scroll wheel + drag X. Y is locked to full 0–100%. Default
+  // view starts at kickoff (clampMin -1) so pregame-seed points don't skew the axis.
+  const { ref: chartRef, xDomain, yDomain, isZoomed, setWindow, bind: chartBind } = useChartZoom(merged, { lockY:true, clampMin:-1 });
+  // X axis reflects game time, formatted per sport (soccer minutes, baseball innings).
+  const isSoccer = g.league === 'mls' || g.league === 'wcup';
+  const isBaseball = g.league === 'mlb';
+  const minPerInn = useMemo(() => {
+    const now = chartData.length ? chartData[chartData.length-1].t : 0;
+    const inn = g.period || 1;
+    return (now > 2 && inn > 0) ? now / Math.max(1, inn - 0.5) : 18; // self-calibrating from current inning
+  }, [chartData, g.period]);
+  const ordinal = n => n + (n===1?'st':n===2?'nd':n===3?'rd':'th');
+  const xFmt = useCallback((v) => {
+    if (v < -0.01) return '';
+    if (isSoccer) return Math.max(0, Math.round(v)) + "'";
+    if (isBaseball) return ordinal(Math.min(15, Math.max(1, Math.floor(v / minPerInn) + 1)));
+    return Math.max(0, Math.round(v)) + 'm';
+  }, [isSoccer, isBaseball, minPerInn]);
   const xTicks = useMemo(() => {
-    const t0 = xDomain[0], t1 = xDomain[1], span = t1 - t0;
+    const t0 = Math.max(0, xDomain[0]), t1 = xDomain[1], span = t1 - t0;
     if (!(span > 0)) return undefined;
+    if (isBaseball) { // one tick per inning boundary
+      const ts = []; for (let k = 0; k*minPerInn <= t1 + 1e-9 && k < 20; k++) { const t = k*minPerInn; if (t >= t0 - 1e-9) ts.push(+t.toFixed(2)); }
+      return ts;
+    }
     const step = span > 80 ? 20 : span > 40 ? 10 : span > 16 ? 5 : span > 6 ? 2 : span > 2 ? 1 : 0.5;
     const ts = []; for (let t = Math.ceil(t0/step)*step; t <= t1 + 1e-9; t += step) ts.push(+t.toFixed(2));
     return ts;
-  }, [xDomain[0], xDomain[1]]);
+  }, [xDomain[0], xDomain[1], isBaseball, minPerInn]);
 
   const liqLines = useMemo(() => positions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
@@ -758,13 +788,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     </defs>
                     <CartesianGrid strokeDasharray="1 0" stroke="#ffffff08" vertical horizontal/>
                     <XAxis dataKey="t" type="number" domain={xDomain} allowDataOverflow tick={{fill:'#555',fontSize:9,fontFamily:fm}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
-                      tickFormatter={v=>v+'m'} ticks={xTicks}/>
+                      tickFormatter={xFmt} ticks={xTicks}/>
                     <YAxis domain={yDomain} allowDataOverflow tick={{fill:'#666',fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+'%'} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
-                    <Tooltip content={<ChartTip home={HOME} away={AWAY} xFormat={v=>v+'m'}/>} cursor={{stroke:'#ffffff22',strokeWidth:1}} isAnimationActive={false}/>
+                    <Tooltip content={<ChartTip home={HOME} away={AWAY} xFormat={xFmt}/>} cursor={{stroke:'#ffffff22',strokeWidth:1}} isAnimationActive={false}/>
                     {yDomain[0] < 0.5 && yDomain[1] > 0.5 && <ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
                     {/* current price line + tag (terminal style) */}
                     <ReferenceLine y={oPrice} stroke={B.green} strokeWidth={1} strokeDasharray="2 3" strokeOpacity={0.6} label={(props)=>{const {viewBox}=props;const w=44;const x=viewBox.x+viewBox.width-w-1;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill={B.green} /><text x={x+w/2} y={y+3} textAnchor="middle" fill="#06070a" fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{(oPrice*100).toFixed(1)}%</text></g>);}}/>
-                    {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
+                    {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;const x=viewBox.x+viewBox.width-w-8;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
                     {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?B.green:B.red;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
                     <Area type="monotone" dataKey="ph" stroke={B.green} strokeWidth={2.25} fill="url(#lhg)" dot={false} animationDuration={0} isAnimationActive={false}/>
                     <Area type="monotone" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#lag)" dot={false} animationDuration={0} isAnimationActive={false}/>
