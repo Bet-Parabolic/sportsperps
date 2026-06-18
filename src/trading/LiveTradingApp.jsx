@@ -831,6 +831,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <div style={{borderTop:'1px solid #1a1a1a'}}>
               <div style={{display:'flex',gap:8,padding:'6px 16px 8px',alignItems:'center'}}>
                 <span style={{fontSize:9,color:'#333',fontWeight:600}}>Oracle</span>
+                {/* Blended composite index (what the market actually trades around) */}
+                <span style={{fontSize:9,display:'flex',alignItems:'center',gap:3}}>
+                  <span style={{color:B.green,fontWeight:800,fontFamily:fm}}>{HOME.short} {(oPrice*100).toFixed(1)}%</span>
+                  <span style={{color:'#444'}}>·</span>
+                  <span style={{color:B.red,fontWeight:800,fontFamily:fm}}>{AWAY.short} {((1-oPrice)*100).toFixed(1)}%</span>
+                </span>
+                {oSrcs.length>0 && <span style={{fontSize:9,color:'#2a2a2a'}}>|</span>}
                 {oSrcs.map(s=>{const hp=(s.price??s.v??0);return(
                   <span key={s.name} style={{fontSize:9,color:'#666',display:'flex',alignItems:'center',gap:3}}>
                     <span style={{width:3,height:3,borderRadius:2,background:B.primary,display:'inline-block'}}/>
