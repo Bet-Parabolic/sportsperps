@@ -47,6 +47,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [orderSide,  setOrderSide]  = useState('home');
   const [orderMargin,setOrderMargin]= useState(500);
   const [orderLev,   setOrderLev]   = useState(3);
+  const [marketMaxLev, setMarketMaxLev] = useState(null); // authoritative cap from backend (incl. scoring throttle)
   const [orderType,  setOrderType]  = useState('market');
   const [limitCents, setLimitCents] = useState(Math.round((initGame.oracle?.indexPrice??0.5)*100));
   const [tpCents,    setTpCents]    = useState('');
@@ -280,6 +281,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 trades: mktData.stats.tradeCount || 0,
               });
             }
+            // Authoritative max leverage (price tier + scoring-play throttle)
+            if (typeof mktData.maxLeverage === 'number') setMarketMaxLev(mktData.maxLeverage);
           }
         } catch(e) {
           setBook(makeBook(upd.oracle?.indexPrice ?? 0.5));
@@ -398,7 +401,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       });
       const result = await res.json();
       if (result.status === 'rejected') {
-        notify('Rejected: '+(result.reason||'unknown'), 'red');
+        if (result.reason === 'leverageRejected') {
+          if (typeof result.maxLeverage === 'number') setMarketMaxLev(result.maxLeverage);
+          notify('Max '+(result.maxLeverage||'')+'x leverage at these odds', 'red');
+        } else {
+          notify('Rejected: '+(result.reason||'unknown'), 'red');
+        }
         return;
       }
       const tn = orderSide==='home' ? HOME : AWAY;
@@ -464,7 +472,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // ── derived ─────────────────────────────────────────────────────────────
   const totalUPnL = positions.reduce((s,p) => s + (p.pnl != null ? p.pnl : calcPnL(p.side,p.exposure||0,p.entry,oPrice)), 0);
   const totalEq   = balance + positions.reduce((s,p)=>s+p.margin,0) + totalUPnL;
-  const ml  = maxLev(oPrice), eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
+  const ml  = marketMaxLev != null ? Math.min(maxLev(oPrice), marketMaxLev) : maxLev(oPrice);
+  const eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
   const team = orderSide==='home' ? HOME : AWAY;
   const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL);
   const entryP = orderSide==='home' ? oPrice : 1-oPrice;
@@ -490,6 +499,33 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     }
     return data;
   }, [chartData, markers]);
+
+  // Chart zoom: time window (minutes) or 'all'
+  const [zoomWin, setZoomWin] = useState('all');
+  const view = useMemo(() => {
+    if (zoomWin === 'all' || merged.length < 2) return merged;
+    const last = merged[merged.length-1].t;
+    const sliced = merged.filter(d => d.t >= last - zoomWin);
+    return sliced.length >= 2 ? sliced : merged;
+  }, [merged, zoomWin]);
+  // Auto-scale Y to the visible window so movement fills the chart (trading-terminal style)
+  const yDomain = useMemo(() => {
+    let lo = 1, hi = 0;
+    for (const d of view) {
+      if (d.ph == null) continue;
+      lo = Math.min(lo, d.ph, d.pa); hi = Math.max(hi, d.ph, d.pa);
+    }
+    if (hi <= lo) return [0, 1];
+    const pad = Math.max(0.015, (hi - lo) * 0.22);
+    return [Math.max(0, +(lo - pad).toFixed(4)), Math.min(1, +(hi + pad).toFixed(4))];
+  }, [view]);
+  const xTicks = useMemo(() => {
+    if (view.length < 2) return undefined;
+    const t0 = view[0].t, t1 = view[view.length-1].t, span = t1 - t0;
+    const step = span > 80 ? 20 : span > 40 ? 10 : span > 16 ? 5 : span > 6 ? 2 : 1;
+    const ts = []; for (let t = Math.ceil(t0/step)*step; t <= t1; t += step) ts.push(t);
+    return ts;
+  }, [view]);
 
   const liqLines = useMemo(() => positions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
@@ -685,39 +721,47 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
           {/* CHART */}
           <div style={{margin:isMobile?'8px 12px 0':'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
-            <div style={{padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid #1f1f1f'}}>
-              <span style={{fontSize:13,fontWeight:600,color:'#888'}}>Win Probability</span>
-              <div style={{display:'flex',gap:16}}>
-                <span style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>
+            <div style={{padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid #1f1f1f',flexWrap:'wrap',gap:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:14}}>
+                <span style={{fontSize:13,fontWeight:600,color:'#888'}}>Win Probability</span>
+                <span style={{display:'flex',alignItems:'center',gap:5,fontSize:12}}>
                   <span style={{width:12,height:3,borderRadius:2,background:B.green,display:'inline-block'}}/>
                   <span style={{color:B.green,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(1)}%</span>
                   <span style={{color:'#666'}}>{HOME.short}</span>
                 </span>
-                <span style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>
+                <span style={{display:'flex',alignItems:'center',gap:5,fontSize:12}}>
                   <span style={{width:12,height:3,borderRadius:2,background:B.red,display:'inline-block'}}/>
                   <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>{(awayProb*100).toFixed(1)}%</span>
                   <span style={{color:'#666'}}>{AWAY.short}</span>
                 </span>
               </div>
+              {/* Zoom controls */}
+              <div style={{display:'flex',gap:2,background:'#0a0a0a',borderRadius:8,padding:2,border:'1px solid #1a1a1a'}}>
+                {[['5m',5],['15m',15],['1H',60],['All','all']].map(([label,val])=>(
+                  <button key={label} onClick={()=>setZoomWin(val)} style={{padding:'3px 10px',fontSize:11,fontWeight:zoomWin===val?700:500,border:'none',cursor:'pointer',borderRadius:6,fontFamily:fm,
+                    background:zoomWin===val?B.primary+'22':'transparent',color:zoomWin===val?B.primaryLight:'#666'}}>{label}</button>
+                ))}
+              </div>
             </div>
-            <div style={{height:220,padding:'4px 8px 0'}}>
+            <div style={{height:240,padding:'4px 8px 0'}}>
               {merged.length > 1 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={merged} margin={{top:8,right:8,bottom:4,left:8}}>
+                  <ComposedChart data={view} margin={{top:8,right:8,bottom:4,left:8}}>
                     <defs>
-                      <linearGradient id="lhg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={B.green} stopOpacity={0.18}/><stop offset="100%" stopColor={B.green} stopOpacity={0.01}/></linearGradient>
-                      <linearGradient id="lag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={B.red} stopOpacity={0.12}/><stop offset="100%" stopColor={B.red} stopOpacity={0.01}/></linearGradient>
+                      <linearGradient id="lhg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={B.green} stopOpacity={0.22}/><stop offset="100%" stopColor={B.green} stopOpacity={0.01}/></linearGradient>
+                      <linearGradient id="lag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={B.red} stopOpacity={0.14}/><stop offset="100%" stopColor={B.red} stopOpacity={0.01}/></linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="2 6" stroke="#ffffff04" vertical={false}/>
-                    <XAxis dataKey="t" tick={{fill:'#555',fontSize:9}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
-                      tickFormatter={v=>v+'m'}
-                      ticks={(()=>{const mT=merged.length?Math.ceil(merged[merged.length-1].t):60;const s=mT>80?20:mT>40?10:mT>20?5:2;const ts=[];for(let t=0;t<=mT+s;t+=s)ts.push(t);return ts;})()}/>
-                    <YAxis domain={[0,1]} tick={{fill:'#555',fontSize:10}} tickFormatter={v=>(v*100)+'%'} axisLine={false} tickLine={false} width={32} orientation="right"/>
-                    <ReferenceLine y={0.5} stroke="#ffffff06" strokeDasharray="4 4"/>
-                    {liqLines.map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
+                    <CartesianGrid strokeDasharray="1 0" stroke="#ffffff08" vertical horizontal/>
+                    <XAxis dataKey="t" type="number" domain={['dataMin','dataMax']} tick={{fill:'#555',fontSize:9,fontFamily:fm}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
+                      tickFormatter={v=>v+'m'} ticks={xTicks}/>
+                    <YAxis domain={yDomain} tick={{fill:'#666',fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+'%'} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
+                    {yDomain[0] < 0.5 && yDomain[1] > 0.5 && <ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
+                    {/* current price line + tag (terminal style) */}
+                    <ReferenceLine y={oPrice} stroke={B.green} strokeWidth={1} strokeDasharray="2 3" strokeOpacity={0.6} label={(props)=>{const {viewBox}=props;const w=44;const x=viewBox.x+viewBox.width-w-1;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill={B.green} /><text x={x+w/2} y={y+3} textAnchor="middle" fill="#06070a" fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{(oPrice*100).toFixed(1)}%</text></g>);}}/>
+                    {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
                     {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?B.green:B.red;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
-                    <Area type="natural" dataKey="ph" stroke={B.green} strokeWidth={2.25} fill="url(#lhg)" dot={false} animationDuration={0} baseValue={0}/>
-                    <Area type="natural" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#lag)" dot={false} animationDuration={0} baseValue={0}/>
+                    <Area type="monotone" dataKey="ph" stroke={B.green} strokeWidth={2.25} fill="url(#lhg)" dot={false} animationDuration={0} isAnimationActive={false}/>
+                    <Area type="monotone" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#lag)" dot={false} animationDuration={0} isAnimationActive={false}/>
                     <Scatter dataKey="mh_val" shape={<HomeMarkerDot/>} isAnimationActive={false}/>
                     <Scatter dataKey="ma_val" shape={<AwayMarkerDot/>} isAnimationActive={false}/>
                     <Scatter dataKey="score_val" shape={<ScoreMarkerDot/>} isAnimationActive={false}/>
@@ -963,6 +1007,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 </div>
                 <input type="range" min={1} max={ml} step={1} value={eL} onChange={e=>setOrderLev(+e.target.value)}
                   style={{width:'100%',accentColor:B.primary,cursor:'pointer',height:4}}/>
+                {ml < 10 && (
+                  <div style={{fontSize:9,color:'#666',marginTop:5}}>
+                    Max {ml}x — leverage is limited as an outcome becomes more certain, so one play can't wipe you out.
+                  </div>
+                )}
               </div>
             </div>
             {/* Limit price */}
@@ -1188,9 +1237,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <div style={{marginBottom:12}}>
                       <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
                         <span style={{fontSize:11,color:'#555',fontWeight:600}}>Leverage</span>
-                        <span style={{fontSize:14,fontWeight:800,color:B.primaryLight,fontFamily:fm}}>{eL}x</span>
+                        <span><span style={{fontSize:14,fontWeight:800,color:B.primaryLight,fontFamily:fm}}>{eL}x</span><span style={{fontSize:10,color:'#444',marginLeft:6}}>{ml}x max</span></span>
                       </div>
                       <input type="range" min={1} max={ml} step={1} value={eL} onChange={e=>setOrderLev(+e.target.value)} style={{width:'100%',accentColor:B.primary,height:4}}/>
+                      {ml < 10 && (
+                        <div style={{fontSize:9,color:'#666',marginTop:5}}>
+                          Max {ml}x — leverage is limited as an outcome becomes more certain, so one play can't wipe you out.
+                        </div>
+                      )}
                     </div>
                     <div style={{background:'#111',borderRadius:12,padding:'10px 14px',marginBottom:14,fontSize:12}}>
                       {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Liquidation',(liqP*100).toFixed(1)+'¢',B.red],['If '+team.name+' wins','+'+fmtUsd(orderSide==='home'?expo*(1-oPrice)/oPrice:expo*oPrice/(1-oPrice)),B.green]].map(([l,v,c],i)=>(

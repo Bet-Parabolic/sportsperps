@@ -48,7 +48,9 @@ export function makeBook(mid){
   return{asks,bids};
 }
 
-export function maxLev(p){const d=Math.min(p,1-p);if(d>=.2)return 10;if(d>=.1)return 5;if(d>=.05)return 3;return 2;}
+// Max leverage by win-probability extremity — mirrors backend risk.js maxLeverageForPrice.
+// d = distance from a 0/1 bound = 1 - extremity. Leverage tightens as an outcome firms up.
+export function maxLev(p){const d=Math.min(p,1-p);if(d>=.40)return 10;if(d>=.25)return 5;if(d>=.15)return 3;if(d>=.05)return 2;return 1;}
 /* Liquidation price in HOME-scale (matches backend getLiqPrice: liq = entry ∓ entryCost/lev).
    home: entry - entry/lev = entry*(1-1/lev);  away: entry + (1-entry)/lev. */
 export function liqPrice(side,entry,lev){return side==="home"?entry*(1-1/lev):entry+(1-entry)/lev;}
