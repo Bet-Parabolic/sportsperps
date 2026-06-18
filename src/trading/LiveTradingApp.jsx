@@ -13,10 +13,10 @@ import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
 
 // Accurate, user-facing labels for the backend oracle source names.
-//   ESPN Model  → ESPN's live win-probability model
-//   Bookmakers  → sportsbook moneylines embedded in ESPN's live feed
-//   Sportsbooks → The Odds API multi-book consensus (pregame seed)
-const SOURCE_LABEL = { 'ESPN Model': 'ESPN', 'Bookmakers': 'Sportsbooks', 'Sportsbooks': 'Odds API' };
+//   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
+//   Sportsbooks → live market consensus: The Odds API in-play odds, with ESPN-embedded
+//                 book odds as a fallback when the Odds API has no line
+const SOURCE_LABEL = { 'ESPN Model': 'ESPN', 'Sportsbooks': 'Sportsbooks', 'Bookmakers': 'Sportsbooks' };
 
 // Minutes since kickoff for a chart point — makes the X axis reflect game time
 // (not wall-clock since the oracle started, which is skewed by pregame seeding).
