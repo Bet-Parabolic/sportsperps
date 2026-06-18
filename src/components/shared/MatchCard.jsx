@@ -7,8 +7,8 @@ export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }
   const awayScore = parseFloat(g.away.score) || 0;
   const homeWinning = homeScore > awayScore;
   const tied = homeScore === awayScore;
-  const statusColor = g.isLive ? B.green : g.isHalf ? "#ff9f1c" : g.isDelayed ? "#ff9f1c" : "#555";
-  const statusLabel = g.isLive && !g.isHalf ? "LIVE" : g.isHalf ? "HALF" : g.isFinal ? "FINAL" : g.isDelayed ? "DELAYED" : "UPCOMING";
+  const statusColor = g.isLive ? B.green : g.isHalf ? "#ff9f1c" : g.isPregame ? B.primaryLight : g.isDelayed ? "#ff9f1c" : "#555";
+  const statusLabel = g.isLive && !g.isHalf ? "LIVE" : g.isHalf ? "HALF" : g.isPregame ? "PREGAME" : g.isFinal ? "FINAL" : g.isDelayed ? "DELAYED" : "UPCOMING";
   return (
     <div style={{background:"#111",border:"1px solid #1f1f1f",borderRadius:16,padding:"20px 24px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
@@ -36,7 +36,7 @@ export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }
         ))}
       </div>
       {g.isScheduled&&(()=>{const when=fmtGameTime(g.date);return(when||g.detail)?(<div style={{fontSize:11,color:"#888",fontFamily:fm,marginTop:10,letterSpacing:"0.04em"}}>{when}{when&&g.detail?" · ":""}{g.detail||""}</div>):null;})()}
-      {(g.isLive||g.isHalf)&&(()=>{const bg=liveGames?findBackendGame(liveGames,g,_espnKey):null;const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
+      {(g.isLive||g.isHalf||g.isPregame)&&(()=>{const bg=liveGames?findBackendGame(liveGames,g,_espnKey):null;const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
         {wp&&<div style={{marginTop:8}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
             <span style={{fontSize:10,color:B.primary,fontWeight:700,fontFamily:fm}}>{wp}% {g.home.name}</span>
@@ -48,8 +48,8 @@ export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }
         </div>}
         {onTrade&&<button onClick={()=>onTrade(g)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
           background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-          <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
-          Trade Live
+          {!g.isPregame&&<span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>}
+          {g.isPregame?"Trade Pregame":"Trade Live"}
         </button>}
       </>);})()}
     </div>

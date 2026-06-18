@@ -12,6 +12,7 @@ function toCard(g) {
   return {
     id: g.id,
     isLive, isHalf: g.status === "halftime", isScheduled: g.status === "scheduled", isFinal: g.status === "final", isDelayed: false,
+    isPregame: g.pregame === true, tradeable: g.tradeable === true,
     date: g.startTime,
     detail: isLive ? periodLabel(g.league, g.period, g.clock, g.statusDetail) : "",
     home: { name: g.home.name||"", abbr: g.home.abbreviation||"", logo: g.home.logo||"", score: g.home.score??null },
@@ -22,17 +23,19 @@ function toCard(g) {
 
 export function HomePage({ liveGames = [], onTrade }) {
   const live = liveGames.filter(g => g.status === "live" || g.status === "halftime");
-  const upcoming = liveGames
+  const namedScheduled = liveGames
     .filter(g => g.status === "scheduled" && g.startTime)
     .filter(g => g.home?.name && g.away?.name && g.home.name !== "TBD" && g.away.name !== "TBD")
-    .sort((a, b) => new Date(a.startTime||0) - new Date(b.startTime||0))
-    .slice(0, 18);
+    .sort((a, b) => new Date(a.startTime||0) - new Date(b.startTime||0));
+  // Pregame = scheduled games the backend has opened for wagering (within 1h of kickoff, oracle seeded)
+  const pregame = namedScheduled.filter(g => g.pregame);
+  const upcoming = namedScheduled.filter(g => !g.pregame).slice(0, 18);
 
   // group live by sport
   const liveBySport = {};
   live.forEach(g => { const k = g.league || "nba"; (liveBySport[k] ||= []).push(g); });
 
-  const hasAny = live.length > 0 || upcoming.length > 0;
+  const hasAny = live.length > 0 || pregame.length > 0 || upcoming.length > 0;
 
   return (
     <div style={{flex:1,overflow:"auto",background:"#0a0a0a",padding:"32px 40px"}}>
@@ -64,6 +67,16 @@ export function HomePage({ liveGames = [], onTrade }) {
           );})}</Grid>
         </div>
       ))}
+
+      {/* PREGAME — open for wagering (within 1h of kickoff), tradeable */}
+      {pregame.length>0 && (
+        <div style={{marginBottom:32}}>
+          <SectionHeader label="◷ PREGAME — OPEN FOR WAGERING" color={B.primaryLight}/>
+          <Grid>{pregame.map(g=>(
+            <MatchCard key={g.id} g={toCard(g)} emoji={sportEmoji[g.league]||"🗓️"} onTrade={onTrade?()=>onTrade(g):null} _espnKey={g.league} liveGames={liveGames}/>
+          ))}</Grid>
+        </div>
+      )}
 
       {/* UPCOMING — browse, with date/time */}
       {upcoming.length>0 && (

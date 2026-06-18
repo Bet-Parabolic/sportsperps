@@ -10,6 +10,15 @@ import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
 
+// "Pregame · starts in 42m" countdown for a scheduled game's status badge.
+function startsInLabel(startTime) {
+  const ms = new Date(startTime).getTime() - Date.now();
+  if (isNaN(ms)) return "Pregame";
+  if (ms <= 0) return "Starting…";
+  const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
+  return h > 0 ? `Pregame · ${h}h ${m % 60}m` : `Pregame · ${m}m`;
+}
+
 export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade }) {
   // ── normalise team colors from backend ──────────────────────────────────
   const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
@@ -99,9 +108,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     setMarkers(prev => [...prev, {t: +chartT.toFixed(2), p, markerType: mt, line: side||'home'}]);
   }, []);
 
-  // Sidebar games: single source = backend liveGames (no more ESPN-direct duplication)
+  // Sidebar games: single source = backend liveGames (no more ESPN-direct duplication).
+  // Include pregame-tradeable games so users can switch into a market about to open.
   const allSidebarGames = useMemo(() => (
-    liveGames.filter(lg => lg.id !== initGame.id && (lg.status === 'live' || lg.status === 'halftime'))
+    liveGames.filter(lg => lg.id !== initGame.id && (lg.status === 'live' || lg.status === 'halftime' || lg.pregame))
   ), [liveGames, initGame.id]);
 
   // Sport counts for nav tabs — backend covers all 7 leagues (NBA, NCAAM, MLB, NFL, NHL, MLS, WCUP)
@@ -648,8 +658,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       <span style={{fontSize:30,fontWeight:900,color:'#fff',fontFamily:fm,lineHeight:1}}>{g.away.score??'–'}</span>
                     </div>
                     <div style={{fontSize:10,fontWeight:600,marginTop:3,
-                      color:g.status==='final'?'#4ade80':g.status==='halftime'?'#ff9f1c':B.green}}>
-                      {g.status==='final'?'Final':g.status==='halftime'?'Half':g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||'Live'}
+                      color:g.status==='final'?'#4ade80':g.status==='halftime'?'#ff9f1c':g.status==='scheduled'?B.primaryLight:B.green}}>
+                      {g.status==='final'?'Final':g.status==='halftime'?'Half':g.status==='scheduled'?startsInLabel(g.startTime):g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||'Live'}
                     </div>
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',minWidth:0}}>
@@ -685,9 +695,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   </div>
                   <div style={{marginTop:8}}>
                     <span style={{fontSize:12,fontWeight:600,padding:'4px 16px',borderRadius:20,
-                      background:g.status==='final'?'#22c55e18':g.status==='halftime'?'#ff9f1c18':'#1a1a1a',
-                      color:g.status==='final'?'#4ade80':g.status==='halftime'?'#ff9f1c':B.green}}>
-                      {g.status==='final'?'Final':g.status==='halftime'?'Halftime':g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||'Live'}
+                      background:g.status==='final'?'#22c55e18':g.status==='halftime'?'#ff9f1c18':g.status==='scheduled'?B.primary+'18':'#1a1a1a',
+                      color:g.status==='final'?'#4ade80':g.status==='halftime'?'#ff9f1c':g.status==='scheduled'?B.primaryLight:B.green}}>
+                      {g.status==='final'?'Final':g.status==='halftime'?'Halftime':g.status==='scheduled'?startsInLabel(g.startTime):g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||'Live'}
                     </span>
                   </div>
                   <div style={{fontSize:11,color:'#555',marginTop:6}}>{g.shortName||g.name}</div>
