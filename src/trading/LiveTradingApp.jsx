@@ -820,7 +820,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           </div>
 
           {/* GAMECAST */}
-          <div data-mob="gamecast" style={{margin:isMobile?'8px 12px 0':'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden',marginBottom:0}}>
+          <div data-mob="gamecast" style={{margin:isMobile?'8px 12px 0':'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
             <div style={{display:'flex',borderBottom:'1px solid #1f1f1f'}}>
               {[['gamecast','Gamecast',playLog.length],['boxscore','Box Score',0]].map(([id,label,count])=>(
                 <button key={id} onClick={()=>setBottomTab(id)} style={{padding:'10px 20px',fontSize:13,fontWeight:600,border:'none',cursor:'pointer',fontFamily:fb,
