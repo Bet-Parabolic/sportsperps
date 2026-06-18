@@ -221,7 +221,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           const cpE = posR.current;
           if (cpE.length) {
             let ch=false;
-            const upd=cpE.filter(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,mp);if(pnl<=-pos.margin*0.95){ch=true;setClosedPos(pr=>[{...pos,closedAt:op,pnl:-pos.margin,closeType:'LIQ'},...pr]);setClosedPnL(p=>p-pos.margin);notify('☠ LIQUIDATED','red');return false;}return true;});
+            // Only this game's positions are priced by this game's mark — never evaluate
+            // another game's position against the wrong price.
+            const upd=cpE.filter(pos=>{if(pos.gameId!==norm.id)return true;const pnl=calcPnL(pos.side,pos.exposure,pos.entry,mp);if(pnl<=-pos.margin*0.95){ch=true;setClosedPos(pr=>[{...pos,closedAt:op,pnl:-pos.margin,closeType:'LIQ'},...pr]);setClosedPnL(p=>p-pos.margin);notify('☠ LIQUIDATED','red');return false;}return true;});
             if(ch)setPositions(upd);
           }
           if((norm.status==='final'||norm.status==='completed')&&!settled){setSettled(true);const homeWins=(norm.home.score||0)>(norm.away.score||0);const finalP=homeWins?1.0:0.0;setSettledWinner(homeWins?HOME.name:AWAY.name);const fp=posR.current;if(fp.length){let sp=0;const nc2=fp.map(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,finalP);sp+=pnl;return{...pos,closedAt:finalP,pnl,closeType:'SETTLED'};});setClosedPos(pr=>[...nc2,...pr]);setBalance(b=>b+fp.reduce((s,p)=>s+p.margin,0)+sp);setClosedPnL(p=>p+sp);setPositions([]);notify('🏆 FINAL — '+fmtUsd(sp),'green');}}
@@ -393,7 +395,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     const ml2 = maxLev(op), lev = Math.min(orderLev, ml2);
     const margin = Math.min(orderMargin, balance);
     if (margin < 10) { notify('Insufficient margin', 'red'); return; }
-    if (reduceOnly && !posR.current.some(p => p.side===orderSide)) { notify('No position to reduce', 'red'); return; }
+    if (reduceOnly && !posR.current.some(p => p.gameId===g.id && p.side===orderSide)) { notify('No position to reduce', 'red'); return; }
     const tp = tpCents!==''&&+tpCents>0 ? +tpCents/100 : null;
     const sl = slCents!==''&&+slCents>0 ? +slCents/100 : null;
     const chartNow = chartData.length ? chartData[chartData.length-1].t : 0;
@@ -490,7 +492,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   }, [chartData, HOME, AWAY, notify, addMark, userId, g.id]);
 
   // ── derived ─────────────────────────────────────────────────────────────
-  const totalUPnL = positions.reduce((s,p) => s + (p.pnl != null ? p.pnl : calcPnL(p.side,p.exposure||0,p.entry,oPrice)), 0);
+  // Positions for THE CURRENT GAME only — the terminal shows one game at a time, so the
+  // chart/panel/liq-lines must be scoped to g.id. (Account totals below stay global.)
+  const gamePositions = useMemo(() => positions.filter(p => p.gameId === g.id), [positions, g.id]);
+  const gameClosed = useMemo(() => closedPos.filter(c => c.gameId === g.id), [closedPos, g.id]);
+  // Account-wide unrealized PnL: trust each position's server pnl; only the current game
+  // can be re-priced live with oPrice — other games without a server pnl contribute 0.
+  const totalUPnL = positions.reduce((s,p) => s + (p.pnl != null ? p.pnl : (p.gameId===g.id ? calcPnL(p.side,p.exposure||0,p.entry,oPrice) : 0)), 0);
   const totalEq   = balance + positions.reduce((s,p)=>s+p.margin,0) + totalUPnL;
   const ml  = marketMaxLev != null ? Math.min(maxLev(oPrice), marketMaxLev) : maxLev(oPrice);
   const eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
@@ -565,10 +573,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     return ts;
   }, [xDomain[0], xDomain[1], isBaseball, curInning]);
 
-  const liqLines = useMemo(() => positions.map(pos => ({
+  const liqLines = useMemo(() => gamePositions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
     liqPriceCents: (pos.liq*100).toFixed(1),
-  })), [positions]);
+  })), [gamePositions]);
 
   // ── render ──────────────────────────────────────────────────────────────
   return (
@@ -835,7 +843,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <div style={{padding:'10px 20px',borderBottom:'1px solid #1f1f1f',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <span style={{fontSize:13,fontWeight:600,color:'#fff'}}>Positions</span>
-                {positions.length>0&&<span style={{background:B.primary+'20',color:B.primary,fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:6}}>{positions.length} OPEN</span>}
+                {gamePositions.length>0&&<span style={{background:B.primary+'20',color:B.primary,fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:6}}>{gamePositions.length} OPEN</span>}
               </div>
               <div style={{display:'flex',gap:12}}>
                 {totalUPnL!==0&&<span style={{fontSize:12,fontFamily:fm,color:pctClr(totalUPnL),fontWeight:700}}>uPnL {fmtUsd(totalUPnL)}</span>}
@@ -843,11 +851,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             </div>
             <div style={{padding:'10px 16px'}}>
-              {positions.length===0&&closedPos.length===0 ? (
+              {gamePositions.length===0&&gameClosed.length===0 ? (
                 <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'20px 0'}}>{settled?'Game settled':'No open positions yet'}</div>
               ) : (
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  {positions.map(pos=>{
+                  {gamePositions.map(pos=>{
                     const pnl=pos.pnl!=null?pos.pnl:calcPnL(pos.side,pos.exposure||0,pos.entry,oPrice);
                     const pnlPct=pos.margin>0?(pnl/pos.margin)*100:0;
                     const tm=pos.side==='home'?HOME:AWAY;
@@ -883,10 +891,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       </div>
                     );
                   })}
-                  {closedPos.length>0&&(
+                  {gameClosed.length>0&&(
                     <div style={{marginTop:4}}>
-                      {positions.length>0&&<div style={{fontSize:11,color:'#555',fontWeight:600,padding:'4px 0 6px'}}>Closed</div>}
-                      {closedPos.map((cp,i)=>{
+                      {gamePositions.length>0&&<div style={{fontSize:11,color:'#555',fontWeight:600,padding:'4px 0 6px'}}>Closed</div>}
+                      {gameClosed.map((cp,i)=>{
                         const cptm=cp.side==='home'?HOME:AWAY;
                         const typeC=cp.closeType==='LIQ'?'#f87171':cp.closeType==='TP'?'#4ade80':cp.closeType==='SL'?'#ef4444':'#666';
                         return(
@@ -1244,7 +1252,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   color:id==='trade'?B.primary:'#666',fontFamily:fb,position:'relative'}}>
                   <span style={{fontSize:18}}>{icon}</span>
                   <span style={{fontSize:9,fontWeight:600}}>{label}</span>
-                  {id==='positions'&&positions.length>0&&<span style={{position:'absolute',top:6,right:'22%',fontSize:8,background:B.primary,color:'#000',borderRadius:8,padding:'1px 4px',fontWeight:700}}>{positions.length}</span>}
+                  {id==='positions'&&gamePositions.length>0&&<span style={{position:'absolute',top:6,right:'22%',fontSize:8,background:B.primary,color:'#000',borderRadius:8,padding:'1px 4px',fontWeight:700}}>{gamePositions.length}</span>}
                 </button>
               ))}
             </div>
