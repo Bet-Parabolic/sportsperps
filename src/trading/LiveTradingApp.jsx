@@ -224,7 +224,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             setChartData(cd => [...cd, {t,ph:op,pa:1-op,mp,floor:clamp(op-0.2,0.01,0.99),ceil:clamp(op+0.2,0.01,0.99),mh_val:null,mh_marker:null,ma_val:null,ma_marker:null}]);
             return prev||ref;
           });
-          if (norm.latestPlay) setPlayLog(prev=>{if(!prev.length||prev[0].id!==norm.latestPlay.id)return[norm.latestPlay,...prev].slice(0,80);return prev;});
+          if (Array.isArray(norm.plays) && norm.plays.length) {
+            setPlayLog(prev=>{const seen=new Set(prev.map(p=>p.id));const fresh=norm.plays.filter(p=>!seen.has(p.id)).reverse();return fresh.length?[...fresh,...prev].slice(0,500):prev;});
+          } else if (norm.latestPlay) setPlayLog(prev=>{if(!prev.length||prev[0].id!==norm.latestPlay.id)return[norm.latestPlay,...prev].slice(0,500);return prev;});
           // Check positions
           const cpE = posR.current;
           if (cpE.length) {
@@ -244,13 +246,17 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         const upd = raw.game || raw;
         setG(upd);
 
-        // append latest play to log
-        if (upd.latestPlay) {
+        // Gamecast: merge the full play history (deduped by id) so the ENTIRE game shows
+        // on open, then new plays append live. Backend plays are oldest→newest; playLog is
+        // newest-first. Falls back to latestPlay if the full list isn't present.
+        if (Array.isArray(upd.plays) && upd.plays.length) {
           setPlayLog(prev => {
-            if (!prev.length || prev[0].id !== upd.latestPlay.id)
-              return [upd.latestPlay, ...prev].slice(0, 80);
-            return prev;
+            const seen = new Set(prev.map(p => p.id));
+            const fresh = upd.plays.filter(p => !seen.has(p.id)).reverse();
+            return fresh.length ? [...fresh, ...prev].slice(0, 500) : prev;
           });
+        } else if (upd.latestPlay) {
+          setPlayLog(prev => (!prev.length || prev[0].id !== upd.latestPlay.id) ? [upd.latestPlay, ...prev].slice(0, 500) : prev);
         }
 
         if (upd.oracle) {
