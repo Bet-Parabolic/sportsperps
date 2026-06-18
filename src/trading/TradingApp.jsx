@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ComposedChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, ReferenceLine, Scatter } from "recharts";
+import { ComposedChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, ReferenceLine, Scatter, Tooltip } from "recharts";
 import { Play, Pause, RotateCcw, ChevronRight } from "lucide-react";
 import { B, brighten, fb, fm } from "../lib/theme.js";
 import { API_URL, ESPN_SOURCES, LIVE_STATUS } from "../lib/constants.js";
@@ -8,6 +8,7 @@ import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { BOX } from "../lib/games.js";
 import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
 import { useChartZoom } from "../lib/useChartZoom.js";
+import { ChartTip } from "../components/shared/ChartTip.jsx";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { LeaderboardPage } from "../components/LeaderboardPage.jsx";
 import { BasketballPage } from "../components/sports/BasketballPage.jsx";
@@ -525,6 +526,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
                   <CartesianGrid strokeDasharray="1 0" stroke="#ffffff08" vertical horizontal/>
                   <XAxis dataKey="t" type="number" domain={xDomain} allowDataOverflow tick={{fill:"#555",fontSize:9,fontFamily:fm}} ticks={xTicks} tickFormatter={G.xTick} axisLine={{stroke:"#1f1f1f"}} tickLine={false}/>
                   <YAxis domain={yDomain} allowDataOverflow tick={{fill:"#666",fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+"%"} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
+                  <Tooltip content={<ChartTip home={HOME} away={AWAY} xFormat={G.xTick}/>} cursor={{stroke:"#ffffff22",strokeWidth:1}} isAnimationActive={false}/>
                   {yDomain[0]<0.5&&yDomain[1]>0.5&&<ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
                   <ReferenceLine y={oracle.price} stroke={B.green} strokeWidth={1} strokeDasharray="2 3" strokeOpacity={0.6} label={(props)=>{const {viewBox}=props;const w=44;const x=viewBox.x+viewBox.width-w-1;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill={B.green}/><text x={x+w/2} y={y+3} textAnchor="middle" fill="#06070a" fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{(oracle.price*100).toFixed(1)}%</text></g>);}}/>
                   {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}

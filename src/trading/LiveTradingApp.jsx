@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ComposedChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, ReferenceLine, Scatter } from "recharts";
+import { ComposedChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, ReferenceLine, Scatter, Tooltip } from "recharts";
 import { B, brighten, fb, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
@@ -7,6 +7,7 @@ import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
 import { subscribeLive } from "../lib/liveSocket.js";
 import { useChartZoom } from "../lib/useChartZoom.js";
+import { ChartTip } from "../components/shared/ChartTip.jsx";
 import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
@@ -759,6 +760,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <XAxis dataKey="t" type="number" domain={xDomain} allowDataOverflow tick={{fill:'#555',fontSize:9,fontFamily:fm}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
                       tickFormatter={v=>v+'m'} ticks={xTicks}/>
                     <YAxis domain={yDomain} allowDataOverflow tick={{fill:'#666',fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+'%'} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
+                    <Tooltip content={<ChartTip home={HOME} away={AWAY} xFormat={v=>v+'m'}/>} cursor={{stroke:'#ffffff22',strokeWidth:1}} isAnimationActive={false}/>
                     {yDomain[0] < 0.5 && yDomain[1] > 0.5 && <ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
                     {/* current price line + tag (terminal style) */}
                     <ReferenceLine y={oPrice} stroke={B.green} strokeWidth={1} strokeDasharray="2 3" strokeOpacity={0.6} label={(props)=>{const {viewBox}=props;const w=44;const x=viewBox.x+viewBox.width-w-1;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill={B.green} /><text x={x+w/2} y={y+3} textAnchor="middle" fill="#06070a" fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{(oPrice*100).toFixed(1)}%</text></g>);}}/>
