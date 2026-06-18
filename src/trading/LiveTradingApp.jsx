@@ -71,6 +71,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const pollRef = useRef(null);  // latest poll() — lets WS events trigger reconciliation early
   const lastScoreIdRef = useRef(null);          // dedupe scoring plays across polls
   const prevScoreRef = useRef({ h: 0, a: 0 });  // detect which team just scored
+  const closedIdsRef = useRef(new Set());       // position ids already moved to history (dedupe)
 
   // ── derived team objects ────────────────────────────────────────────────
   const HOME = useMemo(() => ({
@@ -297,31 +298,44 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           }
           if (posRes.ok) {
             const posData = await posRes.json();
-            setPositions(posData.positions.map(p => ({
-              id: p.id,
-              gameId: p.gameId,
-              side: p.side,
-              size: p.size,
-              margin: p.margin,
-              leverage: p.leverage,
-              exposure: p.size * p.entryPx,
-              entry: p.entryPx,
-              liq: p.liqPrice,
-              tp: p.tp,
-              sl: p.sl,
-              pnl: p.pnl,
-              roe: p.roe,
-              openedAt: p.openedAt,
-            })));
+            // Guard: only update if we got a valid array (a malformed/empty error
+            // response must NOT wipe local positions).
+            if (Array.isArray(posData.positions)) {
+              const mapped = posData.positions.map(p => ({
+                id: p.id, gameId: p.gameId, side: p.side, size: p.size, margin: p.margin,
+                leverage: p.leverage, exposure: p.size * p.entryPx, entry: p.entryPx,
+                liq: p.liqPrice, tp: p.tp, sl: p.sl, pnl: p.pnl, roe: p.roe, openedAt: p.openedAt,
+              }));
+              // Positions that vanished server-side (liquidation / TP-SL / settlement) and
+              // weren't closed by us → record them in history so nothing silently disappears.
+              const liveIds = new Set(mapped.map(p => p.id));
+              const vanished = posR.current.filter(
+                p => p.gameId === g.id && !liveIds.has(p.id) && !closedIdsRef.current.has(p.id)
+              );
+              if (vanished.length) {
+                setClosedPos(pr => [
+                  ...vanished.map(p => {
+                    closedIdsRef.current.add(p.id);
+                    const realized = p.pnl ?? 0;
+                    const ct = realized <= -(p.margin * 0.9) ? 'LIQ'
+                             : (upd.status === 'final' || upd.status === 'completed') ? 'SETTLED' : 'CLOSED';
+                    return { ...p, closedAt: 0, pnl: realized, pnlPct: p.margin>0?realized/p.margin*100:0, closeType: ct };
+                  }),
+                  ...pr,
+                ]);
+                if (vanished.some(p => (p.pnl ?? 0) <= -(p.margin * 0.9))) notify('☠ Position liquidated', 'red');
+              }
+              setPositions(mapped);
+            }
           }
         } catch(e) { /* backend unavailable, keep local state */ }
 
-        // Settlement detection
+        // Settlement detection (handles draws → push)
         if ((upd.status==='final'||upd.status==='completed') && !settled) {
           setSettled(true);
-          const homeWins = (upd.home.score||0) > (upd.away.score||0);
-          setSettledWinner(homeWins ? HOME.name : AWAY.name);
-          notify('Game Final — '+(homeWins ? HOME.name : AWAY.name)+' wins', 'green');
+          const hs=upd.home.score||0, as=upd.away.score||0;
+          if (hs===as) { setSettledWinner('Draw'); notify('Game Final — '+HOME.short+' '+hs+'–'+as+' '+AWAY.short+' (draw, push)', 'info'); }
+          else { const homeWins=hs>as; setSettledWinner(homeWins?HOME.name:AWAY.name); notify('Game Final — '+(homeWins?HOME.name:AWAY.name)+' wins', 'green'); }
         }
       } catch(e) {}
     };
@@ -393,6 +407,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         addMark(chartNow, avgPx, 'entry', orderSide);
         setBottomTab('positions');
         notify(tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
+        pollRef.current?.(); // reconcile immediately so the new position shows now, not in ≤5s
       } else if (result.status === 'resting') {
         notify('Limit '+tn.name+' @ '+limitCents+'¢', 'info');
       }
@@ -434,6 +449,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         addMark(chartNow, avgPx, pnl>=0?'exit-win':'exit-loss', pos.side);
         const tn = pos.side==='home' ? HOME : AWAY;
         notify('Closed '+tn.name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
+        if (pos.id) closedIdsRef.current.add(pos.id); // dedupe vs poll-diff history
         setClosedPos(pr => [{...pos, closedAt: chartNow, exitPx: avgPx, pnl, pnlPct, closeType: 'CLOSED'}, ...pr]);
         setClosedPnL(p => p + pnl);
         setTradeCard({ type:'close', side:pos.side, teamName:tn.name, teamLogo:pos.side==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:pos.side==='home'?HOME.light:AWAY.light, entryPx, exitPx:avgPx, leverage:pos.leverage, pnl, pnlPct, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:periodLabel(g.league, g.period, g.clock, g.statusDetail) });
@@ -977,7 +993,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             </div>
             {/* Summary */}
-            {(()=>{const estFee=expo*0.001;const liqDist=oPrice>0?Math.abs(oPrice-liqP)/oPrice*100:0;const liqCol=liqDist>15?B.green:liqDist>5?'#ff9f1c':B.red;const balPct=balance>0?eM/balance*100:0;return(<>
+            {(()=>{const estFee=expo*0.001;const liqShown=orderSide==='home'?liqP:1-liqP;const curBet=orderSide==='home'?oPrice:1-oPrice;const liqDist=curBet>0?Math.abs(curBet-liqShown)/curBet*100:0;const liqCol=liqDist>15?B.green:liqDist>5?'#ff9f1c':B.red;const balPct=balance>0?eM/balance*100:0;const oppPos=!reduceOnly&&positions.find(p=>p.gameId===g.id&&p.side!==orderSide);return(<>
             <div style={{background:'#0a0a0a',borderRadius:12,padding:'10px 12px',marginBottom:10,fontSize:12}}>
               {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Est. Fee (10 bps)',fmtUsd(estFee),'#888']].map(([l,v,c])=>(
                 <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'3px 0'}}>
@@ -998,10 +1014,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <div style={{background:liqCol+'10',border:'1px solid '+liqCol+'30',borderRadius:10,padding:'10px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10}}>
               <div style={{fontSize:18,flexShrink:0}}>{liqDist>15?'🟢':liqDist>5?'🟡':'🔴'}</div>
               <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:700,color:liqCol,fontFamily:fm}}>Liquidation @ {(liqP*100).toFixed(1)}¢</div>
+                <div style={{fontSize:12,fontWeight:700,color:liqCol,fontFamily:fm}}>Liquidation @ {(liqShown*100).toFixed(1)}¢</div>
                 <div style={{fontSize:10,color:'#888',marginTop:2}}>{liqDist.toFixed(1)}% from current price</div>
               </div>
             </div>
+            {/* Net-position notice: betting the other side nets against the existing one */}
+            {oppPos&&<div style={{fontSize:11,color:'#ff9f1c',marginBottom:8,padding:'7px 10px',background:'#ff9f1c10',borderRadius:8,border:'1px solid #ff9f1c22',lineHeight:1.5}}>
+              You already hold <b>{oppPos.side==='home'?HOME.short:AWAY.short}</b> on this game. Buying {team.short} is the opposite side — it will <b>reduce or close</b> that position, not open a second one.
+            </div>}
             {/* Warnings */}
             {balPct>50&&<div style={{fontSize:11,color:'#ff9f1c',marginBottom:8,padding:'6px 10px',background:'#ff9f1c10',borderRadius:8,border:'1px solid #ff9f1c22'}}>
               Using {balPct.toFixed(0)}% of your balance

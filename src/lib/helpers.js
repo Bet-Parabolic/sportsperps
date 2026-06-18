@@ -49,7 +49,9 @@ export function makeBook(mid){
 }
 
 export function maxLev(p){const d=Math.min(p,1-p);if(d>=.2)return 10;if(d>=.1)return 5;if(d>=.05)return 3;return 2;}
-export function liqPrice(side,entry,lev){return side==="home"?entry*(1-1/lev):entry*(1+1/lev);}
+/* Liquidation price in HOME-scale (matches backend getLiqPrice: liq = entry ∓ entryCost/lev).
+   home: entry - entry/lev = entry*(1-1/lev);  away: entry + (1-entry)/lev. */
+export function liqPrice(side,entry,lev){return side==="home"?entry*(1-1/lev):entry+(1-entry)/lev;}
 export function calcPnL(side,exposure,entry,mark){return side==="home"?exposure*(mark-entry)/entry:exposure*(entry-mark)/entry;}
 
 /* Sport-appropriate period label */
