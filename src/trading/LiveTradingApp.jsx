@@ -506,6 +506,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const simOI  = marketStats.oi || positions.reduce((s,p)=>s+(p.exposure||0),0) + Math.floor(chartData.length*40);
   const fundingRate = marketStats.funding ? marketStats.funding.toFixed(3) : ((oPrice-0.5)*0.08).toFixed(3);
 
+  // X axis reflects game time, formatted per sport (soccer minutes, baseball innings).
+  const isSoccer = g.league === 'mls' || g.league === 'wcup';
+  const isBaseball = g.league === 'mlb';
+  const curInning = Math.max(1, g.period || 1);
+
   // merged chart data with markers
   const merged = useMemo(() => {
     let data = chartData.map(d => ({...d}));
@@ -519,45 +524,46 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     }
     // Once the game has started, hide pregame-seed points (t<0 = before kickoff) so the
     // chart is pure game time. Pregame (not-yet-started) games keep their pre-kickoff line.
-    if (data.some(d => d.t >= 0)) data = data.filter(d => d.t >= 0);
-    // Aesthetic: open at 50/50 and visually diverge to the live odds.
+    const started = data.some(d => d.t >= 0);
+    if (started) data = data.filter(d => d.t >= 0);
+    // Baseball: remap X into inning units (1 → current inning) so the chart always runs
+    // from the 1st inning, regardless of when the oracle's history actually begins.
+    if (isBaseball && started && data.length > 1) {
+      const f = data[0].t, span = Math.max(0.0001, data[data.length-1].t - f);
+      const range = Math.max(1, curInning - 1); // map first→1st, last→current inning
+      data = data.map(d => ({ ...d, t: +(1 + ((d.t - f) / span) * range).toFixed(3) }));
+    }
+    // Aesthetic: open at 50/50 (just before the first tick) and diverge to the live odds.
     if (data.length) {
       const f = data[0];
-      data.unshift({ t:+(f.t-0.5).toFixed(2), ph:0.5, pa:0.5, mp:0.5, floor:0.3, ceil:0.7,
+      data.unshift({ t:+(f.t-0.5).toFixed(3), ph:0.5, pa:0.5, mp:0.5, floor:0.3, ceil:0.7,
         mh_val:null, mh_marker:null, ma_val:null, ma_marker:null });
     }
     return data;
-  }, [chartData, markers]);
+  }, [chartData, markers, isBaseball, curInning]);
 
   // Chart zoom/pan — scroll wheel + drag X. Y is locked to full 0–100%. Default
-  // view starts at kickoff (clampMin -1) so pregame-seed points don't skew the axis.
+  // view starts at game start (clampMin -1) so pregame-seed points don't skew the axis.
   const { ref: chartRef, xDomain, yDomain, isZoomed, setWindow, bind: chartBind } = useChartZoom(merged, { lockY:true, clampMin:-1 });
-  // X axis reflects game time, formatted per sport (soccer minutes, baseball innings).
-  const isSoccer = g.league === 'mls' || g.league === 'wcup';
-  const isBaseball = g.league === 'mlb';
-  const minPerInn = useMemo(() => {
-    const now = chartData.length ? chartData[chartData.length-1].t : 0;
-    const inn = g.period || 1;
-    return (now > 2 && inn > 0) ? now / Math.max(1, inn - 0.5) : 18; // self-calibrating from current inning
-  }, [chartData, g.period]);
   const ordinal = n => n + (n===1?'st':n===2?'nd':n===3?'rd':'th');
   const xFmt = useCallback((v) => {
+    if (isBaseball) return v < 0.5 ? '' : ordinal(Math.round(v));   // v is inning number
     if (v < -0.01) return '';
     if (isSoccer) return Math.max(0, Math.round(v)) + "'";
-    if (isBaseball) return ordinal(Math.min(15, Math.max(1, Math.floor(v / minPerInn) + 1)));
     return Math.max(0, Math.round(v)) + 'm';
-  }, [isSoccer, isBaseball, minPerInn]);
+  }, [isSoccer, isBaseball]);
   const xTicks = useMemo(() => {
-    const t0 = Math.max(0, xDomain[0]), t1 = xDomain[1], span = t1 - t0;
-    if (!(span > 0)) return undefined;
-    if (isBaseball) { // one tick per inning boundary
-      const ts = []; for (let k = 0; k*minPerInn <= t1 + 1e-9 && k < 20; k++) { const t = k*minPerInn; if (t >= t0 - 1e-9) ts.push(+t.toFixed(2)); }
+    if (isBaseball) { // one tick per inning, always from the 1st
+      const last = Math.max(curInning, Math.ceil(xDomain[1]));
+      const ts = []; for (let i = 1; i <= last && i <= 20; i++) ts.push(i);
       return ts;
     }
+    const t0 = Math.max(0, xDomain[0]), t1 = xDomain[1], span = t1 - t0;
+    if (!(span > 0)) return undefined;
     const step = span > 80 ? 20 : span > 40 ? 10 : span > 16 ? 5 : span > 6 ? 2 : span > 2 ? 1 : 0.5;
     const ts = []; for (let t = Math.ceil(t0/step)*step; t <= t1 + 1e-9; t += step) ts.push(+t.toFixed(2));
     return ts;
-  }, [xDomain[0], xDomain[1], isBaseball, minPerInn]);
+  }, [xDomain[0], xDomain[1], isBaseball, curInning]);
 
   const liqLines = useMemo(() => positions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
