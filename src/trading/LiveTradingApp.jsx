@@ -566,7 +566,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
   // Chart zoom/pan — scroll wheel + drag X. Y is locked to full 0–100%. Default
   // view starts at game start (clampMin -1) so pregame-seed points don't skew the axis.
-  const { ref: chartRef, xDomain, yDomain, isZoomed, setWindow, bind: chartBind } = useChartZoom(merged, { lockY:true, clampMin:-1 });
+  const { ref: chartRef, xDomain, yDomain, isZoomed, setWindow, bind: chartBind } = useChartZoom(merged, { yDefault:'full', clampMin:-1 });
   const ordinal = n => n + (n===1?'st':n===2?'nd':n===3?'rd':'th');
   const xFmt = useCallback((v) => {
     if (isBaseball) return v < 0.5 ? '' : ordinal(Math.round(v));   // v is inning number

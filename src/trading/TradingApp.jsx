@@ -123,7 +123,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
   },[chartData,markers,visScoring,scoringTeams]);
 
   // Chart zoom/pan — scroll wheel + drag (trading-terminal style); auto-scales Y to the window.
-  const { ref:chartRef, xDomain, yDomain, isZoomed, setWindow, bind:chartBind } = useChartZoom(merged, { lockY:true });
+  const { ref:chartRef, xDomain, yDomain, isZoomed, setWindow, bind:chartBind } = useChartZoom(merged, { yDefault:'full' });
   const xTicks=useMemo(()=>{
     const t0=xDomain[0],t1=xDomain[1],span=t1-t0; if(!(span>0))return undefined;
     const step=span>40?10:span>16?5:span>6?2:span>2?1:0.5;

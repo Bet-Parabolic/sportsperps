@@ -49,7 +49,7 @@ export function useChartZoom(data, opts = {}) {
   const {
     xKey = "t", yKeys = ["ph", "pa"], padFrac = 0.22,
     insets = { left: 8, right: 44, top: 8, bottom: 22 },
-    lockY = false,        // true = Y axis fixed to full [0,1], Y zoom disabled
+    yDefault = "auto",    // "full" = Y defaults to [0,1] (still zoomable); "auto" = auto-scale to visible
     clampMin = null,      // default-view lower X bound (e.g. 0 = kickoff) — hides earlier (pregame) data unless it's all that exists
   } = opts;
   const ref = useRef(null);
@@ -67,8 +67,8 @@ export function useChartZoom(data, opts = {}) {
     || (ext ? ((clampMin != null && ext[1] > clampMin) ? [Math.max(ext[0], clampMin), ext[1]] : ext) : [0, 1]);
 
   const yDomain = useMemo(() => {
-    if (lockY) return [0, 1];
-    if (yMan) return yMan;
+    if (yMan) return yMan;                 // user has zoomed Y → honor it
+    if (yDefault === "full") return [0, 1]; // default full range, but still zoomable above
     let lo = 1, hi = 0, any = false;
     for (const d of data) {
       const x = d[xKey]; if (x < xDomain[0] || x > xDomain[1]) continue;
@@ -77,7 +77,7 @@ export function useChartZoom(data, opts = {}) {
     if (!any || hi <= lo) return [0, 1];
     const pad = Math.max(0.015, (hi - lo) * padFrac);
     return [Math.max(0, +(lo - pad).toFixed(4)), Math.min(1, +(hi + pad).toFixed(4))];
-  }, [data, xKey, yKeys, xDomain[0], xDomain[1], yMan, padFrac, lockY]);
+  }, [data, xKey, yKeys, xDomain[0], xDomain[1], yMan, padFrac, yDefault]);
 
   // Live snapshot for native/window listeners (avoids re-binding on every render).
   const st = useRef({});
@@ -93,7 +93,7 @@ export function useChartZoom(data, opts = {}) {
       const r = el.getBoundingClientRect();
       const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
       const overY = e.clientX > r.right - insets.right;
-      if (!lockY && (e.shiftKey || overY)) {
+      if (e.shiftKey || overY) {           // Shift+wheel or wheel over the Y axis → zoom Y
         const fy = clamp01((e.clientY - (r.top + insets.top)) / (r.height - insets.top - insets.bottom));
         setYMan(zoomY(yDomain, factor, fy));
       } else {
@@ -104,7 +104,7 @@ export function useChartZoom(data, opts = {}) {
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [insets.left, insets.right, insets.top, insets.bottom, lockY]);
+  }, [insets.left, insets.right, insets.top, insets.bottom]);
 
   // Drag — pan plot / zoom an axis strip. window listeners so drag continues
   // even if the cursor leaves the chart.
@@ -112,7 +112,7 @@ export function useChartZoom(data, opts = {}) {
     const el = ref.current; if (!el) return;
     const { ext } = st.current; if (!ext) return;
     const r = el.getBoundingClientRect();
-    const mode = (!lockY && e.clientX > r.right - insets.right) ? "y"
+    const mode = (e.clientX > r.right - insets.right) ? "y"     // drag Y-axis strip → zoom Y
       : e.clientY > r.bottom - insets.bottom ? "x" : "pan";
     const start = { x: e.clientX, y: e.clientY, xDom: st.current.xDom || ext, yDom: st.current.yDomain };
     const W = r.width - insets.left - insets.right, H = r.height - insets.top - insets.bottom;
