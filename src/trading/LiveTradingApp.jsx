@@ -152,7 +152,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       setChartData([{t:0,ph:p,pa:1-p,mp:p,floor:clamp(p-0.2,0.01,0.99),ceil:clamp(p+0.2,0.01,0.99),mh_val:null,mh_marker:null,ma_val:null,ma_marker:null}]);
       return;
     }
-    fetch(`${API_URL}/oracle/${initGame.id}/history`)
+    // limit=2000 = the oracle's full retained history (it records ~1pt/5s, so the 500
+    // default only covers ~40min — not enough for a full game). 2000 covers a whole match.
+    fetch(`${API_URL}/oracle/${initGame.id}/history?limit=2000`)
       .then(r => r.json())
       .then(data => {
         if (!data.history?.length) return;
