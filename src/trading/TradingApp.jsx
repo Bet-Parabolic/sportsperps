@@ -7,6 +7,7 @@ import { calcPnL, clamp, fmt3, fmtPct, fmtShares, fmtUsd, getGameState, liqPrice
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { BOX } from "../lib/games.js";
 import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
+import { useChartZoom } from "../lib/useChartZoom.js";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { LeaderboardPage } from "../components/LeaderboardPage.jsx";
 import { BasketballPage } from "../components/sports/BasketballPage.jsx";
@@ -115,21 +116,19 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
     // tag scoring-play markers on the nearest point — on the scoring team's own line
     for(const sp of visScoring){if(!data.length)break;let best=0;for(let i=1;i<data.length;i++){if(Math.abs(data[i].t-sp.t)<Math.abs(data[best].t-sp.t))best=i;}
       if(Math.abs(data[best].t-sp.t)<1){const sm=scoringTeams[sp.t]||{team:"home",label:"●"};data[best].score_val=sm.team==="away"?data[best].pa:data[best].ph;data[best].score_marker=sm;}}
+    // Aesthetic: every chart opens at 50/50 and visually diverges to the true odds.
+    if(data.length){const f=data[0];data.unshift({...f,t:+(f.t-0.5).toFixed(2),ph:0.5,pa:0.5,mp:0.5,mh_val:null,mh_marker:null,ma_val:null,ma_marker:null,score_val:null,score_marker:null});}
     return data;
   },[chartData,markers,visScoring,scoringTeams]);
 
-  // Chart zoom: time window (minutes) or 'all' + auto-scaled Y (trading-terminal framing)
-  const [zoomWin,setZoomWin]=useState('all');
-  const view=useMemo(()=>{
-    if(zoomWin==='all'||merged.length<2)return merged;
-    const last=merged[merged.length-1].t;const s=merged.filter(d=>d.t>=last-zoomWin);
-    return s.length>=2?s:merged;
-  },[merged,zoomWin]);
-  const yDomain=useMemo(()=>{
-    let lo=1,hi=0;for(const d of view){if(d.ph==null)continue;lo=Math.min(lo,d.ph,d.pa);hi=Math.max(hi,d.ph,d.pa);}
-    if(hi<=lo)return[0,1];const pad=Math.max(0.015,(hi-lo)*0.22);
-    return[Math.max(0,+(lo-pad).toFixed(4)),Math.min(1,+(hi+pad).toFixed(4))];
-  },[view]);
+  // Chart zoom/pan — scroll wheel + drag (trading-terminal style); auto-scales Y to the window.
+  const { ref:chartRef, xDomain, yDomain, isZoomed, setWindow, bind:chartBind } = useChartZoom(merged, { yKeys:['ph','pa'] });
+  const xTicks=useMemo(()=>{
+    const t0=xDomain[0],t1=xDomain[1],span=t1-t0; if(!(span>0))return undefined;
+    const step=span>40?10:span>16?5:span>6?2:span>2?1:0.5;
+    const ts=[];for(let t=Math.ceil(t0/step)*step;t<=t1+1e-9;t+=step)ts.push(+t.toFixed(2));
+    return ts;
+  },[xDomain[0],xDomain[1]]);
 
   useEffect(()=>{if(!playing||settled)return;const iv=setInterval(()=>{setGameTime(prev=>{
     const dt=(0.1*speed)/60,next=Math.min(prev+dt,60),gst=getGameState(next,PLAYS),sources=makeSources(gst.prob);
@@ -507,22 +506,25 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
                 </span>
               </div>
               <div style={{display:"flex",gap:2,background:"#0a0a0a",borderRadius:8,padding:2,border:"1px solid #1a1a1a"}}>
-                {[["5m",5],["15m",15],["1H",60],["All","all"]].map(([label,val])=>(
-                  <button key={label} onClick={()=>setZoomWin(val)} style={{padding:"3px 10px",fontSize:11,fontWeight:zoomWin===val?700:500,border:"none",cursor:"pointer",borderRadius:6,fontFamily:fm,
-                    background:zoomWin===val?B.primary+"22":"transparent",color:zoomWin===val?B.primaryLight:"#666"}}>{label}</button>
-                ))}
+                {[["5m",5],["15m",15],["1H",60],["All",null]].map(([label,val])=>{
+                  const active=label==="All"?!isZoomed:false;
+                  return(
+                  <button key={label} onClick={()=>setWindow(val)} style={{padding:"3px 10px",fontSize:11,fontWeight:active?700:500,border:"none",cursor:"pointer",borderRadius:6,fontFamily:fm,
+                    background:active?B.primary+"22":"transparent",color:active?B.primaryLight:"#666"}}>{label}</button>
+                  );
+                })}
               </div>
             </div>
-            <div style={{height:240,padding:"4px 8px 0"}}>
+            <div ref={chartRef} {...chartBind} style={{height:240,padding:"4px 8px 0",cursor:"crosshair",userSelect:"none",touchAction:"none"}}>
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={view} margin={{top:8,right:8,bottom:4,left:8}}>
+                <ComposedChart data={merged} margin={{top:8,right:8,bottom:4,left:8}}>
                   <defs>
                     <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={B.green} stopOpacity={0.22}/><stop offset="100%" stopColor={B.green} stopOpacity={0.01}/></linearGradient>
                     <linearGradient id="ag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={B.red} stopOpacity={0.14}/><stop offset="100%" stopColor={B.red} stopOpacity={0.01}/></linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="1 0" stroke="#ffffff08" vertical horizontal/>
-                  <XAxis dataKey="t" type="number" domain={['dataMin','dataMax']} tick={{fill:"#555",fontSize:9,fontFamily:fm}} tickFormatter={G.xTick} axisLine={{stroke:"#1f1f1f"}} tickLine={false}/>
-                  <YAxis domain={yDomain} tick={{fill:"#666",fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+"%"} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
+                  <XAxis dataKey="t" type="number" domain={xDomain} allowDataOverflow tick={{fill:"#555",fontSize:9,fontFamily:fm}} ticks={xTicks} tickFormatter={G.xTick} axisLine={{stroke:"#1f1f1f"}} tickLine={false}/>
+                  <YAxis domain={yDomain} allowDataOverflow tick={{fill:"#666",fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+"%"} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
                   {yDomain[0]<0.5&&yDomain[1]>0.5&&<ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
                   <ReferenceLine y={oracle.price} stroke={B.green} strokeWidth={1} strokeDasharray="2 3" strokeOpacity={0.6} label={(props)=>{const {viewBox}=props;const w=44;const x=viewBox.x+viewBox.width-w-1;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill={B.green}/><text x={x+w/2} y={y+3} textAnchor="middle" fill="#06070a" fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{(oracle.price*100).toFixed(1)}%</text></g>);}}/>
                   {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const x=viewBox.x+8;const y=viewBox.y;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}

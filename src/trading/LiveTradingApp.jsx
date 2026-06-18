@@ -6,6 +6,7 @@ import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, 
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
 import { subscribeLive } from "../lib/liveSocket.js";
+import { useChartZoom } from "../lib/useChartZoom.js";
 import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
@@ -507,35 +508,25 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         else                 { data[best].mh_val=m.p;   data[best].mh_marker=m.markerType; }
       }
     }
+    // Aesthetic: every chart opens at 50/50 and visually diverges to the live odds.
+    if (data.length) {
+      const f = data[0];
+      data.unshift({ t:+(f.t-0.5).toFixed(2), ph:0.5, pa:0.5, mp:0.5, floor:0.3, ceil:0.7,
+        mh_val:null, mh_marker:null, ma_val:null, ma_marker:null });
+    }
     return data;
   }, [chartData, markers]);
 
-  // Chart zoom: time window (minutes) or 'all'
-  const [zoomWin, setZoomWin] = useState('all');
-  const view = useMemo(() => {
-    if (zoomWin === 'all' || merged.length < 2) return merged;
-    const last = merged[merged.length-1].t;
-    const sliced = merged.filter(d => d.t >= last - zoomWin);
-    return sliced.length >= 2 ? sliced : merged;
-  }, [merged, zoomWin]);
-  // Auto-scale Y to the visible window so movement fills the chart (trading-terminal style)
-  const yDomain = useMemo(() => {
-    let lo = 1, hi = 0;
-    for (const d of view) {
-      if (d.ph == null) continue;
-      lo = Math.min(lo, d.ph, d.pa); hi = Math.max(hi, d.ph, d.pa);
-    }
-    if (hi <= lo) return [0, 1];
-    const pad = Math.max(0.015, (hi - lo) * 0.22);
-    return [Math.max(0, +(lo - pad).toFixed(4)), Math.min(1, +(hi + pad).toFixed(4))];
-  }, [view]);
+  // Chart zoom/pan — scroll wheel + drag (trading-terminal style). Auto-scales Y
+  // to the visible window unless the user drags the Y-axis.
+  const { ref: chartRef, xDomain, yDomain, isZoomed, setWindow, bind: chartBind } = useChartZoom(merged, { yKeys:['ph','pa'] });
   const xTicks = useMemo(() => {
-    if (view.length < 2) return undefined;
-    const t0 = view[0].t, t1 = view[view.length-1].t, span = t1 - t0;
-    const step = span > 80 ? 20 : span > 40 ? 10 : span > 16 ? 5 : span > 6 ? 2 : 1;
-    const ts = []; for (let t = Math.ceil(t0/step)*step; t <= t1; t += step) ts.push(t);
+    const t0 = xDomain[0], t1 = xDomain[1], span = t1 - t0;
+    if (!(span > 0)) return undefined;
+    const step = span > 80 ? 20 : span > 40 ? 10 : span > 16 ? 5 : span > 6 ? 2 : span > 2 ? 1 : 0.5;
+    const ts = []; for (let t = Math.ceil(t0/step)*step; t <= t1 + 1e-9; t += step) ts.push(+t.toFixed(2));
     return ts;
-  }, [view]);
+  }, [xDomain[0], xDomain[1]]);
 
   const liqLines = useMemo(() => positions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
@@ -745,26 +736,29 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   <span style={{color:'#666'}}>{AWAY.short}</span>
                 </span>
               </div>
-              {/* Zoom controls */}
+              {/* Zoom controls — quick windows + scroll/drag to zoom */}
               <div style={{display:'flex',gap:2,background:'#0a0a0a',borderRadius:8,padding:2,border:'1px solid #1a1a1a'}}>
-                {[['5m',5],['15m',15],['1H',60],['All','all']].map(([label,val])=>(
-                  <button key={label} onClick={()=>setZoomWin(val)} style={{padding:'3px 10px',fontSize:11,fontWeight:zoomWin===val?700:500,border:'none',cursor:'pointer',borderRadius:6,fontFamily:fm,
-                    background:zoomWin===val?B.primary+'22':'transparent',color:zoomWin===val?B.primaryLight:'#666'}}>{label}</button>
-                ))}
+                {[['5m',5],['15m',15],['1H',60],['All',null]].map(([label,val])=>{
+                  const active = label==='All' ? !isZoomed : false;
+                  return (
+                  <button key={label} onClick={()=>setWindow(val)} style={{padding:'3px 10px',fontSize:11,fontWeight:active?700:500,border:'none',cursor:'pointer',borderRadius:6,fontFamily:fm,
+                    background:active?B.primary+'22':'transparent',color:active?B.primaryLight:'#666'}}>{label}</button>
+                  );
+                })}
               </div>
             </div>
-            <div style={{height:240,padding:'4px 8px 0'}}>
+            <div ref={chartRef} {...chartBind} style={{height:240,padding:'4px 8px 0',cursor:'crosshair',userSelect:'none',touchAction:'none'}}>
               {merged.length > 1 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={view} margin={{top:8,right:8,bottom:4,left:8}}>
+                  <ComposedChart data={merged} margin={{top:8,right:8,bottom:4,left:8}}>
                     <defs>
                       <linearGradient id="lhg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={B.green} stopOpacity={0.22}/><stop offset="100%" stopColor={B.green} stopOpacity={0.01}/></linearGradient>
                       <linearGradient id="lag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={B.red} stopOpacity={0.14}/><stop offset="100%" stopColor={B.red} stopOpacity={0.01}/></linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="1 0" stroke="#ffffff08" vertical horizontal/>
-                    <XAxis dataKey="t" type="number" domain={['dataMin','dataMax']} tick={{fill:'#555',fontSize:9,fontFamily:fm}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
+                    <XAxis dataKey="t" type="number" domain={xDomain} allowDataOverflow tick={{fill:'#555',fontSize:9,fontFamily:fm}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
                       tickFormatter={v=>v+'m'} ticks={xTicks}/>
-                    <YAxis domain={yDomain} tick={{fill:'#666',fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+'%'} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
+                    <YAxis domain={yDomain} allowDataOverflow tick={{fill:'#666',fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+'%'} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
                     {yDomain[0] < 0.5 && yDomain[1] > 0.5 && <ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
                     {/* current price line + tag (terminal style) */}
                     <ReferenceLine y={oPrice} stroke={B.green} strokeWidth={1} strokeDasharray="2 3" strokeOpacity={0.6} label={(props)=>{const {viewBox}=props;const w=44;const x=viewBox.x+viewBox.width-w-1;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill={B.green} /><text x={x+w/2} y={y+3} textAnchor="middle" fill="#06070a" fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{(oPrice*100).toFixed(1)}%</text></g>);}}/>
@@ -889,7 +883,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               ) : (
                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
                   {playLog.map((play,i)=>(
-                    <div key={play.id||i} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px',borderRadius:10,
+                    <div key={(play.id??'p')+'-'+i} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px',borderRadius:10,
                       background:play.scoringPlay?HOME.light+'0a':'transparent',animation:i===0?'slideIn .3s':'none'}}>
                       <div style={{flexShrink:0,width:50,textAlign:'center'}}>
                         <div style={{fontSize:10,color:'#555',fontWeight:600}}>{play.periodDisplay||('Q'+(play.period||''))}</div>
