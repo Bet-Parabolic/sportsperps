@@ -113,9 +113,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // ── helpers ─────────────────────────────────────────────────────────────
   const notify = useCallback((msg, type) => {
     const id = Date.now() + Math.random();
-    setNotifs(p => [...p.slice(-3), {id, msg, type: type||'info'}]);
-    setTimeout(() => setNotifs(p => p.filter(n => n.id !== id)), 5000);
+    // Persist in the activity tray (newest first), capped — they don't auto-dismiss.
+    setNotifs(p => [{id, msg, type: type||'info', t: Date.now()}, ...p].slice(0, 40));
   }, []);
+  const clearNotifs = useCallback(() => setNotifs([]), []);
 
   const addMark = useCallback((chartT, p, mt, side) => {
     setMarkers(prev => [...prev, {t: +chartT.toFixed(2), p, markerType: mt, line: side||'home'}]);
@@ -587,17 +588,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   return (
     <div style={{background:'#0a0a0a', fontFamily:fb, minHeight:'100vh', color:'#fff'}}>
 
-      {/* Notifications */}
-      <div style={{position:'fixed',top:16,right:16,zIndex:50,display:'flex',flexDirection:'column',gap:8,maxWidth:360}}>
-        {notifs.map(n=>(
-          <div key={n.id} style={{padding:'10px 16px',borderRadius:12,fontWeight:600,fontSize:13,animation:'slideIn .25s',
-            background:n.type==='green'?B.green+'22':n.type==='red'?B.red+'22':'#1a1a1a',
-            border:`1px solid ${n.type==='green'?B.green:n.type==='red'?B.red:'#2a2a2a'}33`,
-            color:n.type==='green'?B.green:n.type==='red'?B.red:'#aaa'}}>
-            {n.msg}
-          </div>
-        ))}
-      </div>
+      {/* Trading-action notifications now live in a persistent tray at the bottom of the wager panel (see NotifTray). */}
 
       {/* HEADER — left corner: back+logo, center: tabs, right corner: live+deposit+profile */}
       <div style={{padding:isMobile?'0 10px':'0 24px',height:56,display:'grid',gridTemplateColumns:'auto 1fr auto',alignItems:'center',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
@@ -836,7 +827,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <div style={{padding:'10px 20px',borderBottom:'1px solid #1f1f1f',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
                 <span style={{fontSize:13,fontWeight:600,color:'#fff'}}>Positions</span>
-                {gamePositions.length>0&&<span style={{background:B.primary+'20',color:B.primary,fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:6}}>{gamePositions.length} OPEN</span>}
+                {positions.length>0&&<span style={{background:B.primary+'20',color:B.primary,fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:6}}>{positions.length} OPEN</span>}
               </div>
               <div style={{display:'flex',gap:12}}>
                 {totalUPnL!==0&&<span style={{fontSize:12,fontFamily:fm,color:pctClr(totalUPnL),fontWeight:700}}>uPnL {fmtUsd(totalUPnL)}</span>}
@@ -844,22 +835,35 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             </div>
             <div style={{padding:'10px 16px'}}>
-              {gamePositions.length===0&&gameClosed.length===0 ? (
+              {positions.length===0&&gameClosed.length===0 ? (
                 <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'20px 0'}}>{settled?'Game settled':'No open positions yet'}</div>
               ) : (
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  {gamePositions.map(pos=>{
-                    const pnl=pos.pnl!=null?pos.pnl:calcPnL(pos.side,pos.exposure||0,pos.entry,oPrice);
+                  {positions.map(pos=>{
+                    // Resolve each position's own game so we can show all positions across all games.
+                    const isCur=pos.gameId===g.id;
+                    const pg=isCur?g:liveGames.find(lg=>lg.id===pos.gameId);
+                    const ph=pg?.home, pa=pg?.away;
+                    const homeName=ph?.name||(isCur?HOME.name:'Home');
+                    const awayName=pa?.name||(isCur?AWAY.name:'Away');
+                    const homeShort=ph?.abbreviation||homeName.slice(0,3).toUpperCase();
+                    const awayShort=pa?.abbreviation||awayName.slice(0,3).toUpperCase();
+                    const teamName=pos.side==='home'?homeName:awayName;
+                    const sideColor=pos.side==='home'?B.green:B.red;      // accent by side (team colors can be invisible)
+                    const gOracle=isCur?oPrice:(pg?.oracle?.indexPrice ?? pos.entry);
+                    const pnl=pos.pnl!=null?pos.pnl:calcPnL(pos.side,pos.exposure||0,pos.entry,gOracle);
                     const pnlPct=pos.margin>0?(pnl/pos.margin)*100:0;
-                    const tm=pos.side==='home'?HOME:AWAY;
-                    const markP=pos.side==='home'?oPrice:1-oPrice;
+                    const markP=pos.side==='home'?gOracle:1-gOracle;
                     const posEntryP=pos.side==='home'?pos.entry:1-pos.entry;
                     const posShares=pos.size||Math.round((pos.exposure||0)/Math.max(pos.entry,0.01));
+                    const canSwitch=!isCur&&!!pg&&!!onTrade;
                     return (
-                      <div key={pos.id} style={{borderRadius:12,border:'1px solid #1f1f1f',overflow:'hidden',background:'#0a0a0a'}}>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',borderLeft:'3px solid '+(pos.side==='home'?HOME.light:AWAY.light)}}>
+                      <div key={pos.id} onClick={canSwitch?()=>onTrade(pg):undefined}
+                        title={canSwitch?`View ${homeShort} vs ${awayShort}`:undefined}
+                        style={{borderRadius:12,border:'1px solid '+(isCur?'#1f1f1f':'#262626'),overflow:'hidden',background:'#0a0a0a',cursor:canSwitch?'pointer':'default'}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',borderLeft:'3px solid '+sideColor}}>
                           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                            <span style={{fontSize:13,fontWeight:800,color:pos.side==='home'?HOME.light:AWAY.light}}>{tm.name}</span>
+                            <span style={{fontSize:13,fontWeight:800,color:'#fff'}}>{teamName}</span>
                             <span style={{fontSize:10,fontWeight:700,color:B.primary,background:B.primary+'15',padding:'2px 6px',borderRadius:5,fontFamily:fm}}>{pos.leverage}x</span>
                             {pos.tp&&<span style={{fontSize:10,color:B.green,fontFamily:fm,background:B.green+'10',padding:'2px 5px',borderRadius:4}}>TP {(pos.side==='home'?pos.tp:1-pos.tp)*100|0}¢</span>}
                             {pos.sl&&<span style={{fontSize:10,color:B.red,fontFamily:fm,background:B.red+'10',padding:'2px 5px',borderRadius:4}}>SL {(pos.side==='home'?pos.sl:1-pos.sl)*100|0}¢</span>}
@@ -868,6 +872,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                             <div style={{fontSize:16,fontWeight:800,color:pctClr(pnl),fontFamily:fm}}>{fmtUsd(pnl)}</div>
                             <div style={{fontSize:11,color:pctClr(pnl),fontFamily:fm}}>{fmtPct(pnlPct)}</div>
                           </div>
+                        </div>
+                        {/* game label — which matchup this position belongs to (click to pull it up) */}
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 14px 6px'}}>
+                          <span style={{fontSize:10,color:'#666',fontFamily:fm}}>{homeShort} <span style={{color:'#444'}}>vs</span> {awayShort}{isCur&&<span style={{color:B.primary,marginLeft:6}}>• viewing</span>}</span>
+                          {canSwitch&&<span style={{fontSize:10,color:B.primary,fontWeight:700}}>View →</span>}
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',padding:'8px 14px',borderTop:'1px solid #1a1a1a'}}>
                           {[['Avg entry',(posEntryP*100).toFixed(1)+'¢','#888'],['Mark',(markP*100).toFixed(1)+'¢',B.primaryLight],['Liq',(pos.liq!=null?(pos.side==='home'?pos.liq:1-pos.liq)*100|0:'-')+'¢',B.red],['Size',pos.size?pos.size+' shr':fmtUsd(pos.exposure||0),'#888']].map(([label,value,color])=>(
@@ -879,7 +888,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                         </div>
                         <div style={{padding:'8px 14px',borderTop:'1px solid #1a1a1a',display:'flex',alignItems:'center',gap:6}}>
                           <span style={{fontSize:11,color:'#555',flex:1,fontFamily:fm}}>{posShares.toLocaleString()} shares · margin {fmtUsd(pos.margin)}</span>
-                          <button onClick={()=>closePosition(pos)} style={{padding:'5px 14px',background:'#ef444415',border:'1px solid #ef444430',borderRadius:8,cursor:'pointer',color:'#ef4444',fontWeight:700,fontSize:11,fontFamily:fb}}>Close</button>
+                          <button onClick={(e)=>{e.stopPropagation();closePosition(pos);}} style={{padding:'5px 14px',background:'#ef444415',border:'1px solid #ef444430',borderRadius:8,cursor:'pointer',color:'#ef4444',fontWeight:700,fontSize:11,fontFamily:fb}}>Close</button>
                         </div>
                       </div>
                     );
@@ -1160,6 +1169,29 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 );})}
               </div>
             )}
+            {/* Activity tray — persistent trading-action notifications (don't auto-dismiss) */}
+            <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid #1f1f1f'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                <span style={{fontSize:10,color:'#555',fontWeight:600,letterSpacing:'0.06em'}}>ACTIVITY{notifs.length>0?` (${notifs.length})`:''}</span>
+                {notifs.length>0&&(
+                  <button onClick={clearNotifs} style={{background:'transparent',border:'none',color:'#666',fontSize:10,fontWeight:600,cursor:'pointer',padding:0,fontFamily:fb}}>Clear</button>
+                )}
+              </div>
+              {notifs.length===0?(
+                <div style={{fontSize:11,color:'#444',padding:'6px 0'}}>No activity yet</div>
+              ):(
+                <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:170,overflowY:'auto'}}>
+                  {notifs.map(n=>(
+                    <div key={n.id} style={{padding:'8px 10px',borderRadius:9,fontWeight:600,fontSize:11.5,lineHeight:1.35,
+                      background:n.type==='green'?B.green+'18':n.type==='red'?B.red+'18':'#161616',
+                      border:`1px solid ${n.type==='green'?B.green+'40':n.type==='red'?B.red+'40':'#262626'}`,
+                      color:n.type==='green'?B.green:n.type==='red'?B.red:'#bbb'}}>
+                      {n.msg}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>)}
 
           {rightTab==='book'&&(()=>{
