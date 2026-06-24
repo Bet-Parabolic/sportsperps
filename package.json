@@ -1,7 +1,7 @@
 {
   "name": "perps-io",
   "private": true,
-  "version": "1.0.43",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,10 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "lightweight-charts": "^5.2.0",
+    "lucide-react": "^0.263.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.12.7",
-    "lucide-react": "^0.263.1"
+    "recharts": "^2.12.7"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

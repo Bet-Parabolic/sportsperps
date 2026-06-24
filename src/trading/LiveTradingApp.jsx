@@ -1,14 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { ComposedChart, Area, XAxis, YAxis, ResponsiveContainer, CartesianGrid, ReferenceLine, Scatter, Tooltip } from "recharts";
 import { B, brighten, fb, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
 import { subscribeLive } from "../lib/liveSocket.js";
-import { useChartZoom } from "../lib/useChartZoom.js";
-import { ChartTip } from "../components/shared/ChartTip.jsx";
-import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
+import { TvChart } from "../components/TvChart.jsx";
 import { ProfileModal } from "../components/ProfileModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
 
@@ -568,9 +565,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     return data;
   }, [chartData, markers, isBaseball, curInning]);
 
-  // Chart zoom/pan — scroll wheel + drag X. Y is locked to full 0–100%. Default
-  // view starts at game start (clampMin -1) so pregame-seed points don't skew the axis.
-  const { ref: chartRef, xDomain, yDomain, isZoomed, setWindow, bind: chartBind } = useChartZoom(merged, { yDefault:'full', clampMin:-1 });
+  // TradingView chart (lightweight-charts) handle + quick-window selection. Pan/zoom is
+  // native in the chart; these just drive the preset buttons.
+  const tvRef = useRef(null);
+  const [chartWin, setChartWin] = useState(null);   // null = All (fit full game)
+  // Per-sport X label: soccer minutes, baseball innings, else minutes.
   const ordinal = n => n + (n===1?'st':n===2?'nd':n===3?'rd':'th');
   const xFmt = useCallback((v) => {
     if (isBaseball) return v < 0.5 ? '' : ordinal(Math.round(v));   // v is inning number
@@ -578,18 +577,6 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     if (isSoccer) return Math.max(0, Math.round(v)) + "'";
     return Math.max(0, Math.round(v)) + 'm';
   }, [isSoccer, isBaseball]);
-  const xTicks = useMemo(() => {
-    if (isBaseball) { // one tick per inning, always from the 1st
-      const last = Math.max(curInning, Math.ceil(xDomain[1]));
-      const ts = []; for (let i = 1; i <= last && i <= 20; i++) ts.push(i);
-      return ts;
-    }
-    const t0 = Math.max(0, xDomain[0]), t1 = xDomain[1], span = t1 - t0;
-    if (!(span > 0)) return undefined;
-    const step = span > 80 ? 20 : span > 40 ? 10 : span > 16 ? 5 : span > 6 ? 2 : span > 2 ? 1 : 0.5;
-    const ts = []; for (let t = Math.ceil(t0/step)*step; t <= t1 + 1e-9; t += step) ts.push(+t.toFixed(2));
-    return ts;
-  }, [xDomain[0], xDomain[1], isBaseball, curInning]);
 
   const liqLines = useMemo(() => gamePositions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
@@ -799,40 +786,20 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   <span style={{color:'#666'}}>{AWAY.short}</span>
                 </span>
               </div>
-              {/* Zoom controls — quick windows + scroll/drag to zoom */}
+              {/* Zoom controls — quick windows; scroll-wheel + drag zoom natively (TradingView) */}
               <div style={{display:'flex',gap:2,background:'#0a0a0a',borderRadius:8,padding:2,border:'1px solid #1a1a1a'}}>
                 {[['5m',5],['15m',15],['1H',60],['All',null]].map(([label,val])=>{
-                  const active = label==='All' ? !isZoomed : false;
+                  const active = chartWin===val;
                   return (
-                  <button key={label} onClick={()=>setWindow(val)} style={{padding:'3px 10px',fontSize:11,fontWeight:active?700:500,border:'none',cursor:'pointer',borderRadius:6,fontFamily:fm,
+                  <button key={label} onClick={()=>{setChartWin(val); if(val==null)tvRef.current?.fitContent(); else tvRef.current?.setWindow(val);}} style={{padding:'3px 10px',fontSize:11,fontWeight:active?700:500,border:'none',cursor:'pointer',borderRadius:6,fontFamily:fm,
                     background:active?B.primary+'22':'transparent',color:active?B.primaryLight:'#666'}}>{label}</button>
                   );
                 })}
               </div>
             </div>
-            <div ref={chartRef} {...chartBind} style={{height:240,padding:'4px 8px 0',cursor:'crosshair',userSelect:'none',touchAction:'none'}}>
+            <div style={{height:240,padding:'4px 8px 0'}}>
               {merged.length > 1 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={merged} margin={{top:8,right:8,bottom:4,left:8}}>
-                    <defs>
-                      <linearGradient id="lhg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={B.green} stopOpacity={0.22}/><stop offset="100%" stopColor={B.green} stopOpacity={0.01}/></linearGradient>
-                      <linearGradient id="lag" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor={B.red} stopOpacity={0.14}/><stop offset="100%" stopColor={B.red} stopOpacity={0.01}/></linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="1 0" stroke="#ffffff08" vertical horizontal/>
-                    <XAxis dataKey="t" type="number" domain={xDomain} allowDataOverflow tick={{fill:'#555',fontSize:9,fontFamily:fm}} axisLine={{stroke:'#1f1f1f'}} tickLine={false}
-                      tickFormatter={xFmt} ticks={xTicks}/>
-                    <YAxis domain={yDomain} allowDataOverflow tick={{fill:'#666',fontSize:10,fontFamily:fm}} tickFormatter={v=>(v*100).toFixed(0)+'%'} axisLine={false} tickLine={false} width={36} orientation="right" allowDecimals={false}/>
-                    <Tooltip content={<ChartTip home={HOME} away={AWAY} xFormat={xFmt}/>} cursor={{stroke:'#ffffff22',strokeWidth:1}} isAnimationActive={false}/>
-                    {yDomain[0] < 0.5 && yDomain[1] > 0.5 && <ReferenceLine y={0.5} stroke="#ffffff10" strokeDasharray="4 4"/>}
-                    {liqLines.filter(ll=>ll.liqOnChart>=yDomain[0]&&ll.liqOnChart<=yDomain[1]).map(ll=>(<ReferenceLine key={ll.id} y={ll.liqOnChart} stroke={B.red} strokeWidth={1.5} strokeDasharray="4 4" label={(props)=>{const {viewBox}=props;const text=`LIQ ${ll.liqPriceCents}¢`;const w=text.length*5.5+10;const x=viewBox.x+viewBox.width-w-8;const y=viewBox.y;return(<g><rect x={x} y={y-7} width={w} height={14} rx={3} fill="#000" stroke={B.red} strokeWidth={1}/><text x={x+w/2} y={y+3} textAnchor="middle" fill={B.red} fontSize={9} fontWeight="900" fontFamily="ui-monospace,monospace">{text}</text></g>);}}/>))}
-                    {limitOrders.map(lo=>{const ly=lo.side==='home'?lo.limitPrice:1-lo.limitPrice;const lc=lo.side==='home'?B.green:B.red;return(<ReferenceLine key={'lo-'+lo.id} y={ly} stroke={lc} strokeWidth={1.5} strokeDasharray="8 4" label={{value:(lo.limitPrice*100).toFixed(0)+'¢ LIMIT',position:'insideTopLeft',fontSize:9,fill:lc,fontFamily:fm}}/>);})}
-                    <Area type="monotone" dataKey="ph" stroke={B.green} strokeWidth={2.25} fill="url(#lhg)" dot={false} animationDuration={0} isAnimationActive={false}/>
-                    <Area type="monotone" dataKey="pa" stroke={B.red} strokeWidth={1.75} fill="url(#lag)" dot={false} animationDuration={0} isAnimationActive={false}/>
-                    <Scatter dataKey="mh_val" shape={<HomeMarkerDot/>} isAnimationActive={false}/>
-                    <Scatter dataKey="ma_val" shape={<AwayMarkerDot/>} isAnimationActive={false}/>
-                    <Scatter dataKey="score_val" shape={<ScoreMarkerDot/>} isAnimationActive={false}/>
-                  </ComposedChart>
-                </ResponsiveContainer>
+                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
               ) : (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#444',fontSize:13}}>
                   Loading price history…
