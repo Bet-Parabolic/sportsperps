@@ -97,8 +97,10 @@ export const TvChart = forwardRef(function TvChart(
         horzLine: { color: "#ffffff2a", labelBackgroundColor: "#1f2733" } },
     });
 
-    const home = chart.addSeries(AreaSeries, { lineColor: B.green, topColor: B.green + "30", bottomColor: B.green + "04", lineWidth: 2, priceFormat: pf, priceLineVisible: true, priceLineColor: B.green, priceLineStyle: LineStyle.Dotted, lastValueVisible: true, ...yProv });
-    const away = chart.addSeries(LineSeries, { color: B.red, lineWidth: 1, priceFormat: pf, priceLineVisible: false, lastValueVisible: false,
+    // Both series show only their last-value axis label (home green %, away red %) — no
+    // horizontal dotted price line (that duplicated the current-price tag and cluttered the axis).
+    const home = chart.addSeries(AreaSeries, { lineColor: B.green, topColor: B.green + "30", bottomColor: B.green + "04", lineWidth: 2, priceFormat: pf, priceLineVisible: false, lastValueVisible: true, ...yProv });
+    const away = chart.addSeries(LineSeries, { color: B.red, lineWidth: 1, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
       crosshairMarkerVisible: true, crosshairMarkerRadius: 4, crosshairMarkerBorderColor: B.red, crosshairMarkerBackgroundColor: B.red, ...yProv });
     const markers = createSeriesMarkers(home, []);
 
@@ -198,16 +200,17 @@ export const TvChart = forwardRef(function TvChart(
     placeScoringLogos();
   }, [data, scoringPlays]);
 
-  // price lines: current price, 0.5 midline, liquidations, resting limit orders
+  // price lines: 0.5 midline (no axis label), liquidations, resting limit orders.
+  // Current price is shown by the series' own last-value labels (home green %, away red %),
+  // so we don't draw a separate current-price line here (that produced a duplicate axis label).
   useEffect(() => {
     const { home } = api.current;
     if (!home) return;
     plRef.current.forEach((pl) => { try { home.removePriceLine(pl); } catch (e) {} });
     plRef.current = [];
-    const add = (price, color, title, style = LineStyle.Dashed, width = 1) =>
-      plRef.current.push(home.createPriceLine({ price, color, lineWidth: width, lineStyle: style, axisLabelVisible: true, title }));
-    add(0.5, "#ffffff1a", "", LineStyle.Dashed);
-    if (oPrice != null) add(oPrice, B.green, "", LineStyle.Dotted);
+    const add = (price, color, title, style = LineStyle.Dashed, width = 1, axisLabelVisible = true) =>
+      plRef.current.push(home.createPriceLine({ price, color, lineWidth: width, lineStyle: style, axisLabelVisible, title }));
+    add(0.5, "#ffffff1a", "", LineStyle.Dashed, 1, false);   // faint 50% reference, no axis label
     liqLines.forEach((ll) => add(ll.liqOnChart, B.red, "LIQ " + ll.liqPriceCents + "¢", LineStyle.Dashed, 2));
     limitOrders.forEach((lo) => add(lo.side === "home" ? lo.limitPrice : 1 - lo.limitPrice, lo.side === "home" ? B.green : B.red, (lo.limitPrice * 100).toFixed(0) + "¢ LIMIT", LineStyle.LargeDashed));
   }, [oPrice, liqLines, limitOrders]);

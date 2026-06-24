@@ -9,6 +9,10 @@ export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }
   const tied = homeScore === awayScore;
   const statusColor = g.isLive ? B.green : g.isHalf ? "#ff9f1c" : g.isPregame ? B.primaryLight : g.isDelayed ? "#ff9f1c" : "#555";
   const statusLabel = g.isLive && !g.isHalf ? "LIVE" : g.isHalf ? "HALF" : g.isPregame ? "PREGAME" : g.isFinal ? "FINAL" : g.isDelayed ? "DELAYED" : "UPCOMING";
+  // Resolve the backend game's oracle so scheduled/upcoming cards can show pregame odds.
+  const bg = g._backendGame || (liveGames ? findBackendGame(liveGames, g, _espnKey) : null);
+  const oracle = bg?.oracle;
+  const homeProb = (oracle && oracle.confidence > 0 && oracle.indexPrice != null) ? oracle.indexPrice : null;
   return (
     <div style={{background:"#111",border:"1px solid #1f1f1f",borderRadius:16,padding:"20px 24px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
@@ -19,7 +23,7 @@ export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {[{t:g.home,w:homeWinning&&!tied},{t:g.away,w:!homeWinning&&!tied}].map(({t,w},i)=>(
+        {[{t:g.home,w:homeWinning&&!tied,prob:homeProb},{t:g.away,w:!homeWinning&&!tied,prob:homeProb!=null?1-homeProb:null}].map(({t,w,prob},i)=>(
           <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               {t.logo?<img src={t.logo} style={{width:28,height:28,borderRadius:6,objectFit:"contain"}} alt=""/>
@@ -29,14 +33,17 @@ export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }
                 {showRecord&&t.record&&<div style={{fontSize:10,color:"#555",fontFamily:fm}}>{t.record}</div>}
               </div>
             </div>
-            <span style={{fontSize:28,fontWeight:800,fontFamily:fm,color:(g.isLive||g.isFinal)&&w?"#fff":g.isScheduled?"#444":"#777",minWidth:44,textAlign:"right"}}>
-              {g.isScheduled?"–":t.score??0}
-            </span>
+            {/* Scheduled games show each team's pregame win % (from the oracle) instead of a blank dash. */}
+            {g.isScheduled
+              ? <span style={{fontSize:18,fontWeight:800,fontFamily:fm,color:prob!=null?(i===0?B.primaryLight:"#ff6b61"):"#444",minWidth:48,textAlign:"right"}}>
+                  {prob!=null?Math.round(prob*100)+"%":"–"}
+                </span>
+              : <span style={{fontSize:28,fontWeight:800,fontFamily:fm,color:(g.isLive||g.isFinal)&&w?"#fff":"#777",minWidth:44,textAlign:"right"}}>{t.score??0}</span>}
           </div>
         ))}
       </div>
       {g.isScheduled&&(()=>{const when=fmtGameTime(g.date);return(when||g.detail)?(<div style={{fontSize:11,color:"#888",fontFamily:fm,marginTop:10,letterSpacing:"0.04em"}}>{when}{when&&g.detail?" · ":""}{g.detail||""}</div>):null;})()}
-      {(g.isLive||g.isHalf||g.isPregame)&&(()=>{const bg=liveGames?findBackendGame(liveGames,g,_espnKey):null;const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
+      {(g.isLive||g.isHalf||g.isPregame)&&(()=>{const wp=(g.isLive||g.isHalf)&&homeProb!=null?(homeProb*100).toFixed(1):null;return(<>
         {wp&&<div style={{marginTop:8}}>
           <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
             <span style={{fontSize:10,color:B.primary,fontWeight:700,fontFamily:fm}}>{wp}% {g.home.name}</span>
@@ -46,10 +53,11 @@ export function MatchCard({ g, emoji, showRecord, onTrade, _espnKey, liveGames }
             <div style={{height:"100%",width:wp+"%",background:`linear-gradient(90deg, ${B.primary}, ${B.primaryLight})`,borderRadius:4,transition:"width .5s ease"}}/>
           </div>
         </div>}
+        {/* Live → green "Trade Live"; pregame → red "Trade Pre-Game" (becomes green once the game goes live). */}
         {onTrade&&<button onClick={()=>onTrade(g)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
-          background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+          background:g.isPregame?"linear-gradient(135deg,"+B.red+",#ff7a6e)":"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:g.isPregame?"#fff":"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
           {!g.isPregame&&<span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>}
-          {g.isPregame?"Trade Pregame":"Trade Live"}
+          {g.isPregame?"Trade Pre-Game":"Trade Live"}
         </button>}
       </>);})()}
     </div>
