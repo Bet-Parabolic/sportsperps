@@ -123,9 +123,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   }, []);
 
   // Sidebar games: single source = backend liveGames (no more ESPN-direct duplication).
-  // Include pregame-tradeable games so users can switch into a market about to open.
-  const allSidebarGames = useMemo(() => (
-    liveGames.filter(lg => lg.id !== initGame.id && (lg.status === 'live' || lg.status === 'halftime' || lg.pregame))
+  // Split into Pregame (markets about to open) and Live, each excluding the current game.
+  const sidebarLive = useMemo(() => (
+    liveGames.filter(lg => lg.id !== initGame.id && (lg.status === 'live' || lg.status === 'halftime'))
+  ), [liveGames, initGame.id]);
+  const sidebarPregame = useMemo(() => (
+    liveGames.filter(lg => lg.id !== initGame.id && lg.pregame && lg.status !== 'live' && lg.status !== 'halftime')
+              .sort((a, b) => new Date(a.startTime || 0) - new Date(b.startTime || 0))
   ), [liveGames, initGame.id]);
 
   // Sport counts for nav tabs — backend covers all 7 leagues (NBA, NCAAM, MLB, NFL, NHL, MLS, WCUP)
@@ -726,22 +730,29 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
           </div>
 
-          {/* Other live games — all sports */}
-          {allSidebarGames.length > 0 && (
+          {/* Other markets — split into Pregame + Live */}
+          {(sidebarPregame.length > 0 || sidebarLive.length > 0) && (
             <div style={{padding:'0 16px'}}>
-              <div style={{fontSize:10,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,marginBottom:8}}>OTHER LIVE ({allSidebarGames.length})</div>
-              {allSidebarGames.map(lg=>(
-                <div key={lg.id} onClick={()=>onTrade&&onTrade(lg)}
-                  style={{padding:'10px 12px',marginBottom:6,background:'#111',borderRadius:10,border:'1px solid #1f1f1f',fontSize:11,fontFamily:fm,cursor:onTrade?'pointer':'default'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                    <span style={{color:'#fff',fontWeight:600}}>{lg._emoji?lg._emoji+' ':''}{lg.home.abbreviation||lg.home.name?.slice(0,3).toUpperCase()||'HOME'} <span style={{color:'#555'}}>vs</span> {lg.away.abbreviation||lg.away.name?.slice(0,3).toUpperCase()||'AWAY'}</span>
-                    <span style={{color:B.green,fontSize:10}}>{periodLabel(lg.league||lg._sport, lg.period, lg.clock, lg.statusDetail)||'LIVE'}</span>
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between'}}>
-                    <span style={{color:'#888'}}>{lg.home.score??0} – {lg.away.score??0}</span>
-                    {lg.oracle?.indexPrice && <span style={{color:B.primary,fontWeight:700}}>{(lg.oracle.indexPrice*100).toFixed(0)}%</span>}
-                  </div>
-                  {onTrade&&<div style={{marginTop:3,fontSize:9,color:'#444',textAlign:'right'}}>Trade →</div>}
+              {[
+                { label: 'PREGAME', games: sidebarPregame, color: B.primaryLight, pre: true },
+                { label: 'LIVE', games: sidebarLive, color: B.green, pre: false },
+              ].filter(s => s.games.length > 0).map(section => (
+                <div key={section.label} style={{marginBottom:14}}>
+                  <div style={{fontSize:10,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,marginBottom:8}}>{section.label} ({section.games.length})</div>
+                  {section.games.map(lg=>(
+                    <div key={lg.id} onClick={()=>onTrade&&onTrade(lg)}
+                      style={{padding:'10px 12px',marginBottom:6,background:'#111',borderRadius:10,border:'1px solid #1f1f1f',fontSize:11,fontFamily:fm,cursor:onTrade?'pointer':'default'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                        <span style={{color:'#fff',fontWeight:600}}>{lg._emoji?lg._emoji+' ':''}{lg.home.abbreviation||lg.home.name?.slice(0,3).toUpperCase()||'HOME'} <span style={{color:'#555'}}>vs</span> {lg.away.abbreviation||lg.away.name?.slice(0,3).toUpperCase()||'AWAY'}</span>
+                        <span style={{color:section.color,fontSize:10}}>{section.pre?(startsInLabel(lg.startTime)||'PREGAME'):(periodLabel(lg.league||lg._sport, lg.period, lg.clock, lg.statusDetail)||'LIVE')}</span>
+                      </div>
+                      <div style={{display:'flex',justifyContent:'space-between'}}>
+                        <span style={{color:'#888'}}>{section.pre?'':((lg.home.score??0)+' – '+(lg.away.score??0))}</span>
+                        {lg.oracle?.indexPrice && <span style={{color:B.primary,fontWeight:700}}>{(lg.oracle.indexPrice*100).toFixed(0)}%</span>}
+                      </div>
+                      {onTrade&&<div style={{marginTop:3,fontSize:9,color:'#444',textAlign:'right'}}>{section.pre?'Trade Pre-Game →':'Trade →'}</div>}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
