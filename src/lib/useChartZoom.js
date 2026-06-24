@@ -83,31 +83,50 @@ export function useChartZoom(data, opts = {}) {
   const st = useRef({});
   st.current = { ext, xDom, yDomain };
 
-  // Wheel zoom — native non-passive listener so we can preventDefault (stops the
-  // surrounding terminal from scrolling while zooming the chart).
+  // rAF-coalesced commits — apply at most ONE domain update per animation frame, so a
+  // burst of wheel/mousemove events (which fire faster than the screen refreshes) can't
+  // thrash recharts re-renders. This is what makes pan/zoom feel TradingView-smooth.
+  const pend = useRef(null);   // { x?: [a,b]|null, y?: [lo,hi] }
+  const rafId = useRef(0);
+  const flush = useCallback(() => {
+    rafId.current = 0;
+    const p = pend.current; pend.current = null;
+    if (!p) return;
+    if ("x" in p) setXDom(p.x);
+    if ("y" in p) setYMan(p.y);
+  }, []);
+  const schedule = useCallback(() => { if (!rafId.current) rafId.current = requestAnimationFrame(flush); }, [flush]);
+  useEffect(() => () => { if (rafId.current) cancelAnimationFrame(rafId.current); }, []);
+
+  // Wheel zoom — native non-passive listener so we can preventDefault. Proportional to
+  // scroll delta (continuous on trackpads, smooth per-notch on a mouse) and frame-coalesced.
   useEffect(() => {
     const el = ref.current; if (!el) return;
     const onWheel = (e) => {
-      const { ext, xDom, yDomain } = st.current; if (!ext) return;
+      const { ext } = st.current; if (!ext) return;
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;       // normalize line-mode wheels
+      const factor = Math.min(2, Math.max(0.5, Math.exp(dy * 0.0012)));
       const overY = e.clientX > r.right - insets.right;
-      if (e.shiftKey || overY) {           // Shift+wheel or wheel over the Y axis → zoom Y
+      if (e.shiftKey || overY) {                                      // Shift+wheel / over Y axis → zoom Y
+        const baseY = pend.current && "y" in pend.current ? pend.current.y : st.current.yDomain;
         const fy = clamp01((e.clientY - (r.top + insets.top)) / (r.height - insets.top - insets.bottom));
-        setYMan(zoomY(yDomain, factor, fy));
+        pend.current = { ...pend.current, y: zoomY(baseY, factor, fy) };
       } else {
+        const baseX = pend.current && "x" in pend.current ? (pend.current.x || ext) : (st.current.xDom || ext);
         const fx = clamp01((e.clientX - (r.left + insets.left)) / (r.width - insets.left - insets.right));
-        const nd = zoomRange(xDom || ext, factor, fx, ext);
-        setXDom(isFull(nd, ext) ? null : nd);
+        const nd = zoomRange(baseX, factor, fx, ext);
+        pend.current = { ...pend.current, x: isFull(nd, ext) ? null : nd };
       }
+      schedule();
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [insets.left, insets.right, insets.top, insets.bottom]);
+  }, [insets.left, insets.right, insets.top, insets.bottom, schedule]);
 
-  // Drag — pan plot / zoom an axis strip. window listeners so drag continues
-  // even if the cursor leaves the chart.
+  // Drag — pan plot / zoom an axis strip; also frame-coalesced. window listeners so the
+  // drag continues even if the cursor leaves the chart.
   const onMouseDown = useCallback((e) => {
     const el = ref.current; if (!el) return;
     const { ext } = st.current; if (!ext) return;
@@ -118,14 +137,15 @@ export function useChartZoom(data, opts = {}) {
     const W = r.width - insets.left - insets.right, H = r.height - insets.top - insets.bottom;
     const move = (ev) => {
       const dxF = (ev.clientX - start.x) / W, dyF = (ev.clientY - start.y) / H;
-      if (mode === "pan") { const nd = panRange(start.xDom, -dxF, ext); setXDom(isFull(nd, ext) ? null : nd); }
-      else if (mode === "x") { const nd = zoomRange(start.xDom, 1 - dxF, 0.5, ext); setXDom(isFull(nd, ext) ? null : nd); }
-      else { setYMan(zoomY(start.yDom, 1 + dyF, 0.5)); }
+      if (mode === "pan") { const nd = panRange(start.xDom, -dxF, ext); pend.current = { ...pend.current, x: isFull(nd, ext) ? null : nd }; }
+      else if (mode === "x") { const nd = zoomRange(start.xDom, 1 - dxF, 0.5, ext); pend.current = { ...pend.current, x: isFull(nd, ext) ? null : nd }; }
+      else { pend.current = { ...pend.current, y: zoomY(start.yDom, 1 + dyF, 0.5) }; }
+      schedule();
     };
     const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
     window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
     e.preventDefault();
-  }, [insets.left, insets.right, insets.top, insets.bottom]);
+  }, [insets.left, insets.right, insets.top, insets.bottom, schedule]);
 
   const reset = useCallback(() => { setXDom(null); setYMan(null); }, []);
   // Snapshot a trailing window of `win` x-units (e.g. minutes); null = full.
