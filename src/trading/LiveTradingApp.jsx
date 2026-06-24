@@ -584,6 +584,47 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     liqPriceCents: (pos.liq*100).toFixed(1),
   })), [gamePositions]);
 
+  // Raw scoring plays from the full play log (oldest→newest), with side + raw game-time.
+  const rawScoringPlays = useMemo(() => {
+    const ordered = [...playLog].reverse(); // playLog is newest-first; replay oldest→newest
+    let prevH = 0, prevA = 0;
+    const out = [];
+    for (const p of ordered) {
+      const hs = p.homeScore || 0, as = p.awayScore || 0;
+      if (p.scoringPlay) {
+        const side = hs > prevH ? 'home' : as > prevA ? 'away' : 'home';
+        const wc = p.wallclock ? Date.parse(p.wallclock) : null;
+        const t = wc != null ? gameMinSince(initGame.startTime, wc) : null;
+        if (t != null) out.push({ id: p.id, t, side, label: p.scoreValue > 0 ? '+' + p.scoreValue : '●' });
+      }
+      prevH = hs; prevA = as;
+    }
+    return out;
+  }, [playLog, initGame.startTime]);
+
+  // Position each scoring play on the chart: anchor Y to the scoring team's line (nearest
+  // raw point's probability) and remap X through the SAME baseball-inning transform `merged`
+  // applies, so a Parabolic-logo dot lands on the right spot for every sport. Its own list
+  // (not one-per-point) so simultaneous/adjacent scores never overwrite each other.
+  const scoreMarks = useMemo(() => {
+    let data = chartData.filter(d => d.t != null);
+    const started = data.some(d => d.t >= 0);
+    if (started) data = data.filter(d => d.t >= 0);
+    if (!data.length) return [];
+    let remap = (t) => t;
+    if (isBaseball && started && data.length > 1) {
+      const f = data[0].t, span = Math.max(0.0001, data[data.length - 1].t - f), range = Math.max(1, curInning - 1);
+      remap = (t) => +(1 + ((t - f) / span) * range).toFixed(3);
+    }
+    return rawScoringPlays.map(sp => {
+      let bp = null, bd = Infinity;
+      for (const d of data) { const dd = Math.abs(d.t - sp.t); if (dd < bd) { bd = dd; bp = d; } }
+      if (!bp) return null;
+      const price = sp.side === 'away' ? (bp.pa != null ? bp.pa : 1 - bp.ph) : bp.ph;
+      return { t: remap(sp.t), price, side: sp.side, label: sp.label };
+    }).filter(Boolean);
+  }, [rawScoringPlays, chartData, isBaseball, curInning]);
+
   // ── render ──────────────────────────────────────────────────────────────
   return (
     <div style={{background:'#0a0a0a', fontFamily:fb, minHeight:'100vh', color:'#fff'}}>
@@ -790,7 +831,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
             <div style={{height:240,padding:'4px 8px 0'}}>
               {merged.length > 1 ? (
-                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
+                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders} scoringPlays={scoreMarks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
               ) : (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#444',fontSize:13}}>
                   Loading price history…
@@ -934,15 +975,15 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <div key={(play.id??'p')+'-'+i} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px',borderRadius:10,
                       background:play.scoringPlay?HOME.light+'0a':'transparent',animation:i===0?'slideIn .3s':'none'}}>
                       <div style={{flexShrink:0,width:50,textAlign:'center'}}>
-                        <div style={{fontSize:10,color:'#555',fontWeight:600}}>{play.periodDisplay||('Q'+(play.period||''))}</div>
-                        <div style={{fontSize:11,color:'#777',fontFamily:fm}}>{play.clock}</div>
+                        <div style={{fontSize:10,color:'#fff',fontWeight:600}}>{play.periodDisplay||('Q'+(play.period||''))}</div>
+                        <div style={{fontSize:11,color:'#ccc',fontFamily:fm}}>{play.clock}</div>
                       </div>
                       <div style={{flexShrink:0,width:44,textAlign:'center',fontFamily:fm,fontSize:12,fontWeight:700}}>
-                        <span style={{color:HOME.light}}>{play.homeScore}</span>
-                        <span style={{color:'#333'}}>-</span>
-                        <span style={{color:AWAY.light}}>{play.awayScore}</span>
+                        <span style={{color:'#fff'}}>{play.homeScore}</span>
+                        <span style={{color:'#555'}}>-</span>
+                        <span style={{color:'#fff'}}>{play.awayScore}</span>
                       </div>
-                      <div style={{flex:1,fontSize:13,fontWeight:play.scoringPlay?700:400,color:play.scoringPlay?HOME.light:'#777'}}>
+                      <div style={{flex:1,fontSize:13,fontWeight:play.scoringPlay?700:400,color:'#fff'}}>
                         {play.scoringPlay?'🔥 ':''}{play.text}
                       </div>
                       {play.homeWinPct&&<div style={{flexShrink:0,fontFamily:fm,fontSize:11,color:B.primary,fontWeight:700}}>{(play.homeWinPct*100).toFixed(0)}%</div>}

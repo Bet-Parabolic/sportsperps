@@ -1,6 +1,7 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { createChart, AreaSeries, LineSeries, LineStyle, CrosshairMode, ColorType, createSeriesMarkers } from "lightweight-charts";
 import { B, fm } from "../lib/theme.js";
+import { LOGO_MARK } from "../lib/logos.js";
 
 // Our X is game time (minutes / inning number, may be negative for the 50/50 anchor).
 // lightweight-charts is a TIME axis; we map each game-unit → one DAY from a clean UTC
@@ -15,7 +16,7 @@ const fromT = (tm) => (tm - TIME_BASE) / DAY;
 // home (green area) + away (red line), current-price/0.5/liq/limit price lines,
 // entry + score markers, crosshair tooltip, Y locked 0–100% (still zoomable).
 export const TvChart = forwardRef(function TvChart(
-  { data, oPrice, liqLines = [], limitOrders = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
+  { data, oPrice, liqLines = [], limitOrders = [], scoringPlays = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
   ref
 ) {
   const elRef = useRef(null);
@@ -23,8 +24,41 @@ export const TvChart = forwardRef(function TvChart(
   const plRef = useRef([]);          // current price-line handles
   const autoFit = useRef(true);      // follow the full game until the user interacts
   const yRange = useRef([0, 1]);     // Y axis range — default full 0–100%, zoomable via wheel-over-axis
+  const scoreRef = useRef([]);       // scoring-play markers: [{ t, price, side, label }]
+  const layerRef = useRef(null);     // HTML overlay layer for the parabolic-logo scoring dots
   const xFmtRef = useRef(xFmt); xFmtRef.current = xFmt;
   const labelsRef = useRef({ homeLabel, awayLabel }); labelsRef.current = { homeLabel, awayLabel };
+
+  // Draw a Parabolic-logo dot (green = home scored, red = away scored) at each scoring
+  // play, anchored on that team's line. Re-run on every pan/zoom/resize so they track.
+  const placeScoringLogos = () => {
+    const { chart, home } = api.current;
+    const layer = layerRef.current;
+    if (!chart || !home || !layer) return;
+    const ts = chart.timeScale();
+    layer.innerHTML = "";
+    for (const m of scoreRef.current) {
+      const x = ts.timeToCoordinate(toT(m.t));
+      const y = home.priceToCoordinate(m.price);
+      if (x == null || y == null) continue;
+      const col = m.side === "away" ? B.red : B.green;
+      const dot = document.createElement("div");
+      dot.style.cssText =
+        "position:absolute;left:" + x + "px;top:" + y + "px;transform:translate(-50%,-50%);" +
+        "width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;" +
+        "background:" + col + ";border:1.5px solid #0a0a0a;box-shadow:0 0 7px " + col + "cc;z-index:5;pointer-events:none";
+      dot.innerHTML = '<img src="' + LOGO_MARK + '" style="width:12px;height:12px;display:block" alt=""/>';
+      if (m.label) {
+        const tag = document.createElement("div");
+        tag.textContent = m.label;
+        tag.style.cssText =
+          "position:absolute;top:-13px;left:50%;transform:translateX(-50%);font:700 9px " + fm +
+          ";color:" + col + ";white-space:nowrap;text-shadow:0 1px 2px #000";
+        dot.appendChild(tag);
+      }
+      layer.appendChild(dot);
+    }
+  };
 
   // Apply the current Y range to both series so the shared price scale honors it.
   const applyY = () => {
@@ -64,12 +98,20 @@ export const TvChart = forwardRef(function TvChart(
     });
 
     const home = chart.addSeries(AreaSeries, { lineColor: B.green, topColor: B.green + "30", bottomColor: B.green + "04", lineWidth: 2, priceFormat: pf, priceLineVisible: true, priceLineColor: B.green, priceLineStyle: LineStyle.Dotted, lastValueVisible: true, ...yProv });
-    const away = chart.addSeries(LineSeries, { color: B.red, lineWidth: 1, priceFormat: pf, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, ...yProv });
+    const away = chart.addSeries(LineSeries, { color: B.red, lineWidth: 1, priceFormat: pf, priceLineVisible: false, lastValueVisible: false,
+      crosshairMarkerVisible: true, crosshairMarkerRadius: 4, crosshairMarkerBorderColor: B.red, crosshairMarkerBackgroundColor: B.red, ...yProv });
     const markers = createSeriesMarkers(home, []);
 
     const tip = document.createElement("div");
     tip.style.cssText = "position:absolute;display:none;pointer-events:none;z-index:6;background:#0b0d11;border:1px solid #1f1f1f;border-radius:8px;padding:6px 9px;font-family:" + fm + ";font-size:11px;box-shadow:0 4px 16px #000a;white-space:nowrap";
     el.appendChild(tip);
+
+    // Overlay layer for scoring-play logo dots (positioned in placeScoringLogos).
+    const layer = document.createElement("div");
+    layer.style.cssText = "position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:5";
+    el.appendChild(layer);
+    layerRef.current = layer;
+    chart.timeScale().subscribeVisibleLogicalRangeChange(placeScoringLogos);
 
     chart.subscribeCrosshairMove((p) => {
       if (!p.time || !p.point || p.point.x < 0 || p.point.y < 0) { tip.style.display = "none"; return; }
@@ -113,13 +155,21 @@ export const TvChart = forwardRef(function TvChart(
     const stopAuto = () => { autoFit.current = false; };
     el.addEventListener("pointerdown", stopAuto);
 
-    const ro = new ResizeObserver(() => chart.applyOptions({ width: el.clientWidth }));
+    const ro = new ResizeObserver(() => { chart.applyOptions({ width: el.clientWidth }); placeScoringLogos(); });
     ro.observe(el);
     chart.applyOptions({ width: el.clientWidth });
 
     api.current = { chart, home, away, markers, tip, last: null };
 
-    return () => { ro.disconnect(); el.removeEventListener("wheel", onWheel, { capture: true }); el.removeEventListener("pointerdown", stopAuto); chart.remove(); api.current = {}; };
+    return () => {
+      ro.disconnect();
+      try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(placeScoringLogos); } catch (e) {}
+      el.removeEventListener("wheel", onWheel, { capture: true });
+      el.removeEventListener("pointerdown", stopAuto);
+      chart.remove();
+      layerRef.current = null;
+      api.current = {};
+    };
   }, [height]);
 
   // data → series + markers
@@ -133,15 +183,20 @@ export const TvChart = forwardRef(function TvChart(
       let tm = toT(d.t); if (tm <= prev) tm = prev + 1; prev = tm;
       hd.push({ time: tm, value: d.ph });
       ad.push({ time: tm, value: d.pa != null ? d.pa : 1 - d.ph });
-      if (d.score_marker) mk.push({ time: tm, position: "aboveBar", color: B.primaryLight, shape: "circle", text: d.score_marker.label || "" });
-      else if (d.mh_marker) mk.push({ time: tm, position: "belowBar", color: B.green, shape: "arrowUp" });
+      if (d.mh_marker) mk.push({ time: tm, position: "belowBar", color: B.green, shape: "arrowUp" });
       else if (d.ma_marker) mk.push({ time: tm, position: "aboveBar", color: B.red, shape: "arrowDown" });
     }
     home.setData(hd); away.setData(ad);
     markers?.setMarkers(mk);
+
+    // Scoring plays come pre-positioned ({ t, price, side, label }) on the same X-scale as
+    // `data` — kept as their own list (not one-per-point) so adjacent scores never collide.
+    scoreRef.current = scoringPlays;
+
     api.current.last = hd.length ? fromT(hd[hd.length - 1].time) : null;
     if (autoFit.current) chart?.timeScale().fitContent();
-  }, [data]);
+    placeScoringLogos();
+  }, [data, scoringPlays]);
 
   // price lines: current price, 0.5 midline, liquidations, resting limit orders
   useEffect(() => {
