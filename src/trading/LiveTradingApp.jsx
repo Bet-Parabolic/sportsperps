@@ -459,9 +459,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           if (typeof result.maxLeverage === 'number') setMarketMaxLev(result.maxLeverage);
           notify('Max '+(result.maxLeverage||'')+'x leverage at these odds', 'red');
         } else if (result.reason === 'oracleRejected') {
-          // Backend rejects limits >15¢ from the oracle (clob.js MAX_ORACLE_DISTANCE).
+          // Backend rejects limits >25¢ from the oracle (clob.js MAX_ORACLE_DISTANCE).
           const mkt = Math.round((orderSide==='home'?op:1-op)*100);
-          notify(`Limit too far from market — must be within 15¢ of ${mkt}¢ (${Math.max(1,mkt-15)}–${Math.min(99,mkt+15)}¢)`, 'red');
+          notify(`Limit too far from market — must be within 25¢ of ${mkt}¢ (${Math.max(1,mkt-25)}–${Math.min(99,mkt+25)}¢)`, 'red');
         } else {
           notify('Rejected: '+(result.reason||'unknown'), 'red');
         }
@@ -743,8 +743,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           {(sidebarPregame.length > 0 || sidebarLive.length > 0) && (
             <div style={{padding:'0 16px'}}>
               {[
-                { label: 'PREGAME', games: sidebarPregame, color: B.primaryLight, pre: true },
                 { label: 'LIVE', games: sidebarLive, color: B.green, pre: false },
+                { label: 'PREGAME', games: sidebarPregame, color: B.primaryLight, pre: true },
               ].filter(s => s.games.length > 0).map(section => (
                 <div key={section.label} style={{marginBottom:14}}>
                   <div style={{fontSize:10,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,marginBottom:8}}>{section.label} ({section.games.length})</div>
