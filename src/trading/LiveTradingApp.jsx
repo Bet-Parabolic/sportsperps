@@ -367,6 +367,22 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           }
         } catch(e) { /* backend unavailable, keep local state */ }
 
+        // Reconcile resting limit orders with the backend — a filled or cancelled order drops
+        // off here, which clears its green dotted line on the chart + its Pending entry.
+        try {
+          const ordRes = await fetch(`${API_URL}/orders/${userId}`);
+          if (ordRes.ok) {
+            const ordData = await ordRes.json();
+            if (Array.isArray(ordData.orders)) {
+              setLimitOrders(ordData.orders.map(o => ({
+                id: o.oid, gameId: o.gameId, side: o.side, limitPrice: o.price,
+                leverage: o.leverage, size: o.size,
+                margin: o.leverage ? +(((o.size * o.price) / o.leverage)).toFixed(2) : 0,
+              })));
+            }
+          }
+        } catch(e) { /* keep local limit orders if the fetch fails */ }
+
         // Settlement detection (handles draws → push)
         if ((upd.status==='final'||upd.status==='completed') && !settled) {
           setSettled(true);
@@ -455,12 +471,28 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           : tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
         pollRef.current?.(); // reconcile immediately so the new position shows now, not in ≤5s
       } else if (result.status === 'resting') {
-        notify('Limit '+tn.name+' @ '+limitCents+'¢', 'info');
+        // Track it immediately (green dotted line on the chart + Pending entry); the poll
+        // reconciles against the backend and removes it once it fills or is cancelled.
+        if (result.oid != null) setLimitOrders(p => [...p.filter(l => l.id !== result.oid), { id: result.oid, gameId: g.id, side: orderSide, limitPrice: limitCents/100, leverage: lev, margin, size }]);
+        notify('Limit '+tn.name+' @ '+limitCents+'¢ — resting', 'info');
       }
     } catch(e) {
       notify('Order failed: '+e.message, 'red');
     }
   }, [oPrice, orderSide, orderMargin, orderLev, balance, settled, orderType, limitCents, tpCents, slCents, reduceOnly, chartData, HOME, AWAY, notify, addMark, userId, g.id]);
+
+  // Cancel a resting limit order on the backend (DELETE), then drop it locally so its green
+  // dotted chart line + Pending entry clear immediately (the poll reconcile confirms it).
+  const cancelLimitOrder = useCallback(async (lo) => {
+    setLimitOrders(p => p.filter(l => l.id !== lo.id));   // optimistic
+    try {
+      const res = await fetch(`${API_URL}/orders/${lo.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+      notify(res.ok ? 'Order cancelled' : 'Cancel failed — will retry on next sync', res.ok ? 'info' : 'red');
+    } catch (e) {
+      notify('Cancel failed: ' + e.message, 'red');
+    }
+    pollRef.current?.();
+  }, [userId, notify]);
 
   const closePosition = useCallback(async (posObj) => {
     // posObj is the full position object passed directly from the button
@@ -584,7 +616,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     liqPriceCents: (pos.liq*100).toFixed(1),
   })), [gamePositions]);
 
-  // Raw scoring plays from the full play log (oldest→newest), with side + raw game-time.
+  // Raw scoring plays from the play log, with the scoring side + raw game-time. Side comes
+  // from the play's teamId (the team that scored) — robust regardless of play-log ordering —
+  // with a score-delta fallback when teamId is missing.
+  const homeId = initGame.home?.id, awayId = initGame.away?.id;
   const rawScoringPlays = useMemo(() => {
     const ordered = [...playLog].reverse(); // playLog is newest-first; replay oldest→newest
     let prevH = 0, prevA = 0;
@@ -592,7 +627,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     for (const p of ordered) {
       const hs = p.homeScore || 0, as = p.awayScore || 0;
       if (p.scoringPlay) {
-        const side = hs > prevH ? 'home' : as > prevA ? 'away' : 'home';
+        let side = null;
+        if (p.teamId != null && homeId != null && String(p.teamId) === String(homeId)) side = 'home';
+        else if (p.teamId != null && awayId != null && String(p.teamId) === String(awayId)) side = 'away';
+        else side = hs > prevH ? 'home' : as > prevA ? 'away' : 'home';
         const wc = p.wallclock ? Date.parse(p.wallclock) : null;
         const t = wc != null ? gameMinSince(initGame.startTime, wc) : null;
         if (t != null) out.push({ id: p.id, t, side, label: p.scoreValue > 0 ? '+' + p.scoreValue : '●' });
@@ -600,7 +638,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       prevH = hs; prevA = as;
     }
     return out;
-  }, [playLog, initGame.startTime]);
+  }, [playLog, initGame.startTime, homeId, awayId]);
 
   // Position each scoring play on the chart: anchor Y to the scoring team's line (nearest
   // raw point's probability) and remap X through the SAME baseball-inning transform `merged`
@@ -616,13 +654,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       const f = data[0].t, span = Math.max(0.0001, data[data.length - 1].t - f), range = Math.max(1, curInning - 1);
       remap = (t) => +(1 + ((t - f) / span) * range).toFixed(3);
     }
-    return rawScoringPlays.map(sp => {
+    const out = rawScoringPlays.map(sp => {
       let bp = null, bd = Infinity;
       for (const d of data) { const dd = Math.abs(d.t - sp.t); if (dd < bd) { bd = dd; bp = d; } }
       if (!bp) return null;
       const price = sp.side === 'away' ? (bp.pa != null ? bp.pa : 1 - bp.ph) : bp.ph;
       return { t: remap(sp.t), price, side: sp.side, label: sp.label };
     }).filter(Boolean);
+    return out;
   }, [rawScoringPlays, chartData, isBaseball, curInning]);
 
   // ── render ──────────────────────────────────────────────────────────────
@@ -831,7 +870,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
             <div style={{height:240,padding:'4px 8px 0'}}>
               {merged.length > 1 ? (
-                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders} scoringPlays={scoreMarks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
+                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} scoringPlays={scoreMarks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
               ) : (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#444',fontSize:13}}>
                   Loading price history…
@@ -1204,7 +1243,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <span style={{color:lo.side==='home'?HOME.light:AWAY.light,fontWeight:700}}>{loTm.short} {lo.leverage}x</span>
                     <span style={{color:B.primary,fontFamily:fm}}>@ {(lo.limitPrice*100).toFixed(0)}¢</span>
                     <span style={{color:'#888'}}>{fmtUsd(lo.margin)}</span>
-                    <button onClick={()=>{setLimitOrders(p=>p.filter(l=>l.id!==lo.id));setBalance(b=>b+lo.margin);notify('Order cancelled','info');}}
+                    <button onClick={()=>cancelLimitOrder(lo)}
                       style={{background:'#ef444420',border:'none',borderRadius:6,padding:'3px 8px',cursor:'pointer',color:'#ef4444',fontSize:11,fontWeight:700}}>✕</button>
                   </div>
                 );})}

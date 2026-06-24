@@ -25,6 +25,7 @@ export const TvChart = forwardRef(function TvChart(
   const autoFit = useRef(true);      // follow the full game until the user interacts
   const yRange = useRef([0, 1]);     // Y axis range — default full 0–100%, zoomable via wheel-over-axis
   const scoreRef = useRef([]);       // scoring-play markers: [{ t, price, side, label }]
+  const dataTimesRef = useRef([]);   // toT times of the current series points (for snapping markers)
   const layerRef = useRef(null);     // HTML overlay layer for the parabolic-logo scoring dots
   const xFmtRef = useRef(xFmt); xFmtRef.current = xFmt;
   const labelsRef = useRef({ homeLabel, awayLabel }); labelsRef.current = { homeLabel, awayLabel };
@@ -36,9 +37,22 @@ export const TvChart = forwardRef(function TvChart(
     const layer = layerRef.current;
     if (!chart || !home || !layer) return;
     const ts = chart.timeScale();
+    const dts = dataTimesRef.current;
     layer.innerHTML = "";
+    if (!dts.length) return;
+    const first = dts[0], last = dts[dts.length - 1];
     for (const m of scoreRef.current) {
-      const x = ts.timeToCoordinate(toT(m.t));
+      const target = toT(m.t);
+      if (target < first || target > last) continue;       // scored before/after the charted range
+      // lightweight-charts only returns a coordinate for an exact data-point time, so snap to
+      // the nearest one (points are dense → sub-pixel error).
+      let snapped = first, best = Infinity;
+      for (let i = 0; i < dts.length; i++) {
+        const d = Math.abs(dts[i] - target);
+        if (d < best) { best = d; snapped = dts[i]; }
+        else if (dts[i] > target) break;
+      }
+      const x = ts.timeToCoordinate(snapped);
       const y = home.priceToCoordinate(m.price);
       if (x == null || y == null) continue;
       const col = m.side === "away" ? B.red : B.green;
@@ -99,9 +113,10 @@ export const TvChart = forwardRef(function TvChart(
 
     // Both series show only their last-value axis label (home green %, away red %) — no
     // horizontal dotted price line (that duplicated the current-price tag and cluttered the axis).
-    const home = chart.addSeries(AreaSeries, { lineColor: B.green, topColor: B.green + "30", bottomColor: B.green + "04", lineWidth: 2, priceFormat: pf, priceLineVisible: false, lastValueVisible: true, ...yProv });
+    const home = chart.addSeries(AreaSeries, { lineColor: B.green, topColor: B.green + "30", bottomColor: B.green + "04", lineWidth: 2, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
+      crosshairMarkerVisible: true, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2, crosshairMarkerBorderColor: B.green, crosshairMarkerBackgroundColor: B.green, ...yProv });
     const away = chart.addSeries(LineSeries, { color: B.red, lineWidth: 1, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
-      crosshairMarkerVisible: true, crosshairMarkerRadius: 4, crosshairMarkerBorderColor: B.red, crosshairMarkerBackgroundColor: B.red, ...yProv });
+      crosshairMarkerVisible: true, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2, crosshairMarkerBorderColor: B.red, crosshairMarkerBackgroundColor: B.red, ...yProv });
     const markers = createSeriesMarkers(home, []);
 
     const tip = document.createElement("div");
@@ -190,6 +205,7 @@ export const TvChart = forwardRef(function TvChart(
     }
     home.setData(hd); away.setData(ad);
     markers?.setMarkers(mk);
+    dataTimesRef.current = hd.map((p) => p.time);
 
     // Scoring plays come pre-positioned ({ t, price, side, label }) on the same X-scale as
     // `data` — kept as their own list (not one-per-point) so adjacent scores never collide.
@@ -212,7 +228,8 @@ export const TvChart = forwardRef(function TvChart(
       plRef.current.push(home.createPriceLine({ price, color, lineWidth: width, lineStyle: style, axisLabelVisible, title }));
     add(0.5, "#ffffff1a", "", LineStyle.Dashed, 1, false);   // faint 50% reference, no axis label
     liqLines.forEach((ll) => add(ll.liqOnChart, B.red, "LIQ " + ll.liqPriceCents + "¢", LineStyle.Dashed, 2));
-    limitOrders.forEach((lo) => add(lo.side === "home" ? lo.limitPrice : 1 - lo.limitPrice, lo.side === "home" ? B.green : B.red, (lo.limitPrice * 100).toFixed(0) + "¢ LIMIT", LineStyle.LargeDashed));
+    // Resting limit orders → green dotted line at the order price (removed once filled/cancelled).
+    limitOrders.forEach((lo) => add(lo.side === "home" ? lo.limitPrice : 1 - lo.limitPrice, B.green, "LIMIT " + (lo.limitPrice * 100).toFixed(0) + "¢", LineStyle.Dotted, 1));
   }, [oPrice, liqLines, limitOrders]);
 
   return <div ref={elRef} style={{ position: "relative", width: "100%", height }} />;
