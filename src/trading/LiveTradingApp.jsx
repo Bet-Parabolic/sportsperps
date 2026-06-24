@@ -378,11 +378,16 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           if (ordRes.ok) {
             const ordData = await ordRes.json();
             if (Array.isArray(ordData.orders)) {
-              setLimitOrders(ordData.orders.map(o => ({
-                id: o.oid, gameId: o.gameId, side: o.side, limitPrice: o.price,
-                leverage: o.leverage, size: o.size,
-                margin: o.leverage ? +(((o.size * o.price) / o.leverage)).toFixed(2) : 0,
-              })));
+              setLimitOrders(ordData.orders.map(o => {
+                // Backend price is home-terms; store the side's own price for display/chart.
+                const sidePrice = o.side === 'home' ? o.price : 1 - o.price;
+                const cost = o.side === 'home' ? o.price : 1 - o.price; // contract cost = side's price
+                return {
+                  id: o.oid, gameId: o.gameId, side: o.side, limitPrice: sidePrice,
+                  leverage: o.leverage, size: o.size,
+                  margin: o.leverage ? +(((o.size * cost) / o.leverage)).toFixed(2) : 0,
+                };
+              }));
             }
           }
         } catch(e) { /* keep local limit orders if the fetch fails */ }
@@ -444,7 +449,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           userId,
           gameId: g.id,
           side: orderSide,
-          price: orderType==='limit' ? limitCents/100 : undefined,
+          // Backend prices are HOME-terms for both sides (home pays limitPx, away pays 1−limitPx),
+          // and the oracle-distance check is in home terms — so convert an away limit to home.
+          price: orderType==='limit' ? (orderSide==='home' ? limitCents/100 : 1 - limitCents/100) : undefined,
           size,
           type: orderType,
           leverage: lev,
