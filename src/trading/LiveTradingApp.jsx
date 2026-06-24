@@ -458,6 +458,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         if (result.reason === 'leverageRejected') {
           if (typeof result.maxLeverage === 'number') setMarketMaxLev(result.maxLeverage);
           notify('Max '+(result.maxLeverage||'')+'x leverage at these odds', 'red');
+        } else if (result.reason === 'oracleRejected') {
+          // Backend rejects limits >15¢ from the oracle (clob.js MAX_ORACLE_DISTANCE).
+          const mkt = Math.round((orderSide==='home'?op:1-op)*100);
+          notify(`Limit too far from market — must be within 15¢ of ${mkt}¢ (${Math.max(1,mkt-15)}–${Math.min(99,mkt+15)}¢)`, 'red');
         } else {
           notify('Rejected: '+(result.reason||'unknown'), 'red');
         }
@@ -618,6 +622,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const liqLines = useMemo(() => gamePositions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
     liqPriceCents: (pos.liq*100).toFixed(1),
+  })), [gamePositions]);
+
+  // Open-position entry → green dotted "Entry Price" line on the chart (home-prob axis).
+  const entryLines = useMemo(() => gamePositions.filter(p=>p.entry!=null).map(pos => ({
+    id:pos.id, entryOnChart: pos.side==='home' ? pos.entry : 1-pos.entry,
   })), [gamePositions]);
 
   // Raw scoring plays from the play log, with the scoring side + raw game-time. Side comes
@@ -881,7 +890,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
             <div style={{height:240,padding:'4px 8px 0'}}>
               {merged.length > 1 ? (
-                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} scoringPlays={scoreMarks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
+                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} entryLines={entryLines} scoringPlays={scoreMarks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
               ) : (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#444',fontSize:13}}>
                   Loading price history…

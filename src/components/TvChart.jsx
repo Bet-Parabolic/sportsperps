@@ -16,7 +16,7 @@ const fromT = (tm) => (tm - TIME_BASE) / DAY;
 // home (green area) + away (red line), current-price/0.5/liq/limit price lines,
 // entry + score markers, crosshair tooltip, Y locked 0–100% (still zoomable).
 export const TvChart = forwardRef(function TvChart(
-  { data, oPrice, liqLines = [], limitOrders = [], scoringPlays = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
+  { data, oPrice, liqLines = [], limitOrders = [], entryLines = [], scoringPlays = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
   ref
 ) {
   const elRef = useRef(null);
@@ -200,8 +200,10 @@ export const TvChart = forwardRef(function TvChart(
       let tm = toT(d.t); if (tm <= prev) tm = prev + 1; prev = tm;
       hd.push({ time: tm, value: d.ph });
       ad.push({ time: tm, value: d.pa != null ? d.pa : 1 - d.ph });
-      if (d.mh_marker) mk.push({ time: tm, position: "belowBar", color: B.green, shape: "arrowUp" });
-      else if (d.ma_marker) mk.push({ time: tm, position: "aboveBar", color: B.red, shape: "arrowDown" });
+      // Entry is drawn as a horizontal "Entry Price" line (see price-lines effect), not an
+      // arrow — only exit markers remain as arrows.
+      if (d.mh_marker && d.mh_marker !== "entry") mk.push({ time: tm, position: "belowBar", color: B.green, shape: "arrowUp" });
+      else if (d.ma_marker && d.ma_marker !== "entry") mk.push({ time: tm, position: "aboveBar", color: B.red, shape: "arrowDown" });
     }
     home.setData(hd); away.setData(ad);
     markers?.setMarkers(mk);
@@ -227,10 +229,12 @@ export const TvChart = forwardRef(function TvChart(
     const add = (price, color, title, style = LineStyle.Dashed, width = 1, axisLabelVisible = true) =>
       plRef.current.push(home.createPriceLine({ price, color, lineWidth: width, lineStyle: style, axisLabelVisible, title }));
     add(0.5, "#ffffff1a", "", LineStyle.Dashed, 1, false);   // faint 50% reference, no axis label
+    // Open position entry → green dotted "Entry Price" line.
+    entryLines.forEach((en) => add(en.entryOnChart, B.green, "Entry Price", LineStyle.Dotted, 1));
     liqLines.forEach((ll) => add(ll.liqOnChart, B.red, "LIQ " + ll.liqPriceCents + "¢", LineStyle.Dashed, 2));
     // Resting limit orders → green dotted line at the order price (removed once filled/cancelled).
     limitOrders.forEach((lo) => add(lo.side === "home" ? lo.limitPrice : 1 - lo.limitPrice, B.green, "LIMIT " + (lo.limitPrice * 100).toFixed(0) + "¢", LineStyle.Dotted, 1));
-  }, [oPrice, liqLines, limitOrders]);
+  }, [oPrice, liqLines, limitOrders, entryLines]);
 
   return <div ref={elRef} style={{ position: "relative", width: "100%", height }} />;
 });
