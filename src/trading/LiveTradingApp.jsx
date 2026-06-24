@@ -448,9 +448,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       const tn = orderSide==='home' ? HOME : AWAY;
       if (result.fills?.length > 0) {
         const avgPx = result.fills.reduce((s,f)=>s+f.px*f.size,0) / result.fills.reduce((s,f)=>s+f.size,0);
+        // Same-side bet on a game you already hold → it merges into one net position.
+        const addingToPos = posR.current.some(p => p.gameId===g.id && p.side===orderSide);
         addMark(chartNow, avgPx, 'entry', orderSide);
         setBottomTab('positions');
-        notify(tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
+        notify(addingToPos
+          ? 'Added to '+tn.name+' — positions merged, liq updated'
+          : tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
         pollRef.current?.(); // reconcile immediately so the new position shows now, not in ≤5s
       } else if (result.status === 'resting') {
         notify('Limit '+tn.name+' @ '+limitCents+'¢', 'info');
@@ -899,7 +903,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                           </div>
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',padding:'8px 14px',borderTop:'1px solid #1a1a1a'}}>
-                          {[['Entry',(posEntryP*100).toFixed(1)+'¢','#888'],['Mark',(markP*100).toFixed(1)+'¢',B.primaryLight],['Liq',(pos.liq!=null?(pos.side==='home'?pos.liq:1-pos.liq)*100|0:'-')+'¢',B.red],['Size',pos.size?pos.size+' shr':fmtUsd(pos.exposure||0),'#888']].map(([label,value,color])=>(
+                          {[['Avg entry',(posEntryP*100).toFixed(1)+'¢','#888'],['Mark',(markP*100).toFixed(1)+'¢',B.primaryLight],['Liq',(pos.liq!=null?(pos.side==='home'?pos.liq:1-pos.liq)*100|0:'-')+'¢',B.red],['Size',pos.size?pos.size+' shr':fmtUsd(pos.exposure||0),'#888']].map(([label,value,color])=>(
                             <div key={label} style={{textAlign:'center'}}>
                               <div style={{fontSize:10,color:'#444',marginBottom:2}}>{label}</div>
                               <div style={{fontSize:12,fontWeight:700,fontFamily:fm,color}}>{value}</div>
