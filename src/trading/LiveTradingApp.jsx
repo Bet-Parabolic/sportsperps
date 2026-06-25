@@ -74,6 +74,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [limitCents, setLimitCents] = useState(Math.round((initGame.oracle?.indexPrice??0.5)*100));
   const [tpCents,    setTpCents]    = useState('');
   const [slCents,    setSlCents]    = useState('');
+  const [tpslEdit,   setTpslEdit]   = useState(null);   // { id, tp, sl } — inline TP/SL editor on a position
   const [limitOrders,setLimitOrders]= useState([]);
   const [reduceOnly, setReduceOnly] = useState(false);
   const [rightTab,   setRightTab]   = useState('order');
@@ -508,6 +509,25 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     }
     pollRef.current?.();
   }, [userId, notify]);
+
+  // Set / update / clear TP & SL on an existing position. tpC/slC are the side's price in cents
+  // ('' or 0 → clear that one). Optimistically updates local state, then persists to the backend.
+  const setPositionTriggers = useCallback(async (pos, tpC, slC) => {
+    const tp = tpC !== '' && +tpC > 0 ? +tpC / 100 : null;
+    const sl = slC !== '' && +slC > 0 ? +slC / 100 : null;
+    setPositions(ps => ps.map(p => p.id === pos.id ? { ...p, tp, sl } : p));
+    setTpslEdit(null);
+    try {
+      const res = await fetch(`${API_URL}/positions/triggers`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, gameId: pos.gameId, tp, sl }),
+      });
+      const tm = pos.side === 'home' ? HOME : AWAY;
+      if (res.ok) notify(`TP/SL updated for ${tm.short}${tp?` · TP ${Math.round(tp*100)}¢`:''}${sl?` · SL ${Math.round(sl*100)}¢`:''}${!tp&&!sl?' · cleared':''}`, 'info');
+      else notify('Could not update TP/SL', 'red');
+    } catch (e) { notify('TP/SL update failed: ' + e.message, 'red'); }
+    pollRef.current?.();
+  }, [userId, notify, HOME, AWAY]);
 
   const closePosition = useCallback(async (posObj) => {
     // posObj is the full position object passed directly from the button
@@ -972,8 +992,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                             <span style={{fontSize:13,fontWeight:800,color:'#fff'}}>{teamName}</span>
                             <span style={{fontSize:10,fontWeight:700,color:B.primary,background:B.primary+'15',padding:'2px 6px',borderRadius:5,fontFamily:fm}}>{pos.leverage}x</span>
-                            {pos.tp&&<span style={{fontSize:10,color:B.green,fontFamily:fm,background:B.green+'10',padding:'2px 5px',borderRadius:4}}>TP {(pos.side==='home'?pos.tp:1-pos.tp)*100|0}¢</span>}
-                            {pos.sl&&<span style={{fontSize:10,color:B.red,fontFamily:fm,background:B.red+'10',padding:'2px 5px',borderRadius:4}}>SL {(pos.side==='home'?pos.sl:1-pos.sl)*100|0}¢</span>}
+                            {pos.tp&&<span style={{fontSize:10,color:B.green,fontFamily:fm,background:B.green+'10',padding:'2px 5px',borderRadius:4}}>TP {Math.round(pos.tp*100)}¢</span>}
+                            {pos.sl&&<span style={{fontSize:10,color:B.red,fontFamily:fm,background:B.red+'10',padding:'2px 5px',borderRadius:4}}>SL {Math.round(pos.sl*100)}¢</span>}
                           </div>
                           <div style={{textAlign:'right'}}>
                             <div style={{fontSize:16,fontWeight:800,color:pctClr(pnl),fontFamily:fm}}>{fmtUsd(pnl)}</div>
@@ -995,8 +1015,33 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                         </div>
                         <div style={{padding:'8px 14px',borderTop:'1px solid #1a1a1a',display:'flex',alignItems:'center',gap:6}}>
                           <span style={{fontSize:11,color:'#555',flex:1,fontFamily:fm}}>{posShares.toLocaleString()} shares · margin {fmtUsd(pos.margin)}</span>
+                          <button onClick={(e)=>{e.stopPropagation();setTpslEdit(cur=>cur&&cur.id===pos.id?null:{id:pos.id,tp:pos.tp?String(Math.round(pos.tp*100)):'',sl:pos.sl?String(Math.round(pos.sl*100)):''});}}
+                            style={{padding:'5px 12px',background:tpslEdit?.id===pos.id?B.primary+'25':'#1a1a1a',border:'1px solid '+(tpslEdit?.id===pos.id?B.primary+'50':'#2a2a2a'),borderRadius:8,cursor:'pointer',color:tpslEdit?.id===pos.id?B.primaryLight:'#aaa',fontWeight:700,fontSize:11,fontFamily:fb}}>TP/SL</button>
                           <button onClick={(e)=>{e.stopPropagation();closePosition(pos);}} style={{padding:'5px 14px',background:'#ef444415',border:'1px solid #ef444430',borderRadius:8,cursor:'pointer',color:'#ef4444',fontWeight:700,fontSize:11,fontFamily:fb}}>Close</button>
                         </div>
+                        {/* Inline TP/SL editor — set/clear take-profit & stop-loss on this position (side-scale ¢) */}
+                        {tpslEdit?.id===pos.id&&(
+                          <div onClick={(e)=>e.stopPropagation()} style={{padding:'10px 14px',borderTop:'1px solid #1a1a1a',background:'#0c0c0c'}}>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                              <div>
+                                <div style={{fontSize:9,color:B.green,fontWeight:600,marginBottom:3}}>Take Profit ¢</div>
+                                <input type="number" min={1} max={99} value={tpslEdit.tp} placeholder="—" onChange={e=>setTpslEdit(c=>({...c,tp:e.target.value}))}
+                                  style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:7,padding:'6px 8px',color:B.green,fontSize:12,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                              </div>
+                              <div>
+                                <div style={{fontSize:9,color:B.red,fontWeight:600,marginBottom:3}}>Stop Loss ¢</div>
+                                <input type="number" min={1} max={99} value={tpslEdit.sl} placeholder="—" onChange={e=>setTpslEdit(c=>({...c,sl:e.target.value}))}
+                                  style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:7,padding:'6px 8px',color:B.red,fontSize:12,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                              </div>
+                            </div>
+                            <div style={{fontSize:9,color:'#555',marginBottom:8}}>Triggers when {teamName} reaches the price (TP above, SL below). Entry {(posEntryP*100).toFixed(0)}¢.</div>
+                            <div style={{display:'flex',gap:6}}>
+                              <button onClick={()=>setPositionTriggers(pos,tpslEdit.tp,tpslEdit.sl)} style={{flex:1,padding:'7px 0',background:B.primary,border:'none',borderRadius:8,cursor:'pointer',color:'#000',fontWeight:700,fontSize:11,fontFamily:fb}}>Save</button>
+                              {(pos.tp||pos.sl)&&<button onClick={()=>setPositionTriggers(pos,'','')} style={{padding:'7px 12px',background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:8,cursor:'pointer',color:'#888',fontWeight:700,fontSize:11,fontFamily:fb}}>Clear</button>}
+                              <button onClick={()=>setTpslEdit(null)} style={{padding:'7px 12px',background:'transparent',border:'1px solid #2a2a2a',borderRadius:8,cursor:'pointer',color:'#666',fontWeight:700,fontSize:11,fontFamily:fb}}>Cancel</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
