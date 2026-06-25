@@ -221,6 +221,8 @@ export const TvChart = forwardRef(function TvChart(
       el.removeEventListener("wheel", onWheel, { capture: true });
       el.removeEventListener("pointerdown", stopAuto);
       chart.remove();
+      try { layer.remove(); } catch (e) {}   // remove imperatively-appended overlays so a
+      try { tip.remove(); } catch (e) {}      // re-mount (StrictMode/remount) can't leave a stale, duplicated layer
       layerRef.current = null;
       api.current = {};
     };
