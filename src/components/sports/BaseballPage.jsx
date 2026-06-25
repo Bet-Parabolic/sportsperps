@@ -9,14 +9,19 @@ export function BaseballPage({ data={events:[],loading:true,error:false}, onTrad
   const final   = games.filter(g => g.isFinal && isRecent(g.date));
   const sched   = games.filter(g => g.isScheduled).sort(byDate);
   const delayed = games.filter(g => g.isDelayed);
+  const isPreGame = (g) => !!findBackendGame(liveGames, g, 'mlb')?.pregame;
+  const pregame  = sched.filter(isPreGame);
+  const upcoming = sched.filter(g => !isPreGame(g));
 
   const GameCard = ({ g }) => {
     const homeScore = parseInt(g.home.score) || 0;
     const awayScore = parseInt(g.away.score) || 0;
     const homeWinning = homeScore > awayScore;
     const tied = homeScore === awayScore;
-    const statusColor = g.isLive ? B.green : g.isDelayed ? "#ff9f1c" : g.isFinal ? "#555" : "#555";
-    const statusLabel = g.isLive ? "LIVE" : g.isDelayed ? "DELAYED" : g.isFinal ? "FINAL" : "UPCOMING";
+    const bg = findBackendGame(liveGames, g, 'mlb');
+    const isPre = g.isScheduled && !!bg?.pregame;
+    const statusColor = g.isLive ? B.green : isPre ? B.primaryLight : g.isDelayed ? "#ff9f1c" : g.isFinal ? "#555" : "#555";
+    const statusLabel = g.isLive ? "LIVE" : isPre ? "PREGAME" : g.isDelayed ? "DELAYED" : g.isFinal ? "FINAL" : "UPCOMING";
 
     return (
       <div style={{background:"#111",border:"1px solid #1f1f1f",borderRadius:16,padding:"20px 24px",transition:"all .15s"}}>
@@ -58,7 +63,7 @@ export function BaseballPage({ data={events:[],loading:true,error:false}, onTrad
         {g.isScheduled && (()=>{const when=fmtGameTime(g.date);return(when||g.detail)?(
           <div style={{fontSize:11,color:"#888",fontFamily:fm,marginTop:8,letterSpacing:"0.04em"}}>{when}{when&&g.detail?" · ":""}{g.detail||""}</div>
         ):null;})()}
-        {g.isLive&&(()=>{const bg=findBackendGame(liveGames,g,'mlb');const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
+        {(g.isLive||isPre)&&(()=>{const wp=bg?.oracle?.indexPrice?(bg.oracle.indexPrice*100).toFixed(1):null;return(<>
           {wp&&<div style={{marginTop:8}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
               <span style={{fontSize:10,color:B.primary,fontWeight:700,fontFamily:fm}}>{wp}% {g.home.name}</span>
@@ -69,9 +74,9 @@ export function BaseballPage({ data={events:[],loading:true,error:false}, onTrad
             </div>
           </div>}
           {onTrade&&bg&&<button onClick={()=>onTrade(bg)} style={{width:"100%",marginTop:10,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
-            background:"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            <span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
-            Trade Live
+            background:isPre?"linear-gradient(135deg,"+B.red+",#ff7a6e)":"linear-gradient(135deg,"+B.green+","+B.greenLight+")",color:isPre?"#fff":"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            {!isPre&&<span style={{width:6,height:6,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>}
+            {isPre?"Trade Pre-Game":"Trade Live"}
           </button>}
         </>);})()}
       </div>
@@ -126,12 +131,22 @@ export function BaseballPage({ data={events:[],loading:true,error:false}, onTrad
         </div>
       )}
 
+      {/* Pregame — open for wagering */}
+      {pregame.length > 0 && (
+        <div style={{marginBottom:32}}>
+          <div style={{fontSize:11,fontWeight:700,color:B.primaryLight,letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>◷ PREGAME — OPEN FOR WAGERING</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
+            {pregame.map(g=><GameCard key={g.id} g={g}/>)}
+          </div>
+        </div>
+      )}
+
       {/* Upcoming */}
-      {sched.length > 0 && (
+      {upcoming.length > 0 && (
         <div style={{marginBottom:32}}>
           <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>UPCOMING</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
-            {sched.map(g=><GameCard key={g.id} g={g}/>)}
+            {upcoming.map(g=><GameCard key={g.id} g={g}/>)}
           </div>
         </div>
       )}

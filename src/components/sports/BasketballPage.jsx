@@ -7,14 +7,17 @@ export function BasketballPage({ liveGames, onTrade }) {
   const live    = bballGames.filter(g => g.status === "live" || g.status === "halftime");
   const final   = bballGames.filter(g => (g.status === "final" || g.status === "completed") && isRecent(g.date || g.startTime));
   const sched   = bballGames.filter(g => g.status === "scheduled").sort((a,b) => new Date(a.date||a.startTime||0) - new Date(b.date||b.startTime||0));
+  const pregame  = sched.filter(g => g.pregame);
+  const upcoming = sched.filter(g => !g.pregame);
   const hasGames = live.length > 0 || sched.length > 0 || final.length > 0;
 
   const GameCard = ({ g }) => {
     const isLive = g.status === "live";
     const isHalf = g.status === "halftime";
     const isFinal = g.status === "final" || g.status === "completed";
-    const statusColor = isLive ? B.green : isHalf ? "#ff9f1c" : isFinal ? "#666" : "#555";
-    const statusLabel = isLive ? "LIVE" : isHalf ? "HALF" : isFinal ? "FINAL" : g.statusDetail || "UPCOMING";
+    const isPre = g.status === "scheduled" && g.pregame;
+    const statusColor = isLive ? B.green : isHalf ? "#ff9f1c" : isPre ? B.primaryLight : isFinal ? "#666" : "#555";
+    const statusLabel = isLive ? "LIVE" : isHalf ? "HALF" : isPre ? "PREGAME" : isFinal ? "FINAL" : g.statusDetail || "UPCOMING";
     const homeWinning = (g.home.score || 0) > (g.away.score || 0);
     const winProb = g.oracle?.indexPrice ? (g.oracle.indexPrice * 100).toFixed(1) : null;
 
@@ -76,8 +79,8 @@ export function BasketballPage({ liveGames, onTrade }) {
           </div>
         </div>
 
-        {/* Oracle win prob bar */}
-        {winProb && (isLive || isHalf) && (
+        {/* Oracle win prob bar (live, halftime, or pregame once the oracle is seeded) */}
+        {winProb && (isLive || isHalf || isPre) && (
           <div style={{marginTop:4}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
               <span style={{fontSize:10,color:B.primary,fontWeight:700,fontFamily:fm}}>{winProb}% {g.home.abbreviation||g.home.name}</span>
@@ -89,12 +92,12 @@ export function BasketballPage({ liveGames, onTrade }) {
           </div>
         )}
 
-        {/* Trade Live button */}
-        {onTrade && (isLive || isHalf) && (
+        {/* Live → green "Trade Live"; pregame → red "Trade Pre-Game" */}
+        {onTrade && (isLive || isHalf || isPre) && (
           <button onClick={()=>onTrade(g)} style={{width:"100%",marginTop:8,padding:"10px 0",borderRadius:10,border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:13,
-            background:"linear-gradient(135deg, "+B.green+", "+B.greenLight+")",color:"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-            <span style={{width:7,height:7,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>
-            Trade Live
+            background:isPre?"linear-gradient(135deg,"+B.red+",#ff7a6e)":"linear-gradient(135deg, "+B.green+", "+B.greenLight+")",color:isPre?"#fff":"#000",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            {!isPre&&<span style={{width:7,height:7,borderRadius:"50%",background:"#000",opacity:0.5,animation:"pulse 1.5s infinite"}}/>}
+            {isPre?"Trade Pre-Game":"Trade Live"}
           </button>
         )}
 
@@ -140,12 +143,22 @@ export function BasketballPage({ liveGames, onTrade }) {
         </div>
       )}
 
+      {/* Pregame — open for wagering */}
+      {pregame.length > 0 && (
+        <div style={{marginBottom:32}}>
+          <div style={{fontSize:11,fontWeight:700,color:B.primaryLight,letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>◷ PREGAME — OPEN FOR WAGERING</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
+            {pregame.map(g => <GameCard key={g.id} g={g}/>)}
+          </div>
+        </div>
+      )}
+
       {/* Scheduled */}
-      {sched.length > 0 && (
+      {upcoming.length > 0 && (
         <div style={{marginBottom:32}}>
           <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>UPCOMING</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
-            {sched.map(g => <GameCard key={g.id} g={g}/>)}
+            {upcoming.map(g => <GameCard key={g.id} g={g}/>)}
           </div>
         </div>
       )}
