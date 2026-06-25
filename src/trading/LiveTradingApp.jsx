@@ -6,8 +6,10 @@ import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
 import { subscribeLive } from "../lib/liveSocket.js";
 import { TvChart } from "../components/TvChart.jsx";
-import { ProfileModal } from "../components/ProfileModal.jsx";
+import { ProfilePage } from "../components/ProfilePage.jsx";
+import { AuthModal } from "../components/AuthModal.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
+import { getAuth, currentUserId, authToken, isLoggedIn } from "../lib/auth.js";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -36,14 +38,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // ── normalise team colors from backend ──────────────────────────────────
   const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
 
-  // ── userId: persist in localStorage, register with backend ──────────────
-  const [userId] = useState(() => {
-    let id = localStorage.getItem('perpdictions_userId');
-    if (!id) { id = crypto.randomUUID(); localStorage.setItem('perpdictions_userId', id); }
-    return id;
-  });
+  // ── auth/userId: guest UUID until the user signs up; auth session adds username/token ──
+  const [auth, setAuth] = useState(getAuth);          // { userId, username, token } | null
+  const userId = auth?.userId || currentUserId();     // trade as the authed account, else guest
+  const [showAuth, setShowAuth] = useState(false);    // login/signup modal
 
-  // Register user with backend on mount
+  // Register user with backend on mount (idempotent; guests get a paper balance)
   useEffect(() => {
     fetch(`${API_URL}/users`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId}) }).catch(()=>{});
   }, [userId]);
@@ -428,6 +428,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
   // ── placeOrder (backend CLOB) ────────────────────────────────────────────
   const placeOrder = useCallback(async () => {
+    if (!isLoggedIn()) { setShowAuth(true); return; }  // gate: must sign in / sign up to wager
     if (settled) return;
     const op = oR.current;
     const ml2 = maxLev(op), lev = Math.min(orderLev, ml2);
@@ -448,6 +449,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
           userId,
+          token: authToken(),
           gameId: g.id,
           side: orderSide,
           // Backend prices are HOME-terms for both sides (home pays limitPx, away pays 1−limitPx),
@@ -1556,7 +1558,20 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           </div>
         </div>
       )}
-      {showProfile && <ProfileModal userId={userId} onClose={()=>setShowProfile(false)}/>}
+      {showProfile && (
+        <ProfilePage
+          userId={userId}
+          onClose={()=>setShowProfile(false)}
+          onLoggedOut={()=>{ setAuth(null); setShowProfile(false); }}
+        />
+      )}
+      {showAuth && (
+        <AuthModal
+          reason="Sign in or create an account to place a wager."
+          onClose={()=>setShowAuth(false)}
+          onAuth={(data)=>{ setAuth(data); setShowAuth(false); pollRef.current?.(); }}
+        />
+      )}
       {tradeCard && <TradeCard card={tradeCard} onClose={()=>setTradeCard(null)}/>}
     </div>
   );
