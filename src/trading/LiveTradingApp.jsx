@@ -609,15 +609,25 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     // chart is pure game time. Pregame (not-yet-started) games keep their pre-kickoff line.
     const started = data.some(d => d.t >= 0);
     if (started) data = data.filter(d => d.t >= 0);
-    // Resample to a uniform time cadence. lightweight-charts spaces points by index, so the
-    // live tail (recorded every ~5s) would otherwise pack the current inning/minute with far
-    // more points than the sparse seeded early game and stretch it across most of the width.
-    // Cap to ~1 point per BUCKET minutes (keep the latest in each bucket) → x ∝ game time.
-    if (data.length > 2) {
-      const BUCKET = 0.5; // minutes of game time
-      const byBucket = new Map();
-      for (const d of data) byBucket.set(Math.round(d.t / BUCKET), d);   // last per bucket wins
-      data = [...byBucket.values()].sort((a, b) => a.t - b.t);
+    // Resample onto a UNIFORM time grid so the x-axis is perfectly even. lightweight-charts
+    // spaces points by index, so without this the dense live tail (~1pt/5s) and the sparse
+    // seeded early game produce uneven spacing. We emit one point per equal time step across
+    // [t0, tN], linearly interpolating the win prob — so point index ∝ game time exactly.
+    if (data.length > 2 && data[data.length-1].t > data[0].t) {
+      const t0 = data[0].t, tN = data[data.length-1].t;
+      const n = Math.min(600, Math.max(8, Math.round((tN - t0) / 0.5))); // ~1 step / 30s, capped
+      const grid = []; let j = 0;
+      for (let i = 0; i <= n; i++) {
+        const bt = t0 + (tN - t0) * (i / n);
+        while (j + 1 < data.length && data[j + 1].t <= bt) j++;
+        let ph = data[j].ph;
+        if (j + 1 < data.length && data[j + 1].t > data[j].t) {
+          const fr = Math.max(0, Math.min(1, (bt - data[j].t) / (data[j + 1].t - data[j].t)));
+          ph = data[j].ph + fr * (data[j + 1].ph - data[j].ph);
+        }
+        grid.push({ t: +bt.toFixed(4), ph, pa: 1 - ph, mp: ph, mh_val: null, mh_marker: null, ma_val: null, ma_marker: null });
+      }
+      data = grid;
     }
     for (const m of markers) {
       let best = 0;
