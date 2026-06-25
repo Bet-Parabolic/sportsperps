@@ -9,7 +9,7 @@ import { BOX } from "../lib/games.js";
 import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
 import { useChartZoom } from "../lib/useChartZoom.js";
 import { ChartTip } from "../components/shared/ChartTip.jsx";
-import { ProfileModal } from "../components/ProfileModal.jsx";
+import { ProfilePage } from "../components/ProfilePage.jsx";
 import { LeaderboardPage } from "../components/LeaderboardPage.jsx";
 import { BasketballPage } from "../components/sports/BasketballPage.jsx";
 import { BaseballPage } from "../components/sports/BaseballPage.jsx";
@@ -1184,7 +1184,7 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
           </div>
         </div>
       )}
-      {showProfile && <ProfileModal userId={userId} onClose={()=>setShowProfile(false)}/>}
+      {showProfile && <ProfilePage onClose={()=>setShowProfile(false)} onLoggedOut={()=>setShowProfile(false)}/>}
     </div>
   );
 }
