@@ -102,7 +102,7 @@ export const TvChart = forwardRef(function TvChart(
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "#888", fontFamily: fm, attributionLogo: false },
       grid: { vertLines: { color: "#ffffff08" }, horzLines: { color: "#ffffff08" } },
       rightPriceScale: { borderColor: "#1f1f1f", scaleMargins: { top: 0.06, bottom: 0.06 } },
-      timeScale: { borderColor: "#1f1f1f", timeVisible: false, secondsVisible: false, rightOffset: 3, minBarSpacing: 0.05,
+      timeScale: { borderColor: "#1f1f1f", timeVisible: false, secondsVisible: false, rightOffset: 1, minBarSpacing: 0.05,
         fixLeftEdge: true, fixRightEdge: true,   // can't scroll/zoom past the data into the empty pre-game region
         tickMarkFormatter: (tm) => (xFmtRef.current ? xFmtRef.current(fromT(tm)) : "") },
       localization: { priceFormatter: (p) => (p * 100).toFixed(0) + "%", timeFormatter: (tm) => (xFmtRef.current ? xFmtRef.current(fromT(tm)) : "") },
@@ -231,7 +231,9 @@ export const TvChart = forwardRef(function TvChart(
     add(0.5, "#ffffff1a", "", LineStyle.Dashed, 1, false);   // faint 50% reference, no axis label
     // Open position entry → green dotted "Entry Price" line.
     entryLines.forEach((en) => add(en.entryOnChart, B.green, "Entry Price", LineStyle.Dotted, 1));
-    liqLines.forEach((ll) => add(ll.liqOnChart, B.red, "LIQ " + ll.liqPriceCents + "¢", LineStyle.Dashed, 2));
+    // Liquidation: one label = the win % level that triggers it (matches the line's position
+    // on the chart's win-prob axis — no separate, conflicting axis tag).
+    liqLines.forEach((ll) => add(ll.liqOnChart, B.red, "LIQ " + Math.round(ll.liqOnChart * 100) + "%", LineStyle.Dashed, 2, false));
     // Resting limit orders → green dotted line at the order price (removed once filled/cancelled).
     limitOrders.forEach((lo) => add(lo.side === "home" ? lo.limitPrice : 1 - lo.limitPrice, B.green, "LIMIT " + (lo.limitPrice * 100).toFixed(0) + "¢", LineStyle.Dotted, 1));
   }, [oPrice, liqLines, limitOrders, entryLines]);

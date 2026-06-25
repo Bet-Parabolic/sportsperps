@@ -604,7 +604,21 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
   // merged chart data with markers
   const merged = useMemo(() => {
-    let data = chartData.map(d => ({...d}));
+    let data = chartData.filter(d => d.t != null).map(d => ({...d}));
+    // Once the game has started, hide pregame-seed points (t<0 = before kickoff) so the
+    // chart is pure game time. Pregame (not-yet-started) games keep their pre-kickoff line.
+    const started = data.some(d => d.t >= 0);
+    if (started) data = data.filter(d => d.t >= 0);
+    // Resample to a uniform time cadence. lightweight-charts spaces points by index, so the
+    // live tail (recorded every ~5s) would otherwise pack the current inning/minute with far
+    // more points than the sparse seeded early game and stretch it across most of the width.
+    // Cap to ~1 point per BUCKET minutes (keep the latest in each bucket) → x ∝ game time.
+    if (data.length > 2) {
+      const BUCKET = 0.5; // minutes of game time
+      const byBucket = new Map();
+      for (const d of data) byBucket.set(Math.round(d.t / BUCKET), d);   // last per bucket wins
+      data = [...byBucket.values()].sort((a, b) => a.t - b.t);
+    }
     for (const m of markers) {
       let best = 0;
       for (let i=1; i<data.length; i++) if (Math.abs(data[i].t-m.t)<Math.abs(data[best].t-m.t)) best=i;
@@ -613,10 +627,6 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         else                 { data[best].mh_val=m.p;   data[best].mh_marker=m.markerType; }
       }
     }
-    // Once the game has started, hide pregame-seed points (t<0 = before kickoff) so the
-    // chart is pure game time. Pregame (not-yet-started) games keep their pre-kickoff line.
-    const started = data.some(d => d.t >= 0);
-    if (started) data = data.filter(d => d.t >= 0);
     // Baseball: remap X into inning units (1 → current inning) so the chart always runs
     // from the 1st inning, regardless of when the oracle's history actually begins.
     if (isBaseball && started && data.length > 1) {
