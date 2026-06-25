@@ -16,9 +16,10 @@ const fromT = (tm) => (tm - TIME_BASE) / DAY;
 // home (green area) + away (red line), current-price/0.5/liq/limit price lines,
 // entry + score markers, crosshair tooltip, Y locked 0–100% (still zoomable).
 export const TvChart = forwardRef(function TvChart(
-  { data, oPrice, liqLines = [], limitOrders = [], entryLines = [], scoringPlays = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
+  { data, oPrice, liqLines = [], limitOrders = [], entryLines = [], scoringPlays = [], xTicks = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
   ref
 ) {
+  const X_AXIS_H = 18;               // height of our custom evenly-spaced x-axis strip
   const elRef = useRef(null);
   const api = useRef({});           // chart + series handles
   const plRef = useRef([]);          // current price-line handles
@@ -27,6 +28,8 @@ export const TvChart = forwardRef(function TvChart(
   const scoreRef = useRef([]);       // scoring-play markers: [{ t, price, side, label }]
   const dataTimesRef = useRef([]);   // toT times of the current series points (for snapping markers)
   const layerRef = useRef(null);     // HTML overlay layer for the parabolic-logo scoring dots
+  const xLayerRef = useRef(null);    // custom x-axis label strip (evenly spaced, no repeats)
+  const xTicksRef = useRef(xTicks); xTicksRef.current = xTicks;
   const xFmtRef = useRef(xFmt); xFmtRef.current = xFmt;
   const labelsRef = useRef({ homeLabel, awayLabel }); labelsRef.current = { homeLabel, awayLabel };
 
@@ -74,6 +77,38 @@ export const TvChart = forwardRef(function TvChart(
     }
   };
 
+  // Our own x-axis: one evenly-spaced label per inning / minute-interval, no repeats. The
+  // native time axis is hidden — lightweight-charts can't guarantee even, non-repeating ticks.
+  const placeXLabels = () => {
+    const { chart } = api.current;
+    const layer = xLayerRef.current;
+    if (!chart || !layer) return;
+    const ts = chart.timeScale();
+    const dts = dataTimesRef.current;
+    layer.innerHTML = "";
+    if (!dts.length) return;
+    const first = dts[0], last = dts[dts.length - 1];
+    const seen = new Set();
+    for (const tk of xTicksRef.current) {
+      if (seen.has(tk.label)) continue;          // never repeat a label
+      const target = toT(tk.t);
+      if (target < first || target > last) continue;
+      let snapped = first, best = Infinity;       // snap to nearest data time (timeToCoordinate needs one)
+      for (let i = 0; i < dts.length; i++) {
+        const d = Math.abs(dts[i] - target);
+        if (d < best) { best = d; snapped = dts[i]; }
+        else if (dts[i] > target) break;
+      }
+      const x = ts.timeToCoordinate(snapped);
+      if (x == null) continue;
+      seen.add(tk.label);
+      const lab = document.createElement("div");
+      lab.textContent = tk.label;
+      lab.style.cssText = "position:absolute;top:3px;left:" + x + "px;transform:translateX(-50%);font:400 10px " + fm + ";color:#888;white-space:nowrap";
+      layer.appendChild(lab);
+    }
+  };
+
   // Apply the current Y range to both series so the shared price scale honors it.
   const applyY = () => {
     const prov = () => ({ priceRange: { minValue: yRange.current[0], maxValue: yRange.current[1] } });
@@ -97,14 +132,15 @@ export const TvChart = forwardRef(function TvChart(
     const pf = { type: "custom", formatter: (p) => (p * 100).toFixed(1) + "%" };
 
     const chart = createChart(el, {
-      height,
+      height: height - X_AXIS_H,
       autoSize: false,
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "#888", fontFamily: fm, attributionLogo: false },
       grid: { vertLines: { color: "#ffffff08" }, horzLines: { color: "#ffffff08" } },
       rightPriceScale: { borderColor: "#1f1f1f", scaleMargins: { top: 0.06, bottom: 0.06 } },
-      timeScale: { borderColor: "#1f1f1f", timeVisible: false, secondsVisible: false, rightOffset: 1, minBarSpacing: 0.05,
-        fixLeftEdge: true, fixRightEdge: true,   // can't scroll/zoom past the data into the empty pre-game region
-        tickMarkFormatter: (tm) => (xFmtRef.current ? xFmtRef.current(fromT(tm)) : "") },
+      // Native time axis hidden — we render our own evenly-spaced labels (placeXLabels) so
+      // innings/minutes never repeat or skew. Keep fixLeftEdge/Right for pan/zoom anchoring.
+      timeScale: { borderColor: "#1f1f1f", visible: false, timeVisible: false, secondsVisible: false, rightOffset: 1, minBarSpacing: 0.05,
+        fixLeftEdge: true, fixRightEdge: true },
       localization: { priceFormatter: (p) => (p * 100).toFixed(0) + "%", timeFormatter: (tm) => (xFmtRef.current ? xFmtRef.current(fromT(tm)) : "") },
       crosshair: { mode: CrosshairMode.Normal,
         vertLine: { color: "#ffffff2a", width: 1, style: LineStyle.Solid, labelBackgroundColor: "#1f2733" },
@@ -128,7 +164,8 @@ export const TvChart = forwardRef(function TvChart(
     layer.style.cssText = "position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:5";
     el.appendChild(layer);
     layerRef.current = layer;
-    chart.timeScale().subscribeVisibleLogicalRangeChange(placeScoringLogos);
+    const redraw = () => { placeScoringLogos(); placeXLabels(); };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(redraw);
 
     chart.subscribeCrosshairMove((p) => {
       if (!p.time || !p.point || p.point.x < 0 || p.point.y < 0) { tip.style.display = "none"; return; }
@@ -172,7 +209,7 @@ export const TvChart = forwardRef(function TvChart(
     const stopAuto = () => { autoFit.current = false; };
     el.addEventListener("pointerdown", stopAuto);
 
-    const ro = new ResizeObserver(() => { chart.applyOptions({ width: el.clientWidth }); placeScoringLogos(); });
+    const ro = new ResizeObserver(() => { chart.applyOptions({ width: el.clientWidth }); redraw(); });
     ro.observe(el);
     chart.applyOptions({ width: el.clientWidth });
 
@@ -180,7 +217,7 @@ export const TvChart = forwardRef(function TvChart(
 
     return () => {
       ro.disconnect();
-      try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(placeScoringLogos); } catch (e) {}
+      try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(redraw); } catch (e) {}
       el.removeEventListener("wheel", onWheel, { capture: true });
       el.removeEventListener("pointerdown", stopAuto);
       chart.remove();
@@ -216,7 +253,8 @@ export const TvChart = forwardRef(function TvChart(
     api.current.last = hd.length ? fromT(hd[hd.length - 1].time) : null;
     if (autoFit.current) chart?.timeScale().fitContent();
     placeScoringLogos();
-  }, [data, scoringPlays]);
+    placeXLabels();
+  }, [data, scoringPlays, xTicks]);
 
   // price lines: 0.5 midline (no axis label), liquidations, resting limit orders.
   // Current price is shown by the series' own last-value labels (home green %, away red %),
@@ -238,5 +276,10 @@ export const TvChart = forwardRef(function TvChart(
     limitOrders.forEach((lo) => add(lo.side === "home" ? lo.limitPrice : 1 - lo.limitPrice, B.green, "LIMIT " + (lo.limitPrice * 100).toFixed(0) + "¢", LineStyle.Dotted, 1));
   }, [oPrice, liqLines, limitOrders, entryLines]);
 
-  return <div ref={elRef} style={{ position: "relative", width: "100%", height }} />;
+  return (
+    <div style={{ position: "relative", width: "100%", height }}>
+      <div ref={elRef} style={{ position: "relative", width: "100%", height: height - X_AXIS_H }} />
+      <div ref={xLayerRef} style={{ position: "relative", width: "100%", height: X_AXIS_H, pointerEvents: "none" }} />
+    </div>
+  );
 });

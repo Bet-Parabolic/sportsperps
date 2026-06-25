@@ -666,6 +666,27 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     return Math.max(0, Math.round(v)) + 'm';
   }, [isSoccer, isBaseball]);
 
+  // Evenly-spaced x-axis ticks (one per inning / per nice minute step) — rendered by TvChart
+  // as our own axis so labels never repeat or skew. `t` values match `merged`'s scale.
+  const xTicks = useMemo(() => {
+    if (!merged.length) return [];
+    let lo = Infinity, hi = -Infinity;
+    for (const d of merged) { if (d.t < lo) lo = d.t; if (d.t > hi) hi = d.t; }
+    const out = [];
+    if (isBaseball) {
+      const maxInn = Math.max(1, Math.round(hi));      // merged remaps last point → current inning
+      const step = maxInn > 9 ? 2 : 1;
+      for (let n = 1; n <= maxInn; n += step) out.push({ t: n, label: ordinal(n) });
+    } else {
+      const span = Math.max(1, hi - Math.max(0, lo));
+      const rawStep = span / 5;
+      const nice = [2, 5, 10, 15, 20, 30, 45, 60].find(s => s >= rawStep) || 60;
+      const start = Math.max(nice, Math.ceil(Math.max(0, lo) / nice) * nice);
+      for (let m = start; m <= hi + 0.001; m += nice) out.push({ t: m, label: isSoccer ? Math.round(m) + "'" : Math.round(m) + "m" });
+    }
+    return out;
+  }, [merged, isBaseball, isSoccer]);
+
   const liqLines = useMemo(() => gamePositions.map(pos => ({
     id:pos.id, side:pos.side, liqOnChart: pos.side==='home' ? pos.liq : 1-pos.liq,
     liqPriceCents: (pos.liq*100).toFixed(1),
@@ -937,7 +958,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
             <div style={{height:240,padding:'4px 8px 0'}}>
               {merged.length > 1 ? (
-                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} entryLines={entryLines} scoringPlays={scoreMarks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
+                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} entryLines={entryLines} scoringPlays={scoreMarks} xTicks={xTicks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
               ) : (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#444',fontSize:13}}>
                   Loading price history…
