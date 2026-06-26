@@ -544,12 +544,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
           userId,
+          token: authToken(),          // required now that orders are auth-gated for logged-in accounts
           gameId: pos.gameId || g.id,
           side: closeSide,
           size: pos.size,
           type: 'market',
           leverage: pos.leverage,
-          reduceOnly: true,
+          reduceOnly: true,            // market reduce-only: closes immediately, overriding any TP/SL
         }),
       });
       const result = await res.json();
@@ -570,6 +571,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         setTradeCard({ type:'close', side:pos.side, teamName:tn.name, teamLogo:pos.side==='home'?HOME.logoUrl:AWAY.logoUrl, teamColor:pos.side==='home'?HOME.light:AWAY.light, entryPx, exitPx:avgPx, leverage:pos.leverage, pnl, pnlPct, gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:periodLabel(g.league, g.period, g.clock, g.statusDetail) });
       } else if (result.status === 'rejected') {
         notify('Close rejected: '+(result.reason||''), 'red');
+      } else if (result.error) {
+        notify('Close failed: '+result.error, 'red');
       }
     } catch(e) {
       notify('Close failed: '+e.message, 'red');
