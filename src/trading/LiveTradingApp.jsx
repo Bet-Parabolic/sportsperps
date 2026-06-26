@@ -440,8 +440,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     const sl = slCents!==''&&+slCents>0 ? +slCents/100 : null;
     const chartNow = chartData.length ? chartData[chartData.length-1].t : 0;
 
-    // Calculate size from margin + leverage: size = (margin * leverage) / price
-    const price = orderType==='limit' ? limitCents/100 : op;
+    // Calculate size from margin + leverage: shares = (margin * leverage) / cost-per-share.
+    // Cost per share is in the ORDER'S OWN side terms — home pays the home price, away pays
+    // (1 − home price). For market that's the oracle price; for limit it's the entered price
+    // (limitCents is already in side terms). Using the home price for an away market order
+    // under-sized the fill (e.g. away at 38% only committed ~0.61× the intended margin).
+    const price = orderType==='limit' ? limitCents/100 : (orderSide==='home' ? op : 1 - op);
     const size = Math.max(1, Math.round((margin * lev) / Math.max(price, 0.01)));
 
     try {
