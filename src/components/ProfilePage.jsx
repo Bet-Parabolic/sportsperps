@@ -71,6 +71,10 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
         <div style={avatar}>{username.charAt(0).toUpperCase()}</div>
         <div style={{ fontSize: 22, fontWeight: 700, color: B.white, fontFamily: fd }}>{username}</div>
         <div style={{ fontSize: 12, color: B.dim }}>Joined {joined}</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: fm, color: B.primaryLight, background: B.primary + "18", padding: "4px 11px", borderRadius: 999 }}>⚡ {(profile?.points || 0).toLocaleString()} pts</span>
+          {profile?.streak > 0 && <span style={{ fontSize: 12, fontWeight: 700, fontFamily: fm, color: "#ff9f1c", background: "#ff9f1c18", padding: "4px 11px", borderRadius: 999 }}>🔥 {profile.streak}-day streak</span>}
+        </div>
         <button onClick={() => setView("account")} style={editBtn}>Edit</button>
       </div>
 
@@ -116,6 +120,8 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
           <StatBox label="ROI" value={fmtPct(returnPct)} color={returnPct >= 0 ? B.primary : B.red} />
           <StatBox label="Win rate" value={`${winRate}%`} />
           <StatBox label="Volume" value={fmtUsd(profile?.totalVolume ?? 0)} />
+          <StatBox label="Points" value={(profile?.points ?? 0).toLocaleString()} color={B.primaryLight} />
+          <StatBox label="Day streak" value={profile?.streak ? "🔥 " + profile.streak : "0"} />
           <StatBox label="Settled bets" value={String(profile?.tradeCount ?? 0)} />
           <StatBox label="Open positions" value={String(profile?.openPositions ?? positions.length)} />
         </div>

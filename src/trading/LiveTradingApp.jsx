@@ -487,6 +487,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         notify(addingToPos
           ? 'Added to '+tn.name+' — positions merged, liq updated'
           : tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
+        if (result.points?.total > 0) notify('⚡ +'+result.points.total+' points'+(result.points.streak>0?' · 🔥 '+result.points.streakCount+'-day streak':''), 'info');
         pollRef.current?.(); // reconcile immediately so the new position shows now, not in ≤5s
       } else if (result.status === 'resting') {
         // Track it immediately (green dotted line on the chart + Pending entry); the poll
