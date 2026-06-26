@@ -16,7 +16,7 @@ const fromT = (tm) => (tm - TIME_BASE) / DAY;
 // home (green area) + away (red line), current-price/0.5/liq/limit price lines,
 // entry + score markers, crosshair tooltip, Y locked 0–100% (still zoomable).
 export const TvChart = forwardRef(function TvChart(
-  { data, oPrice, liqLines = [], limitOrders = [], entryLines = [], scoringPlays = [], xTicks = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
+  { data, oPrice, liqLines = [], limitOrders = [], entryLines = [], tpLines = [], slLines = [], scoringPlays = [], xTicks = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
   ref
 ) {
   const X_AXIS_H = 18;               // height of our custom evenly-spaced x-axis strip
@@ -276,7 +276,10 @@ export const TvChart = forwardRef(function TvChart(
     liqLines.forEach((ll) => add(ll.liqOnChart, B.red, "LIQ " + Math.round(ll.liqOnChart * 100) + "%", LineStyle.Dashed, 2, false));
     // Resting limit orders → green dotted line at the order price (removed once filled/cancelled).
     limitOrders.forEach((lo) => add(lo.side === "home" ? lo.limitPrice : 1 - lo.limitPrice, B.green, "LIMIT " + (lo.limitPrice * 100).toFixed(0) + "¢", LineStyle.Dotted, 1));
-  }, [oPrice, liqLines, limitOrders, entryLines]);
+    // Take-profit → blue dotted; stop-loss → yellow dotted (levels already in home-prob terms).
+    tpLines.forEach((t) => add(t.priceOnChart, "#3b82f6", "TP " + Math.round(t.priceOnChart * 100) + "%", LineStyle.Dotted, 1, false));
+    slLines.forEach((s) => add(s.priceOnChart, "#facc15", "SL " + Math.round(s.priceOnChart * 100) + "%", LineStyle.Dotted, 1, false));
+  }, [oPrice, liqLines, limitOrders, entryLines, tpLines, slLines]);
 
   return (
     <div style={{ position: "relative", width: "100%", height }}>

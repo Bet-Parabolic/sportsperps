@@ -699,6 +699,15 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     id:pos.id, entryOnChart: pos.side==='home' ? pos.entry : 1-pos.entry,
   })), [gamePositions]);
 
+  // TP/SL levels → dotted lines (TP blue, SL yellow). tp/sl are stored in the position's own
+  // side scale, so convert away-side levels to home-prob terms (same as liq/entry).
+  const tpLines = useMemo(() => gamePositions.filter(p=>p.tp!=null).map(pos => ({
+    id:pos.id, priceOnChart: pos.side==='home' ? pos.tp : 1-pos.tp,
+  })), [gamePositions]);
+  const slLines = useMemo(() => gamePositions.filter(p=>p.sl!=null).map(pos => ({
+    id:pos.id, priceOnChart: pos.side==='home' ? pos.sl : 1-pos.sl,
+  })), [gamePositions]);
+
   // Raw scoring plays from the play log, with the scoring side + raw game-time. Side comes
   // from the play's teamId (the team that scored) — robust regardless of play-log ordering —
   // with a score-delta fallback when teamId is missing.
@@ -960,7 +969,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
             <div style={{height:240,padding:'4px 8px 0'}}>
               {merged.length > 1 ? (
-                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} entryLines={entryLines} scoringPlays={scoreMarks} xTicks={xTicks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
+                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} entryLines={entryLines} tpLines={tpLines} slLines={slLines} scoringPlays={scoreMarks} xTicks={xTicks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
               ) : (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#444',fontSize:13}}>
                   Loading price history…
