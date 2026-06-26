@@ -8,6 +8,7 @@ import { subscribeLive } from "../lib/liveSocket.js";
 import { TvChart } from "../components/TvChart.jsx";
 import { ProfilePage } from "../components/ProfilePage.jsx";
 import { AuthModal } from "../components/AuthModal.jsx";
+import { ChatPanel } from "../components/ChatPanel.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
 import { getAuth, currentUserId, authToken, isLoggedIn } from "../lib/auth.js";
 
@@ -1126,7 +1127,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           {/* GAMECAST */}
           <div data-mob="gamecast" style={{margin:isMobile?'8px 12px 0':'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
             <div style={{display:'flex',borderBottom:'1px solid #1f1f1f'}}>
-              {[['gamecast','Gamecast',playLog.length],['boxscore','Box Score',0]].map(([id,label,count])=>(
+              {[['gamecast','Gamecast',playLog.length],['boxscore','Box Score',0],['chat','Chat',0]].map(([id,label,count])=>(
                 <button key={id} onClick={()=>setBottomTab(id)} style={{padding:'10px 20px',fontSize:13,fontWeight:600,border:'none',cursor:'pointer',fontFamily:fb,
                   background:'transparent',color:bottomTab===id?'#fff':'#666',borderBottom:bottomTab===id?'2px solid '+B.primary:'2px solid transparent'}}>
                   {label}{id==='gamecast'&&count>0&&<span style={{color:B.primary,marginLeft:4,fontSize:11}}>{count}</span>}
@@ -1191,6 +1192,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   </div>
                 );
               })()}
+              {bottomTab==='chat' && <ChatPanel gameId={g.id} userId={userId} homeShort={HOME.short} awayShort={AWAY.short} onRequireAuth={()=>setShowAuth(true)}/>}
             </div>
           </div>
 
