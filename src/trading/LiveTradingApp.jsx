@@ -461,6 +461,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           // and the oracle-distance check is in home terms — so convert an away limit to home.
           price: orderType==='limit' ? (orderSide==='home' ? limitCents/100 : 1 - limitCents/100) : undefined,
           size,
+          // Treat the input margin as the MAX total spend — the backend sizes the fill so
+          // margin + spread + fee ≤ this budget (fee comes out of the wager, not extra).
+          budget: reduceOnly ? undefined : margin,
           type: orderType,
           leverage: lev,
           tif: orderType==='limit' ? 'GTC' : undefined,
