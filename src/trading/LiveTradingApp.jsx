@@ -488,7 +488,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         // Same-side bet on a game you already hold → it merges into one net position.
         const addingToPos = posR.current.some(p => p.gameId===g.id && p.side===orderSide);
         addMark(chartNow, avgPx, 'entry', orderSide);
-        setBottomTab('positions');
+        // Jump to Positions after a fill — but stay on Chat if the user is watching it (so the
+        // bettors feed stays put and their own bet message just streams in).
+        setBottomTab(t => t === 'chat' ? 'chat' : 'positions');
         notify(addingToPos
           ? 'Added to '+tn.name+' — positions merged, liq updated'
           : tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
