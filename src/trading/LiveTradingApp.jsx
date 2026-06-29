@@ -71,6 +71,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [orderMargin,setOrderMargin]= useState(500);
   const [orderLev,   setOrderLev]   = useState(3);
   const [marketMaxLev, setMarketMaxLev] = useState(null); // authoritative cap from backend (incl. scoring throttle)
+  const [marketMaxLevBySide, setMarketMaxLevBySide] = useState(null); // gap-aware cap per side {home,away}
   const [orderType,  setOrderType]  = useState('market');
   const [limitCents, setLimitCents] = useState(Math.round((initGame.oracle?.indexPrice??0.5)*100));
   const [tpCents,    setTpCents]    = useState('');
@@ -321,8 +322,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 trades: mktData.stats.tradeCount || 0,
               });
             }
-            // Authoritative max leverage (price tier + scoring-play throttle)
+            // Authoritative max leverage (gap-aware: extremity + single-event swing, per side)
             if (typeof mktData.maxLeverage === 'number') setMarketMaxLev(mktData.maxLeverage);
+            if (mktData.maxLeverageBySide) setMarketMaxLevBySide(mktData.maxLeverageBySide);
           }
         } catch(e) {
           setBook(makeBook(upd.oracle?.indexPrice ?? 0.5));
@@ -474,7 +476,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       const result = await res.json();
       if (result.status === 'rejected') {
         if (result.reason === 'leverageRejected') {
-          if (typeof result.maxLeverage === 'number') setMarketMaxLev(result.maxLeverage);
+          if (typeof result.maxLeverage === 'number') {
+            setMarketMaxLev(result.maxLeverage);
+            // the rejection's cap is for THIS side — update the per-side cap so the slider corrects
+            setMarketMaxLevBySide(b => ({ ...(b || {}), [orderSide]: result.maxLeverage }));
+          }
           notify('Max '+(result.maxLeverage||'')+'x leverage at these odds', 'red');
         } else if (result.reason === 'oracleRejected') {
           // Backend rejects limits >25¢ from the oracle (clob.js MAX_ORACLE_DISTANCE).
@@ -599,7 +605,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // can be re-priced live with oPrice — other games without a server pnl contribute 0.
   const totalUPnL = positions.reduce((s,p) => s + (p.pnl != null ? p.pnl : (p.gameId===g.id ? calcPnL(p.side,p.exposure||0,p.entry,oPrice) : 0)), 0);
   const totalEq   = balance + positions.reduce((s,p)=>s+p.margin,0) + totalUPnL;
-  const ml  = marketMaxLev != null ? Math.min(maxLev(oPrice), marketMaxLev) : maxLev(oPrice);
+  // Side-aware gap cap: a favorite keeps more leverage than the underdog in the same game.
+  const sideCap = marketMaxLevBySide ? marketMaxLevBySide[orderSide] : marketMaxLev;
+  const ml  = sideCap != null ? Math.min(maxLev(oPrice), sideCap) : maxLev(oPrice);
   const eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
   const team = orderSide==='home' ? HOME : AWAY;
   const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL);
