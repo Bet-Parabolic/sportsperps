@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/dash", "destination": "/" },
+    { "source": "/dash/(.*)", "destination": "/" }
+  ]
+}

@@ -8,6 +8,7 @@ import { useLiveGames } from "./lib/useLiveGames.js";
 import { LandingPage } from "./components/LandingPage.jsx";
 const TradingApp = lazy(() => import("./trading/TradingApp.jsx").then(m => ({ default: m.TradingApp })));
 const LiveTradingApp = lazy(() => import("./trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
+const DashboardPage = lazy(() => import("./dash/DashboardPage.jsx").then(m => ({ default: m.DashboardPage })));
 
 const Splash = () => (
   <div style={{minHeight:"100vh",background:"#000",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -24,6 +25,8 @@ export default function App() {
   const host = typeof window !== "undefined" ? window.location.hostname : "";
   const isAppDomain = /^app\./.test(host);
   const isProdLanding = host === "parabolic.gg" || host === "www.parabolic.gg";
+  // Internal oracle-accuracy dashboard — /dash on any host (admin-gated, unlinked, noindex).
+  const isDash = typeof window !== "undefined" && window.location.pathname.startsWith("/dash");
 
   const [page, setPage] = useState(isAppDomain ? "trading" : "landing");
   const [sel, setSel] = useState(PROC_GAMES[0]);
@@ -64,7 +67,9 @@ export default function App() {
         button:hover:not(:disabled){filter:brightness(1.15);}button:active:not(:disabled){transform:scale(0.98);}
         *{box-sizing:border-box;margin:0;padding:0;}
       `}</style>
-      {page==="landing"
+      {isDash
+        ? <Suspense fallback={<Splash/>}><DashboardPage/></Suspense>
+        : page==="landing"
         ? <LandingPage onLaunch={launchApp} onDocs={()=>window.open("https://docs.parabolic.gg/docs","_blank","noopener,noreferrer")}/>
         : <Suspense fallback={<Splash/>}>
             {page==="live-trading"&&liveGame
