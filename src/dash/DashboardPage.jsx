@@ -71,6 +71,8 @@ const TIP = {
   vBasis: "Hedge venue's price minus our oracle (P = Polymarket, K = Kalshi). The cost of crossing to hedge; near 0 is ideal.",
   vState: "open = live game with residual delta, keep the hedge on. unwind = game final or all user positions closed → close the hedge. none = nothing to hedge.",
   vFills: "Every fill the vault took as counterparty, newest first — the moment a user's order was filled by the vault.",
+  vFunding: "Net funding the vault has collected as the residual counterparty (it's short the book's net delta). A small steady revenue line that also pays traders to balance the book.",
+  vFundRow: "Current funding rate for this game, %/hr. + → home longs pay (away + vault receive); − → reversed. Driven by book premium + vault inventory skew. See FUNDING_SPEC.",
 };
 
 function Login({ onAuthed }) {
@@ -205,6 +207,7 @@ function VaultTab({ vault }) {
         <Stat label="Liability" value={fmtUsd(v.liability)} sub="short notional" info={TIP.vLiability} />
         <Stat label="Active games" value={v.activeGames ?? 0} info={TIP.vActive} />
         <Stat label="Volume" value={fmtUsd(v.totalVolume)} />
+        <Stat label="Funding collected" value={fmtSigned(v.fundingCollected)} sub="net carry" info={TIP.vFunding} />
         {vault.shadow && <Stat label="Hedge coverage" value={vault.shadow.coverageRate != null ? (vault.shadow.coverageRate * 100).toFixed(0) + "%" : "—"} sub={`${vault.shadow.samples || 0} samples`} />}
       </div>
 
@@ -217,6 +220,7 @@ function VaultTab({ vault }) {
                 <th style={th}>Net Δ<Info text={TIP.vNetDelta} /></th>
                 <th style={th}>Liability H/A<Info text={TIP.vLiabRow} /></th>
                 <th style={th}>Unreal<Info text={TIP.vUnreal} /></th>
+                <th style={th}>Funding/hr<Info text={TIP.vFundRow} /></th>
                 <th style={th}>Hedge<Info text={TIP.vHedge} /></th>
                 <th style={th}>Best venue<Info text={TIP.vVenue} /></th>
                 <th style={th}>Basis ¢ P/K<Info text={TIP.vBasis} /></th>
@@ -230,6 +234,7 @@ function VaultTab({ vault }) {
                   <td style={{ ...td, color: signColor(g.users?.netHomeDelta) }}>{(g.users?.netHomeDelta ?? 0) >= 0 ? "+" : ""}{g.users?.netHomeDelta}</td>
                   <td style={td}>{fmtUsd(g.liability?.homeNotional)} / {fmtUsd(g.liability?.awayNotional)}</td>
                   <td style={{ ...td, color: signColor(g.unrealizedPnl) }}>{fmtSigned(g.unrealizedPnl)}</td>
+                  <td style={{ ...td, color: g.funding ? signColor(g.funding.hourlyPct) : C.mut }}>{g.funding ? (g.funding.hourlyPct >= 0 ? "+" : "") + g.funding.hourlyPct.toFixed(3) + "%" : "—"}</td>
                   <td style={td}>{g.hedge?.contracts > 0 ? `${g.hedge.side} ×${g.hedge.contracts}` : "—"}</td>
                   <td style={td}>{g.hedge?.bestVenue ? `${g.hedge.bestVenue} @ ${cents(g.hedge.bestVenuePx)}` : <span style={{ color: C.red }}>no venue</span>}</td>
                   <td style={td}>{g.hedge?.basisPoly != null ? (g.hedge.basisPoly * 100).toFixed(1) : "—"} / {g.hedge?.basisKalshi != null ? (g.hedge.basisKalshi * 100).toFixed(1) : "—"}</td>
