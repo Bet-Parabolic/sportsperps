@@ -46,6 +46,8 @@ const TIP = {
   logloss: "Like Brier, but punishes being confident AND wrong much harder. Lower is better. Target: green < 0.55; above 0.69 (red) means we're confidently wrong somewhere.",
   auc: "Can the oracle tell winners from losers? 1.0 = always priced the winner higher; 0.5 = a coin flip. Target: green > 0.82, amber to 0.72, red below.",
   reliability: "How far the prices sit from reality on average (the gap in the calibration curve). 0 = perfectly honest. Lower is better. Target: green < 0.01, amber to 0.03, red above.",
+  skill: "Brier Skill Score: how much we beat a dumb forecaster that always guesses the average outcome. > 0 = we add value; 1 = perfect; negative = worse than guessing. Target: green > 0.2, amber > 0, red ≤ 0.",
+  phases: "Brier within each phase of the game (per sport) — shows WHERE in a game the oracle is least accurate (e.g. the chaotic final innings/minutes). Each cell colors once it has ≥ 10 forecasts.",
   calibration: "Each dot: of all the moments the oracle said X%, did it actually happen X% of the time? On the dashed line = honest. Below = overpriced, above = underpriced.",
   sources: "Each price source graded on its own (lower Brier = more accurate). Tells us which source to trust and how to weight the blend.",
   singleSource: "Share of a game's logged moments priced by only ONE source. Target: green < 25%, amber to 50%, red above — over 50% it can't be cross-checked (soccer's known weak spot).",
@@ -364,6 +366,7 @@ export function DashboardPage() {
             <Stat label="Log-loss" value={fmt(summary.logLoss, 3)} info={TIP.logloss} valueColor={band(summary.logLoss, trust, "low", 0.55, 0.69)} />
             <Stat label="AUC" value={fmt(summary.auc, 3)} sub="discrimination" info={TIP.auc} valueColor={band(summary.auc, trust, "high", 0.82, 0.72)} />
             <Stat label="Reliability" value={fmt(summary.murphy?.reliability, 4)} sub="miscalibration" info={TIP.reliability} valueColor={band(summary.murphy?.reliability, trust, "low", 0.01, 0.03)} />
+            <Stat label="Skill score" value={fmt(summary.brierSkill, 3)} sub="vs base rate" info={TIP.skill} valueColor={band(summary.brierSkill, trust, "high", 0.2, 0)} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -377,6 +380,25 @@ export function DashboardPage() {
               </table>
             </Panel>
           </div>
+
+          <Panel title="Calibration by game phase" info={TIP.phases}>
+            {Object.keys(summary.phases || {}).length === 0
+              ? <div style={{ color: C.mut, fontSize: 13 }}>No phase data yet.</div>
+              : Object.entries(summary.phases).map(([lg, rows]) => (
+                <div key={lg} style={{ marginBottom: 12 }}>
+                  <div style={{ color: C.mut, fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{lg}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {rows.map((r) => (
+                      <div key={r.bucket} style={{ background: C.surface, borderRadius: 8, padding: "6px 10px", minWidth: 60, textAlign: "center" }}>
+                        <div style={{ color: C.mut, fontSize: 10 }}>{r.bucket}</div>
+                        <div style={{ color: band(r.brier, r.n >= 10, "low", 0.18, 0.22), fontSize: 15, fontWeight: 700, fontFamily: mono }}>{fmt(r.brier, 3)}</div>
+                        <div style={{ color: C.mut, fontSize: 9 }}>n={r.n}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </Panel>
 
           <Panel title="Coverage by sport">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
