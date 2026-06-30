@@ -48,6 +48,7 @@ const TIP = {
   reliability: "How far the prices sit from reality on average (the gap in the calibration curve). 0 = perfectly honest. Lower is better. Target: green < 0.01, amber to 0.03, red above.",
   skill: "Brier Skill Score: how much we beat a dumb forecaster that always guesses the average outcome. > 0 = we add value; 1 = perfect; negative = worse than guessing. Target: green > 0.2, amber > 0, red ≤ 0.",
   phases: "Brier within each phase of the game (per sport) — shows WHERE in a game the oracle is least accurate (e.g. the chaotic final innings/minutes). Each cell colors once it has ≥ 10 forecasts.",
+  weights: "Data-driven weighting: each source's suggested share is INVERSELY proportional to its error (more accurate → more weight). A heuristic to nudge toward — NOT a final answer; wait for ~1000 forecasts before a big reweight. ↑ = source is underweighted vs its accuracy, ↓ = overweighted.",
   calibration: "Each dot: of all the moments the oracle said X%, did it actually happen X% of the time? On the dashed line = honest. Below = overpriced, above = underpriced.",
   sources: "Each price source graded on its own (lower Brier = more accurate). Tells us which source to trust and how to weight the blend.",
   singleSource: "Share of a game's logged moments priced by only ONE source. Target: green < 25%, amber to 50%, red above — over 50% it can't be cross-checked (soccer's known weak spot).",
@@ -380,6 +381,29 @@ export function DashboardPage() {
               </table>
             </Panel>
           </div>
+
+          <Panel title="Source weighting — current vs suggested" info={TIP.weights}>
+            {(summary.weights || []).length === 0
+              ? <div style={{ color: C.mut, fontSize: 13 }}>No source data yet.</div>
+              : (() => {
+                const w = summary.weights;
+                const curTot = w.reduce((a, r) => a + (r.current || 0), 0) || 1;
+                return <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead><tr><th style={th}>Source</th><th style={th}>Current</th><th style={th}>Suggested</th><th style={th}>Log-loss</th><th style={th}>n</th></tr></thead>
+                  <tbody>{w.map((r) => {
+                    const cur = (r.current || 0) / curTot;
+                    const up = r.suggestedShare > cur + 0.02, down = r.suggestedShare < cur - 0.02;
+                    return <tr key={r.name}>
+                      <td style={td}>{r.name}</td>
+                      <td style={{ ...td, color: C.mut }}>{r.current ?? "—"} · {(cur * 100).toFixed(0)}%</td>
+                      <td style={{ ...td, color: up ? C.primaryLt : down ? C.amber : C.text, fontWeight: 700 }}>{(r.suggestedShare * 100).toFixed(0)}% {up ? "↑" : down ? "↓" : ""}</td>
+                      <td style={td}>{fmt(r.logLoss, 3)}</td>
+                      <td style={{ ...td, color: C.mut }}>{r.n}</td>
+                    </tr>;
+                  })}</tbody>
+                </table>;
+              })()}
+          </Panel>
 
           <Panel title="Calibration by game phase" info={TIP.phases}>
             {Object.keys(summary.phases || {}).length === 0
