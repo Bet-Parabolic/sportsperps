@@ -20,6 +20,33 @@ const adminFetch = (path) =>
 
 const fmt = (v, d = 4) => (v == null ? "—" : (+v).toFixed(d));
 
+// Hover-explainers. Pure-CSS tooltip (no state) — a "?" badge that reveals plain-English help.
+const TIP_CSS = `
+.dinfo{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid #2a2f3a;color:#8a93a6;font-size:9px;font-weight:700;margin-left:5px;cursor:help;position:relative;vertical-align:middle;}
+.dinfo .dtip{display:none;position:absolute;bottom:150%;left:50%;transform:translateX(-50%);width:244px;background:#11141a;border:1px solid #2a2f3a;border-radius:8px;padding:9px 11px;color:#cfd6e4;font-size:11px;font-weight:400;line-height:1.55;z-index:60;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.55);white-space:normal;}
+.dinfo:hover .dtip,.dinfo:focus .dtip{display:block;}
+`;
+const Info = ({ text }) => (
+  <span className="dinfo" tabIndex={0} role="img" aria-label={text}>?<span className="dtip">{text}</span></span>
+);
+const TIP = {
+  games: "Finished games we've scored the oracle against. Each one feeds every metric below.",
+  forecasts: "Individual (predicted price → actual result) checkpoints across all graded games — the sample size behind the metrics.",
+  brier: "The headline accuracy score: average squared gap between the oracle's price and what actually happened. 0 = perfect, 0.25 = a useless 50/50 guess. Lower is better.",
+  logloss: "Like Brier, but punishes being confident AND wrong much harder. Lower is better — rewards honest probabilities, not just close ones.",
+  auc: "Can the oracle tell winners from losers? 1.0 = it always priced the eventual winner higher; 0.5 = no better than a coin flip. Measures ranking, ignoring the exact price.",
+  reliability: "How far the prices sit from reality on average (the gap in the calibration curve). 0 = perfectly honest. Lower is better — this is the 'miscalibration' number.",
+  calibration: "Each dot: of all the moments the oracle said X%, did it actually happen X% of the time? On the dashed line = honest. Below = overpriced, above = underpriced.",
+  sources: "Each price source graded on its own (lower Brier = more accurate). Tells us which source to trust and how to weight the blend.",
+  singleSource: "Share of a game's logged moments priced by only ONE source. High = thin, fragile coverage (soccer's known weak spot).",
+  avgConf: "The oracle's own confidence (how much its sources agreed), averaged over the game. Higher = sources agreed.",
+  settleGap: "How far the oracle's last live price was from the true 1/0 result. A big gap = a late surprise it didn't see coming.",
+  staleKalshi: "How often the safety guard dropped a Kalshi quote for disagreeing with the live model. High = Kalshi was stale that game.",
+  liveOracle: "The current live win-probability price for the home side, in cents.",
+  liveSources: "How many independent price sources are feeding this game right now.",
+  ticks: "Price points logged for this game so far. 0 on a settled game = it was already over when capture started.",
+};
+
 function Login({ onAuthed }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
@@ -50,19 +77,19 @@ function Login({ onAuthed }) {
   );
 }
 
-const Panel = ({ title, children, right }) => (
+const Panel = ({ title, children, right, info }) => (
   <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, marginBottom: 16 }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-      <div style={{ color: C.text, fontWeight: 700, fontSize: 14 }}>{title}</div>
+      <div style={{ color: C.text, fontWeight: 700, fontSize: 14 }}>{title}{info && <Info text={info} />}</div>
       {right}
     </div>
     {children}
   </div>
 );
 
-const Stat = ({ label, value, sub }) => (
+const Stat = ({ label, value, sub, info }) => (
   <div style={{ background: C.surface, borderRadius: 10, padding: "12px 14px", minWidth: 120 }}>
-    <div style={{ color: C.mut, fontSize: 11, fontWeight: 600 }}>{label}</div>
+    <div style={{ color: C.mut, fontSize: 11, fontWeight: 600 }}>{label}{info && <Info text={info} />}</div>
     <div style={{ color: C.text, fontSize: 22, fontWeight: 700, fontFamily: mono }}>{value}</div>
     {sub && <div style={{ color: C.mut, fontSize: 11 }}>{sub}</div>}
   </div>
@@ -159,6 +186,7 @@ export function DashboardPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "24px 28px", fontFamily: "'Hanken Grotesk', system-ui, sans-serif" }}>
+      <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>Oracle accuracy</div>
@@ -173,7 +201,7 @@ export function DashboardPage() {
         {live.length === 0
           ? <div style={{ color: C.mut, fontSize: 13 }}>No live games right now.</div>
           : <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={th}>Game</th><th style={th}>Score</th><th style={th}>State</th><th style={th}>Oracle</th><th style={th}>Sources</th><th style={th}>Ticks</th><th style={th}></th></tr></thead>
+              <thead><tr><th style={th}>Game</th><th style={th}>Score</th><th style={th}>State</th><th style={th}>Oracle<Info text={TIP.liveOracle} /></th><th style={th}>Sources<Info text={TIP.liveSources} /></th><th style={th}>Ticks<Info text={TIP.ticks} /></th><th style={th}></th></tr></thead>
               <tbody>{live.map((g) => (
                 <tr key={g.game_id}>
                   <td style={td}>{g.away}@{g.home} <span style={{ color: C.mut }}>{g.league}</span></td>
@@ -195,17 +223,17 @@ export function DashboardPage() {
       {summary && !empty && (
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-            <Stat label="Games graded" value={summary.games} />
-            <Stat label="Forecasts" value={summary.pairs} />
-            <Stat label="Brier" value={fmt(summary.brier)} sub="lower better" />
-            <Stat label="Log-loss" value={fmt(summary.logLoss, 3)} />
-            <Stat label="AUC" value={fmt(summary.auc, 3)} sub="discrimination" />
-            <Stat label="Reliability" value={fmt(summary.murphy?.reliability, 4)} sub="miscalibration" />
+            <Stat label="Games graded" value={summary.games} info={TIP.games} />
+            <Stat label="Forecasts" value={summary.pairs} info={TIP.forecasts} />
+            <Stat label="Brier" value={fmt(summary.brier)} sub="lower better" info={TIP.brier} />
+            <Stat label="Log-loss" value={fmt(summary.logLoss, 3)} info={TIP.logloss} />
+            <Stat label="AUC" value={fmt(summary.auc, 3)} sub="discrimination" info={TIP.auc} />
+            <Stat label="Reliability" value={fmt(summary.murphy?.reliability, 4)} sub="miscalibration" info={TIP.reliability} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <Panel title="Calibration (reliability curve)"><ReliabilityChart bins={summary.reliability} /></Panel>
-            <Panel title="Source accuracy (Brier, lower better)">
+            <Panel title="Calibration (reliability curve)" info={TIP.calibration}><ReliabilityChart bins={summary.reliability} /></Panel>
+            <Panel title="Source accuracy (Brier, lower better)" info={TIP.sources}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead><tr><th style={th}>Source</th><th style={th}>Brier</th><th style={th}>Log-loss</th><th style={th}>n</th></tr></thead>
                 <tbody>{Object.entries(sources || {}).sort((a, b) => (a[1].brier ?? 9) - (b[1].brier ?? 9)).map(([name, s]) => (
@@ -217,7 +245,7 @@ export function DashboardPage() {
 
           <Panel title="Coverage by sport">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={th}>League</th><th style={th}>Games</th><th style={th}>Single-source</th><th style={th}>Avg confidence</th><th style={th}>Settle gap</th><th style={th}>Stale-Kalshi</th></tr></thead>
+              <thead><tr><th style={th}>League</th><th style={th}>Games</th><th style={th}>Single-source<Info text={TIP.singleSource} /></th><th style={th}>Avg confidence<Info text={TIP.avgConf} /></th><th style={th}>Settle gap<Info text={TIP.settleGap} /></th><th style={th}>Stale-Kalshi<Info text={TIP.staleKalshi} /></th></tr></thead>
               <tbody>{Object.entries(coverage?.byLeague || {}).map(([lg, c]) => (
                 <tr key={lg}><td style={td}>{lg}</td><td style={td}>{c.games}</td>
                   <td style={{ ...td, color: c.singleSourceFrac > 0.5 ? C.red : C.text }}>{fmt(c.singleSourceFrac * 100, 0)}%</td>
@@ -228,7 +256,7 @@ export function DashboardPage() {
 
           <Panel title="Recent settlements">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={th}>Game</th><th style={th}>League</th><th style={th}>Outcome</th><th style={th}>Settle gap</th><th style={th}>Updates</th><th style={th}></th></tr></thead>
+              <thead><tr><th style={th}>Game</th><th style={th}>League</th><th style={th}>Outcome</th><th style={th}>Settle gap<Info text={TIP.settleGap} /></th><th style={th}>Updates<Info text={TIP.ticks} /></th><th style={th}></th></tr></thead>
               <tbody>{settlements.map((s) => (
                 <tr key={s.game_id}><td style={td}>{s.game_id}</td><td style={td}>{s.league}</td>
                   <td style={td}>{s.outcome_type} ({s.home_score}-{s.away_score})</td>
