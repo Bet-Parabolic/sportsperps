@@ -72,7 +72,7 @@ const TIP = {
   vState: "open = live game with residual delta, keep the hedge on. unwind = game final or all user positions closed → close the hedge. none = nothing to hedge.",
   vFills: "Every fill the vault took as counterparty, newest first — the moment a user's order was filled by the vault.",
   vFunding: "Net funding the vault has collected as the residual counterparty (it's short the book's net delta). A small steady revenue line that also pays traders to balance the book.",
-  vFundRow: "Current funding rate for this game, %/hr. + → home longs pay (away + vault receive); − → reversed. Driven by book premium + vault inventory skew. See FUNDING_SPEC.",
+  vFundRow: "Current funding rate for this game, %/hr (already tapered). + → home longs pay (away + vault receive); − → reversed. Driven by book premium + vault inventory skew, per-sport calibrated. ·t = the time-to-settlement taper (1 early → 0.1 at the final whistle) shrinking the carry near game end. See FUNDING_SPEC.",
   vHistory: "Every position taken against the vault, full lifecycle: the user's entry + close, and the vault's mirror PnL on Parabolic plus the shadow hedge prices. Open episodes first, then closed.",
   vFundUser: "Net funding the user paid (−) or received (+) over the life of the position.",
   vVaultPnl: "The vault's PnL on Parabolic for this position — the zero-sum counterparty result (≈ −user PnL). Funding and platform fees are separate lines.",
@@ -248,7 +248,7 @@ function VaultTab({ vault, history = [] }) {
                   <td style={{ ...td, color: signColor(g.users?.netHomeDelta) }}>{(g.users?.netHomeDelta ?? 0) >= 0 ? "+" : ""}{g.users?.netHomeDelta}</td>
                   <td style={td}>{fmtUsd(g.liability?.homeNotional)} / {fmtUsd(g.liability?.awayNotional)}</td>
                   <td style={{ ...td, color: signColor(g.unrealizedPnl) }}>{fmtSigned(g.unrealizedPnl)}</td>
-                  <td style={{ ...td, color: g.funding ? signColor(g.funding.hourlyPct) : C.mut }}>{g.funding ? (g.funding.hourlyPct >= 0 ? "+" : "") + g.funding.hourlyPct.toFixed(3) + "%" : "—"}</td>
+                  <td style={{ ...td, color: g.funding ? signColor(g.funding.hourlyPct) : C.mut }}>{g.funding ? (g.funding.hourlyPct >= 0 ? "+" : "") + g.funding.hourlyPct.toFixed(3) + "%" : "—"}{g.funding && g.funding.taper != null && g.funding.taper < 0.99 ? <span style={{ color: C.mut, fontSize: 10 }}> ·t{g.funding.taper.toFixed(2)}</span> : null}</td>
                   <td style={td}>{g.hedge?.contracts > 0 ? `${g.hedge.side} ×${g.hedge.contracts}` : "—"}</td>
                   <td style={td}>{g.hedge?.bestVenue ? `${g.hedge.bestVenue} @ ${cents(g.hedge.bestVenuePx)}` : <span style={{ color: C.red }}>no venue</span>}</td>
                   <td style={td}>{g.hedge?.basisPoly != null ? (g.hedge.basisPoly * 100).toFixed(1) : "—"} / {g.hedge?.basisKalshi != null ? (g.hedge.basisKalshi * 100).toFixed(1) : "—"}</td>
