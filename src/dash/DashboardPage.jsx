@@ -9,7 +9,7 @@ import { API_URL } from "../lib/constants.js";
 
 const C = {
   bg: "#06070a", card: "#0b0d11", surface: "#11141a", border: "#181b22",
-  text: "#eef1f6", mut: "#8a93a6", primary: "#1fd182", primaryLt: "#52e0a3", red: "#ff5247",
+  text: "#eef1f6", mut: "#8a93a6", primary: "#1fd182", primaryLt: "#52e0a3", red: "#ff5247", amber: "#f5b14b",
 };
 const mono = "'JetBrains Mono', ui-monospace, monospace";
 const TOK = "parabolic_admin_token";
@@ -42,13 +42,13 @@ const Info = ({ text }) => (
 const TIP = {
   games: "Finished games we've scored the oracle against. Each one feeds every metric below.",
   forecasts: "Individual (predicted price → actual result) checkpoints across all graded games — the sample size behind the metrics.",
-  brier: "The headline accuracy score: average squared gap between the oracle's price and what actually happened. 0 = perfect, 0.25 = a useless 50/50 guess. Lower is better.",
-  logloss: "Like Brier, but punishes being confident AND wrong much harder. Lower is better — rewards honest probabilities, not just close ones.",
-  auc: "Can the oracle tell winners from losers? 1.0 = it always priced the eventual winner higher; 0.5 = no better than a coin flip. Measures ranking, ignoring the exact price.",
-  reliability: "How far the prices sit from reality on average (the gap in the calibration curve). 0 = perfectly honest. Lower is better — this is the 'miscalibration' number.",
+  brier: "The headline accuracy score: average squared gap between the oracle's price and what actually happened. 0 = perfect, 0.25 = a useless 50/50 guess. Lower is better. Target: green < 0.18, amber to 0.22, red above (barely beating a coin).",
+  logloss: "Like Brier, but punishes being confident AND wrong much harder. Lower is better. Target: green < 0.55; above 0.69 (red) means we're confidently wrong somewhere.",
+  auc: "Can the oracle tell winners from losers? 1.0 = always priced the winner higher; 0.5 = a coin flip. Target: green > 0.82, amber to 0.72, red below.",
+  reliability: "How far the prices sit from reality on average (the gap in the calibration curve). 0 = perfectly honest. Lower is better. Target: green < 0.01, amber to 0.03, red above.",
   calibration: "Each dot: of all the moments the oracle said X%, did it actually happen X% of the time? On the dashed line = honest. Below = overpriced, above = underpriced.",
   sources: "Each price source graded on its own (lower Brier = more accurate). Tells us which source to trust and how to weight the blend.",
-  singleSource: "Share of a game's logged moments priced by only ONE source. High = thin, fragile coverage (soccer's known weak spot).",
+  singleSource: "Share of a game's logged moments priced by only ONE source. Target: green < 25%, amber to 50%, red above — over 50% it can't be cross-checked (soccer's known weak spot).",
   avgConf: "The oracle's own confidence (how much its sources agreed), averaged over the game. Higher = sources agreed.",
   settleGap: "How far the oracle's last live price was from the true 1/0 result. A big gap = a late surprise it didn't see coming.",
   staleKalshi: "How often the safety guard dropped a Kalshi quote for disagreeing with the live model. High = Kalshi was stale that game.",
@@ -110,13 +110,38 @@ const Panel = ({ title, children, right, info }) => (
   </div>
 );
 
-const Stat = ({ label, value, sub, info }) => (
+const Stat = ({ label, value, sub, info, valueColor }) => (
   <div style={{ background: C.surface, borderRadius: 10, padding: "12px 14px", minWidth: 120 }}>
     <div style={{ color: C.mut, fontSize: 11, fontWeight: 600 }}>{label}{info && <Info text={info} />}</div>
-    <div style={{ color: C.text, fontSize: 22, fontWeight: 700, fontFamily: mono }}>{value}</div>
+    <div style={{ color: valueColor || C.text, fontSize: 22, fontWeight: 700, fontFamily: mono }}>{value}</div>
     {sub && <div style={{ color: C.mut, fontSize: 11 }}>{sub}</div>}
   </div>
 );
+
+// Sample-size confidence: how much to trust the graded metrics (see ORACLE_METRICS_GUIDE.md §1).
+function confidence(games, forecasts) {
+  if (games == null) return { color: C.mut, label: "—", msg: "" };
+  if (games < 10 || forecasts < 100)
+    return { color: C.red, label: "Not yet meaningful", msg: "Too little data — ignore the values below for now. Watch that games accumulate and coverage stays healthy. (Trust overall numbers at ~50 games / 500 forecasts.)" };
+  if (games < 50 || forecasts < 500)
+    return { color: C.amber, label: "Directional only", msg: "Big biases and trends are visible, but the numbers aren't precise yet. Confirm at ~50 games / 500 forecasts." };
+  return { color: C.primary, label: "Confident", msg: "Sample is large enough to trust — confirm it holds stable across multiple match-days." };
+}
+const ConfidenceBanner = ({ games, forecasts }) => {
+  const c = confidence(games, forecasts);
+  return (
+    <div style={{ background: c.color + "14", border: `1px solid ${c.color}55`, borderRadius: 12, padding: "11px 16px", marginBottom: 16 }}>
+      <span style={{ color: c.color, fontWeight: 800, fontSize: 13 }}>{c.label}</span>
+      <span style={{ color: C.text, fontSize: 13 }}> · {games} games / {forecasts} forecasts graded</span>
+      <div style={{ color: C.mut, fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>{c.msg}</div>
+    </div>
+  );
+};
+// Metric color band, gated by trust: gray until there's enough data, then green/amber/red vs targets.
+const band = (v, trust, dir, good, ok) =>
+  (!trust || v == null) ? C.mut
+    : dir === "low" ? (v <= good ? C.primary : v <= ok ? C.amber : C.red)
+      : (v >= good ? C.primary : v >= ok ? C.amber : C.red);
 
 const th = { textAlign: "left", color: C.mut, fontSize: 11, fontWeight: 600, padding: "6px 10px", borderBottom: `1px solid ${C.border}` };
 const td = { color: C.text, fontSize: 12, padding: "6px 10px", fontFamily: mono, borderBottom: `1px solid ${C.border}` };
@@ -282,6 +307,7 @@ export function DashboardPage() {
   if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
 
   const empty = summary && summary.games === 0;
+  const trust = !!summary && summary.games >= 10 && summary.pairs >= 100;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "24px 28px", fontFamily: "'Hanken Grotesk', system-ui, sans-serif" }}>
@@ -325,17 +351,19 @@ export function DashboardPage() {
 
       {explore && <GameExplorer gameId={explore} onClose={() => setExplore(null)} />}
 
+      {summary && <ConfidenceBanner games={summary.games} forecasts={summary.pairs} />}
+
       {empty && <Panel title="No data yet"><div style={{ color: C.mut, fontSize: 13 }}>No games graded yet — settlements populate as live games finish. Capture is recording; check back after a game ends.</div></Panel>}
 
       {summary && !empty && (
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-            <Stat label="Games graded" value={summary.games} info={TIP.games} />
+            <Stat label="Games graded" value={summary.games} info={TIP.games} valueColor={confidence(summary.games, summary.pairs).color} />
             <Stat label="Forecasts" value={summary.pairs} info={TIP.forecasts} />
-            <Stat label="Brier" value={fmt(summary.brier)} sub="lower better" info={TIP.brier} />
-            <Stat label="Log-loss" value={fmt(summary.logLoss, 3)} info={TIP.logloss} />
-            <Stat label="AUC" value={fmt(summary.auc, 3)} sub="discrimination" info={TIP.auc} />
-            <Stat label="Reliability" value={fmt(summary.murphy?.reliability, 4)} sub="miscalibration" info={TIP.reliability} />
+            <Stat label="Brier" value={fmt(summary.brier)} sub="lower better" info={TIP.brier} valueColor={band(summary.brier, trust, "low", 0.18, 0.22)} />
+            <Stat label="Log-loss" value={fmt(summary.logLoss, 3)} info={TIP.logloss} valueColor={band(summary.logLoss, trust, "low", 0.55, 0.69)} />
+            <Stat label="AUC" value={fmt(summary.auc, 3)} sub="discrimination" info={TIP.auc} valueColor={band(summary.auc, trust, "high", 0.82, 0.72)} />
+            <Stat label="Reliability" value={fmt(summary.murphy?.reliability, 4)} sub="miscalibration" info={TIP.reliability} valueColor={band(summary.murphy?.reliability, trust, "low", 0.01, 0.03)} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -355,7 +383,7 @@ export function DashboardPage() {
               <thead><tr><th style={th}>League</th><th style={th}>Games</th><th style={th}>Single-source<Info text={TIP.singleSource} /></th><th style={th}>Avg confidence<Info text={TIP.avgConf} /></th><th style={th}>Settle gap<Info text={TIP.settleGap} /></th><th style={th}>Stale-Kalshi<Info text={TIP.staleKalshi} /></th></tr></thead>
               <tbody>{Object.entries(coverage?.byLeague || {}).map(([lg, c]) => (
                 <tr key={lg}><td style={td}>{lg}</td><td style={td}>{c.games}</td>
-                  <td style={{ ...td, color: c.singleSourceFrac > 0.5 ? C.red : C.text }}>{fmt(c.singleSourceFrac * 100, 0)}%</td>
+                  <td style={{ ...td, color: band(c.singleSourceFrac, true, "low", 0.25, 0.5) }}>{fmt(c.singleSourceFrac * 100, 0)}%</td>
                   <td style={td}>{fmt(c.avgConfidence, 2)}</td><td style={td}>{fmt(c.avgSettleGap, 3)}</td><td style={{ ...td, color: C.mut }}>{fmt(c.avgStaleKalshi, 1)}</td></tr>
               ))}</tbody>
             </table>
