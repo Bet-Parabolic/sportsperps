@@ -19,6 +19,16 @@ const adminFetch = (path) =>
     .then((r) => { if (r.status === 401) throw new Error("401"); return r.json(); });
 
 const fmt = (v, d = 4) => (v == null ? "—" : (+v).toFixed(d));
+const fmtUsd = (v) => (v == null ? "—" : "$" + (+v).toLocaleString(undefined, { maximumFractionDigits: 0 }));
+const fmtSigned = (v) => (v == null ? "—" : (v >= 0 ? "+$" : "−$") + Math.abs(+v).toFixed(0));
+const cents = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "¢");
+const ago = (ts) => {
+  if (!ts) return "—";
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m";
+  return Math.floor(s / 3600) + "h";
+};
 
 // Hover-explainers. Pure-CSS tooltip (no state) — a "?" badge that reveals plain-English help.
 const TIP_CSS = `
@@ -45,6 +55,19 @@ const TIP = {
   liveOracle: "The current live win-probability price for the home side, in cents.",
   liveSources: "How many independent price sources are feeding this game right now.",
   ticks: "Price points logged for this game so far. 0 on a settled game = it was already over when capture started.",
+  // Vault tab
+  vBalance: "The vault's paper-USDC balance — its capital base. Grows with fees + winning inventory; shrinks on losing inventory.",
+  vPnl: "Realized PnL booked from settled games (vault collected premium, then paid out the outcome). Lifetime.",
+  vUnreal: "Open inventory marked at the current oracle price across all active games. What realized PnL would be if every game settled at today's price.",
+  vLiability: "Total notional the vault is currently short across all games (sum of per-side exposure). The book it would need to hedge.",
+  vActive: "Games where the vault currently holds inventory (is acting as counterparty).",
+  vNetDelta: "Users' net home-contract exposure on this game = exactly what the vault is short = what it would buy externally to flatten. + = net-long home, − = net-long away.",
+  vLiabRow: "Notional the vault is short on each side (home / away), marked at the oracle. Compared against the per-game exposure cap.",
+  vHedge: "The hedge the vault would place to flatten: side × contracts. Capital intensity scales with leverage, but hedge SIZE does not.",
+  vVenue: "Cheapest hedge venue right now (fee/gas-aware) and the price it'd cross at for the side being hedged.",
+  vBasis: "Hedge venue's price minus our oracle (P = Polymarket, K = Kalshi). The cost of crossing to hedge; near 0 is ideal.",
+  vState: "open = live game with residual delta, keep the hedge on. unwind = game final or all user positions closed → close the hedge. none = nothing to hedge.",
+  vFills: "Every fill the vault took as counterparty, newest first — the moment a user's order was filled by the vault.",
 };
 
 function Login({ onAuthed }) {
@@ -138,13 +161,87 @@ function GameExplorer({ gameId, onClose }) {
   );
 }
 
+function VaultTab({ vault }) {
+  if (!vault) return <Panel title="Vault"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const v = vault.vault || {};
+  const games = vault.games || [];
+  const fills = vault.fills || [];
+  const stateColor = { open: C.primaryLt, unwind: "#f5a524", none: C.mut };
+  const signColor = (n) => ((n || 0) >= 0 ? C.primaryLt : C.red);
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <Stat label="Balance" value={fmtUsd(v.balance)} info={TIP.vBalance} />
+        <Stat label="Realized PnL" value={fmtSigned(v.totalPnl)} sub="lifetime" info={TIP.vPnl} />
+        <Stat label="Unrealized PnL" value={fmtSigned(v.unrealizedPnl)} sub="open inventory" info={TIP.vUnreal} />
+        <Stat label="Liability" value={fmtUsd(v.liability)} sub="short notional" info={TIP.vLiability} />
+        <Stat label="Active games" value={v.activeGames ?? 0} info={TIP.vActive} />
+        <Stat label="Volume" value={fmtUsd(v.totalVolume)} />
+        {vault.shadow && <Stat label="Hedge coverage" value={vault.shadow.coverageRate != null ? (vault.shadow.coverageRate * 100).toFixed(0) + "%" : "—"} sub={`${vault.shadow.samples || 0} samples`} />}
+      </div>
+
+      <Panel title={`Positions & hedges by game (${games.length})`} info={TIP.vHedge}>
+        {games.length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No open vault inventory right now.</div>
+          : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={th}>Game</th><th style={th}>Status</th><th style={th}>Oracle</th>
+                <th style={th}>Net Δ<Info text={TIP.vNetDelta} /></th>
+                <th style={th}>Liability H/A<Info text={TIP.vLiabRow} /></th>
+                <th style={th}>Unreal<Info text={TIP.vUnreal} /></th>
+                <th style={th}>Hedge<Info text={TIP.vHedge} /></th>
+                <th style={th}>Best venue<Info text={TIP.vVenue} /></th>
+                <th style={th}>Basis ¢ P/K<Info text={TIP.vBasis} /></th>
+                <th style={th}>State<Info text={TIP.vState} /></th>
+              </tr></thead>
+              <tbody>{games.map((g) => (
+                <tr key={g.gameId}>
+                  <td style={td}>{g.matchup} <span style={{ color: C.mut }}>{g.league}</span></td>
+                  <td style={{ ...td, color: C.mut }}>{g.status}</td>
+                  <td style={{ ...td, color: C.primaryLt }}>{cents(g.oraclePx)}</td>
+                  <td style={{ ...td, color: signColor(g.users?.netHomeDelta) }}>{(g.users?.netHomeDelta ?? 0) >= 0 ? "+" : ""}{g.users?.netHomeDelta}</td>
+                  <td style={td}>{fmtUsd(g.liability?.homeNotional)} / {fmtUsd(g.liability?.awayNotional)}</td>
+                  <td style={{ ...td, color: signColor(g.unrealizedPnl) }}>{fmtSigned(g.unrealizedPnl)}</td>
+                  <td style={td}>{g.hedge?.contracts > 0 ? `${g.hedge.side} ×${g.hedge.contracts}` : "—"}</td>
+                  <td style={td}>{g.hedge?.bestVenue ? `${g.hedge.bestVenue} @ ${cents(g.hedge.bestVenuePx)}` : <span style={{ color: C.red }}>no venue</span>}</td>
+                  <td style={td}>{g.hedge?.basisPoly != null ? (g.hedge.basisPoly * 100).toFixed(1) : "—"} / {g.hedge?.basisKalshi != null ? (g.hedge.basisKalshi * 100).toFixed(1) : "—"}</td>
+                  <td style={{ ...td, color: stateColor[g.hedge?.state] || C.mut, fontWeight: 700 }}>{g.hedge?.state}</td>
+                </tr>
+              ))}</tbody>
+            </table></div>}
+      </Panel>
+
+      <Panel title={`Recent vault fills (${fills.length})`} info={TIP.vFills}>
+        {fills.length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No vault fills yet.</div>
+          : <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>When</th><th style={th}>Game</th><th style={th}>User</th><th style={th}>Side</th><th style={th}>Size</th><th style={th}>Price</th><th style={th}>Notional</th></tr></thead>
+              <tbody>{fills.map((f, i) => (
+                <tr key={i}>
+                  <td style={{ ...td, color: C.mut }}>{ago(f.ts)} ago</td>
+                  <td style={td}>{f.matchup}</td>
+                  <td style={{ ...td, color: C.mut }} title={f.userId}>{(f.userId || "").slice(0, 8)}</td>
+                  <td style={{ ...td, color: f.side === "home" ? C.primaryLt : C.red }}>{f.side}</td>
+                  <td style={td}>{f.size}</td>
+                  <td style={td}>{cents(f.px)}</td>
+                  <td style={td}>{fmtUsd(f.notional)}</td>
+                </tr>
+              ))}</tbody>
+            </table>}
+      </Panel>
+    </>
+  );
+}
+
 export function DashboardPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(TOK));
+  const [tab, setTab] = useState("oracle"); // 'oracle' | 'vault'
   const [summary, setSummary] = useState(null);
   const [sources, setSources] = useState(null);
   const [coverage, setCoverage] = useState(null);
   const [settlements, setSettlements] = useState([]);
   const [live, setLive] = useState([]);
+  const [vault, setVault] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -160,18 +257,20 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv] = await Promise.all([
+      const [s, src, cov, set, lv, vlt] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
         safe(adminFetch("/admin/oracle/settlements?limit=50")),
         safe(adminFetch("/admin/oracle/live")),
+        safe(adminFetch("/admin/vault")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
       if (cov) setCoverage(cov);
       setSettlements(set?.settlements || []);
       setLive(lv?.live || []);
+      if (vlt) setVault(vlt);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -189,14 +288,22 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>Oracle accuracy</div>
-          <div style={{ color: C.mut, fontSize: 12 }}>Internal dashboard · all sports · graded forecasts</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : "Oracle accuracy"}</div>
+          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
-        <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {[["oracle", "Oracle"], ["vault", "Vault"]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
+          ))}
+          <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
+        </div>
       </div>
 
       {err && <div style={{ color: C.red, marginBottom: 12 }}>{err}</div>}
 
+      {tab === "vault" && <VaultTab vault={vault} />}
+
+      {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>
         {live.length === 0
           ? <div style={{ color: C.mut, fontSize: 13 }}>No live games right now.</div>
@@ -268,6 +375,7 @@ export function DashboardPage() {
           </Panel>
         </>
       )}
+      </>}
     </div>
   );
 }
