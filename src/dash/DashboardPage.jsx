@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   ScatterChart, Scatter, LineChart, Line, XAxis, YAxis, ReferenceLine,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -30,15 +31,34 @@ const ago = (ts) => {
   return Math.floor(s / 3600) + "h";
 };
 
-// Hover-explainers. Pure-CSS tooltip (no state) — a "?" badge that reveals plain-English help.
+// Hover-explainers — a "?" badge that reveals plain-English help. The tooltip is rendered in a
+// PORTAL with position:fixed (anchored to the badge's viewport rect) so it can never be clipped by
+// a scrollable/overflow ancestor — e.g. the vault tables wrap in overflow-x:auto, which previously
+// swallowed every table-header tooltip.
 const TIP_CSS = `
 .dinfo{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;border:1px solid #2a2f3a;color:#8a93a6;font-size:9px;font-weight:700;margin-left:5px;cursor:help;position:relative;vertical-align:middle;}
-.dinfo .dtip{display:none;position:absolute;bottom:150%;left:50%;transform:translateX(-50%);width:244px;background:#11141a;border:1px solid #2a2f3a;border-radius:8px;padding:9px 11px;color:#cfd6e4;font-size:11px;font-weight:400;line-height:1.55;z-index:60;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.55);white-space:normal;}
-.dinfo:hover .dtip,.dinfo:focus .dtip{display:block;}
+.dtip{position:fixed;width:244px;background:#11141a;border:1px solid #2a2f3a;border-radius:8px;padding:9px 11px;color:#cfd6e4;font-size:11px;font-weight:400;line-height:1.55;z-index:9999;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.55);white-space:normal;transform:translate(-50%,calc(-100% - 9px));pointer-events:none;}
 `;
-const Info = ({ text }) => (
-  <span className="dinfo" tabIndex={0} role="img" aria-label={text}>?<span className="dtip">{text}</span></span>
-);
+const Info = ({ text }) => {
+  const ref = useRef(null);
+  const [pos, setPos] = useState(null);
+  const show = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const half = 126; // ~half tooltip width + margin, to keep it on-screen near the edges
+    const x = Math.min(Math.max(r.left + r.width / 2, half + 4), window.innerWidth - half - 4);
+    setPos({ x, y: r.top });
+  };
+  const hide = () => setPos(null);
+  return (
+    <span ref={ref} className="dinfo" tabIndex={0} role="img" aria-label={text}
+      onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>?
+      {pos && text && createPortal(
+        <span className="dtip" style={{ left: pos.x, top: pos.y }}>{text}</span>,
+        document.body)}
+    </span>
+  );
+};
 const TIP = {
   games: "Finished games we've scored the oracle against. Each one feeds every metric below.",
   forecasts: "Individual (predicted price → actual result) checkpoints across all graded games — the sample size behind the metrics.",
