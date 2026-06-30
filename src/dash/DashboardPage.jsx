@@ -92,7 +92,8 @@ const TIP = {
   vState: "open = live game with residual delta, keep the hedge on. unwind = game final or all user positions closed → close the hedge. none = nothing to hedge.",
   vFills: "Every fill the vault took as counterparty, newest first — the moment a user's order was filled by the vault.",
   vFunding: "Net funding the vault has collected as the residual counterparty (it's short the book's net delta). A small steady revenue line that also pays traders to balance the book.",
-  vFundRow: "Current funding rate for this game, %/hr (already tapered). + → home longs pay (away + vault receive); − → reversed. Driven by book premium + vault inventory skew, per-sport calibrated. ·t = the time-to-settlement taper (1 early → 0.1 at the final whistle) shrinking the carry near game end. See FUNDING_SPEC.",
+  vFundRow: "Current funding rate for this game, %/hr (already tapered). + → home longs pay (away + vault receive); − → away longs pay (home + vault receive). Driven by book premium + vault inventory skew, per-sport calibrated. ·t = the time-to-settlement taper (1 early → 0.1 at the final whistle) shrinking the carry near game end. See FUNDING_SPEC.",
+  vPin: "Funding→exposure coupling. When one side stays heavily one-sided (|skew| ≥ 0.8) the vault throttles how much MORE inventory it'll take on that side — its cap shrinks from ×1.00 toward ×0.50 over ~30 min of sustained pinning, then recovers as skew normalizes. Shows the pinned side (HOME/AWAY), how long it's been pinned, and the current cap multiplier. Applies symmetrically to either side.",
   vHistory: "Every position taken against the vault, full lifecycle: the user's entry + close, and the vault's mirror PnL on Parabolic plus the shadow hedge prices. Open episodes first, then closed.",
   vFundUser: "Net funding the user paid (−) or received (+) over the life of the position.",
   vVaultPnl: "The vault's PnL on Parabolic for this position — the zero-sum counterparty result (≈ −user PnL). Funding and platform fees are separate lines.",
@@ -255,6 +256,7 @@ function VaultTab({ vault, history = [] }) {
                 <th style={th}>Liability H/A<Info text={TIP.vLiabRow} /></th>
                 <th style={th}>Unreal<Info text={TIP.vUnreal} /></th>
                 <th style={th}>Funding/hr<Info text={TIP.vFundRow} /></th>
+                <th style={th}>Pin<Info text={TIP.vPin} /></th>
                 <th style={th}>Hedge<Info text={TIP.vHedge} /></th>
                 <th style={th}>Best venue<Info text={TIP.vVenue} /></th>
                 <th style={th}>Basis ¢ P/K<Info text={TIP.vBasis} /></th>
@@ -269,6 +271,14 @@ function VaultTab({ vault, history = [] }) {
                   <td style={td}>{fmtUsd(g.liability?.homeNotional)} / {fmtUsd(g.liability?.awayNotional)}</td>
                   <td style={{ ...td, color: signColor(g.unrealizedPnl) }}>{fmtSigned(g.unrealizedPnl)}</td>
                   <td style={{ ...td, color: g.funding ? signColor(g.funding.hourlyPct) : C.mut }}>{g.funding ? (g.funding.hourlyPct >= 0 ? "+" : "") + g.funding.hourlyPct.toFixed(3) + "%" : "—"}{g.funding && g.funding.taper != null && g.funding.taper < 0.99 ? <span style={{ color: C.mut, fontSize: 10 }}> ·t{g.funding.taper.toFixed(2)}</span> : null}</td>
+                  <td style={td}>{(() => {
+                    const f = g.funding;
+                    if (!f || !f.pinSide) return <span style={{ color: C.mut }}>—</span>;
+                    const side = f.pinSide > 0 ? "HOME" : "AWAY";
+                    const cap = f.exposureScale ? (f.pinSide > 0 ? f.exposureScale.home : f.exposureScale.away) : 1;
+                    const hot = cap <= 0.75;
+                    return <span style={{ color: hot ? C.red : C.amber, fontWeight: 700 }}>{side} {f.pinMinutes}m <span style={{ color: C.mut, fontWeight: 400 }}>×{cap.toFixed(2)}</span></span>;
+                  })()}</td>
                   <td style={td}>{g.hedge?.contracts > 0 ? `${g.hedge.side} ×${g.hedge.contracts}` : "—"}</td>
                   <td style={td}>{g.hedge?.bestVenue ? `${g.hedge.bestVenue} @ ${cents(g.hedge.bestVenuePx)}` : <span style={{ color: C.red }}>no venue</span>}</td>
                   <td style={td}>{g.hedge?.basisPoly != null ? (g.hedge.basisPoly * 100).toFixed(1) : "—"} / {g.hedge?.basisKalshi != null ? (g.hedge.basisKalshi * 100).toFixed(1) : "—"}</td>
