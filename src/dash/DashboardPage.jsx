@@ -117,6 +117,7 @@ export function DashboardPage() {
   const [sources, setSources] = useState(null);
   const [coverage, setCoverage] = useState(null);
   const [settlements, setSettlements] = useState([]);
+  const [live, setLive] = useState([]);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -129,14 +130,21 @@ export function DashboardPage() {
   }, []);
 
   const load = useCallback(async () => {
+    // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
+    const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set] = await Promise.all([
-        adminFetch("/admin/oracle/summary"),
-        adminFetch("/admin/oracle/sources"),
-        adminFetch("/admin/oracle/coverage"),
-        adminFetch("/admin/oracle/settlements?limit=50"),
+      const [s, src, cov, set, lv] = await Promise.all([
+        safe(adminFetch("/admin/oracle/summary")),
+        safe(adminFetch("/admin/oracle/sources")),
+        safe(adminFetch("/admin/oracle/coverage")),
+        safe(adminFetch("/admin/oracle/settlements?limit=50")),
+        safe(adminFetch("/admin/oracle/live")),
       ]);
-      setSummary(s); setSources(src); setCoverage(cov); setSettlements(set.settlements || []);
+      if (s) setSummary(s);
+      if (src) setSources(src);
+      if (cov) setCoverage(cov);
+      setSettlements(set?.settlements || []);
+      setLive(lv?.live || []);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -160,6 +168,28 @@ export function DashboardPage() {
       </div>
 
       {err && <div style={{ color: C.red, marginBottom: 12 }}>{err}</div>}
+
+      <Panel title={`Live now — capturing (${live.length})`}>
+        {live.length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No live games right now.</div>
+          : <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>Game</th><th style={th}>Score</th><th style={th}>State</th><th style={th}>Oracle</th><th style={th}>Sources</th><th style={th}>Ticks</th><th style={th}></th></tr></thead>
+              <tbody>{live.map((g) => (
+                <tr key={g.game_id}>
+                  <td style={td}>{g.away}@{g.home} <span style={{ color: C.mut }}>{g.league}</span></td>
+                  <td style={td}>{g.away_score}-{g.home_score}</td>
+                  <td style={{ ...td, color: C.mut }}>{g.statusDetail || `P${g.period}`}</td>
+                  <td style={{ ...td, color: C.primaryLt }}>{g.ip == null ? "—" : (g.ip * 100).toFixed(1) + "¢"}</td>
+                  <td style={{ ...td, color: C.mut }}>{g.sources}</td>
+                  <td style={td}>{g.ticks}</td>
+                  <td style={td}><button onClick={() => setExplore(g.game_id)} style={{ background: "none", border: `1px solid ${C.border}`, color: C.primaryLt, borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 11 }}>path</button></td>
+                </tr>
+              ))}</tbody>
+            </table>}
+      </Panel>
+
+      {explore && <GameExplorer gameId={explore} onClose={() => setExplore(null)} />}
+
       {empty && <Panel title="No data yet"><div style={{ color: C.mut, fontSize: 13 }}>No games graded yet — settlements populate as live games finish. Capture is recording; check back after a game ends.</div></Panel>}
 
       {summary && !empty && (
@@ -195,8 +225,6 @@ export function DashboardPage() {
               ))}</tbody>
             </table>
           </Panel>
-
-          {explore && <GameExplorer gameId={explore} onClose={() => setExplore(null)} />}
 
           <Panel title="Recent settlements">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
