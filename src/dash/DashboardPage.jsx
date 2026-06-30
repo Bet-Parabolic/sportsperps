@@ -258,7 +258,7 @@ export function DashboardPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr><th style={th}>Game</th><th style={th}>League</th><th style={th}>Outcome</th><th style={th}>Settle gap<Info text={TIP.settleGap} /></th><th style={th}>Updates<Info text={TIP.ticks} /></th><th style={th}></th></tr></thead>
               <tbody>{settlements.map((s) => (
-                <tr key={s.game_id}><td style={td}>{s.game_id}</td><td style={td}>{s.league}</td>
+                <tr key={s.game_id}><td style={td} title={s.game_id}>{s.away_team && s.home_team ? `${s.away_team} @ ${s.home_team}` : s.game_id}</td><td style={td}>{s.league}</td>
                   <td style={td}>{s.outcome_type} ({s.home_score}-{s.away_score})</td>
                   <td style={{ ...td, color: s.settle_gap > 0.1 ? C.red : C.text }}>{fmt(s.settle_gap, 3)}</td>
                   <td style={{ ...td, color: C.mut }}>{s.source_update_count}</td>
