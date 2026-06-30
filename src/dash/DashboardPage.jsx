@@ -73,6 +73,10 @@ const TIP = {
   vFills: "Every fill the vault took as counterparty, newest first — the moment a user's order was filled by the vault.",
   vFunding: "Net funding the vault has collected as the residual counterparty (it's short the book's net delta). A small steady revenue line that also pays traders to balance the book.",
   vFundRow: "Current funding rate for this game, %/hr. + → home longs pay (away + vault receive); − → reversed. Driven by book premium + vault inventory skew. See FUNDING_SPEC.",
+  vHistory: "Every position taken against the vault, full lifecycle: the user's entry + close, and the vault's mirror PnL on Parabolic plus the shadow hedge prices. Open episodes first, then closed.",
+  vFundUser: "Net funding the user paid (−) or received (+) over the life of the position.",
+  vVaultPnl: "The vault's PnL on Parabolic for this position — the zero-sum counterparty result (≈ −user PnL). Funding and platform fees are separate lines.",
+  vHedgeShadow: "SHADOW hedge: the venue (P=Polymarket, K=Kalshi) and price the vault would have crossed at to flatten this position's side, at open / at close. No real order is placed yet (Phase 2).",
 };
 
 function Login({ onAuthed }) {
@@ -191,7 +195,8 @@ function GameExplorer({ gameId, onClose }) {
   );
 }
 
-function VaultTab({ vault }) {
+function VaultTab({ vault, history = [] }) {
+  const [sub, setSub] = useState("live"); // 'live' | 'history'
   if (!vault) return <Panel title="Vault"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   const v = vault.vault || {};
   const games = vault.games || [];
@@ -210,6 +215,15 @@ function VaultTab({ vault }) {
         <Stat label="Funding collected" value={fmtSigned(v.fundingCollected)} sub="net carry" info={TIP.vFunding} />
         {vault.shadow && <Stat label="Hedge coverage" value={vault.shadow.coverageRate != null ? (vault.shadow.coverageRate * 100).toFixed(0) + "%" : "—"} sub={`${vault.shadow.samples || 0} samples`} />}
       </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {[["live", `Live (${games.length})`], ["history", `History (${history.length})`]].map(([id, label]) => (
+          <button key={id} onClick={() => setSub(id)} style={{ background: sub === id ? C.surface : "transparent", border: `1px solid ${sub === id ? C.border : "transparent"}`, color: sub === id ? C.text : C.mut, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: sub === id ? 700 : 500 }}>{label}</button>
+        ))}
+      </div>
+
+      {sub === "history" && <VaultHistory rows={history} />}
+      {sub === "live" && <>
 
       <Panel title={`Positions & hedges by game (${games.length})`} info={TIP.vHedge}>
         {games.length === 0
@@ -262,7 +276,71 @@ function VaultTab({ vault }) {
               ))}</tbody>
             </table>}
       </Panel>
+      </>}
     </>
+  );
+}
+
+function VaultHistory({ rows }) {
+  const signColor = (n) => ((n || 0) >= 0 ? C.primaryLt : C.red);
+  const px = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "¢");
+  const closed = rows.filter((r) => r.status === "closed");
+  const open = rows.filter((r) => r.status === "open");
+  const Row = ({ r }) => (
+    <tr>
+      <td style={td}>{r.matchup} <span style={{ color: C.mut }}>{r.league}</span></td>
+      <td style={{ ...td, color: r.side === "home" ? C.primaryLt : C.red }}>{r.side}</td>
+      {/* User entry */}
+      <td style={td}>{px(r.entry_px)}</td>
+      <td style={td}>{r.size}</td>
+      <td style={td}>{fmtUsd(r.margin)}</td>
+      <td style={td}>{fmtUsd(r.notional)}</td>
+      <td style={{ ...td, color: C.mut }}>{px(r.liq_price)}</td>
+      <td style={td}>{r.leverage}x</td>
+      {/* User close */}
+      <td style={td}>{r.close_type ? <span style={{ color: C.mut }}>{r.close_type}</span> : "—"}</td>
+      <td style={td}>{px(r.exit_px)}</td>
+      <td style={{ ...td, color: signColor(r.user_pnl) }}>{r.user_pnl == null ? "—" : fmtSigned(r.user_pnl)}</td>
+      <td style={{ ...td, color: signColor(r.funding_user) }}>{r.funding_user == null ? "—" : fmtSigned(r.funding_user)}</td>
+      <td style={{ ...td, color: C.mut }}>{fmtUsd((r.open_fee || 0) + (r.close_fee || 0))}</td>
+      {/* Vault side */}
+      <td style={{ ...td, color: signColor(r.vault_pnl) }}>{r.vault_pnl == null ? "—" : fmtSigned(r.vault_pnl)}</td>
+      <td style={td}>{r.hedge_venue_open ? `${r.hedge_venue_open[0].toUpperCase()} ${px(r.hedge_px_open)}` : "—"}</td>
+      <td style={td}>{r.hedge_venue_close ? `${r.hedge_venue_close[0].toUpperCase()} ${px(r.hedge_px_close)}` : "—"}</td>
+      <td style={{ ...td, color: C.mut }}>{r.closed_at ? new Date(r.closed_at).toLocaleString() : (r.opened_at ? new Date(r.opened_at).toLocaleString() : "—")}</td>
+    </tr>
+  );
+  const head = (
+    <thead>
+      <tr>
+        <th style={{ ...th, borderBottom: "none" }}></th><th style={{ ...th, borderBottom: "none" }}></th>
+        <th style={{ ...th, textAlign: "center", color: C.primaryLt }} colSpan={6}>USER ENTRY</th>
+        <th style={{ ...th, textAlign: "center", color: C.text }} colSpan={5}>USER CLOSE</th>
+        <th style={{ ...th, textAlign: "center", color: "#f5b14b" }} colSpan={4}>VAULT</th>
+        <th style={{ ...th, borderBottom: "none" }}></th>
+      </tr>
+      <tr>
+        <th style={th}>Game</th><th style={th}>Side</th>
+        <th style={th}>Entry</th><th style={th}>Size</th><th style={th}>Margin</th><th style={th}>Notional</th><th style={th}>Liq</th><th style={th}>Lev</th>
+        <th style={th}>Type</th><th style={th}>Exit</th><th style={th}>User PnL</th><th style={th}>Funding<Info text={TIP.vFundUser} /></th><th style={th}>Fees</th>
+        <th style={th}>Vault PnL<Info text={TIP.vVaultPnl} /></th><th style={th}>Hedge open<Info text={TIP.vHedgeShadow} /></th><th style={th}>Hedge close<Info text={TIP.vHedgeShadow} /></th>
+        <th style={th}>When</th>
+      </tr>
+    </thead>
+  );
+  return (
+    <Panel title={`Position history — all vault counterparty actions (${rows.length})`} info={TIP.vHistory}>
+      <div style={{ color: C.mut, fontSize: 11, marginBottom: 10 }}>Hedge columns are <b>shadow</b> prices (the venue + price the vault would cross at). Real on-venue execution + its fees/PnL arrive in Phase 2.</div>
+      {rows.length === 0
+        ? <div style={{ color: C.mut, fontSize: 13 }}>No vault actions recorded yet.</div>
+        : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+            {head}
+            <tbody>
+              {open.map((r) => <Row key={r.id} r={r} />)}
+              {closed.map((r) => <Row key={r.id} r={r} />)}
+            </tbody>
+          </table></div>}
+    </Panel>
   );
 }
 
@@ -275,6 +353,7 @@ export function DashboardPage() {
   const [settlements, setSettlements] = useState([]);
   const [live, setLive] = useState([]);
   const [vault, setVault] = useState(null);
+  const [vaultHistory, setVaultHistory] = useState([]);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -290,13 +369,14 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
         safe(adminFetch("/admin/oracle/settlements?limit=50")),
         safe(adminFetch("/admin/oracle/live")),
         safe(adminFetch("/admin/vault")),
+        safe(adminFetch("/admin/vault/history?limit=200")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -304,6 +384,7 @@ export function DashboardPage() {
       setSettlements(set?.settlements || []);
       setLive(lv?.live || []);
       if (vlt) setVault(vlt);
+      if (vh) setVaultHistory(vh.rows || []);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -335,7 +416,7 @@ export function DashboardPage() {
 
       {err && <div style={{ color: C.red, marginBottom: 12 }}>{err}</div>}
 
-      {tab === "vault" && <VaultTab vault={vault} />}
+      {tab === "vault" && <VaultTab vault={vault} history={vaultHistory} />}
 
       {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>
