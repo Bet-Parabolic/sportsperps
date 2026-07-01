@@ -1,5 +1,5 @@
 import { WS_URL } from "./constants.js";
-import { currentUserId } from "./auth.js";
+import { currentUserId, authToken } from "./auth.js";
 
 /* ─────────────────────────────────────────────────────────────
    liveSocket — ONE shared WebSocket for the whole app.
@@ -27,7 +27,8 @@ let liveUid = null; // the userId this socket is subscribed as (for private per-
 function sendSubscribe() {
   const userId = liveUid || currentUserId();
   if (ws && ws.readyState === 1 && userId) {
-    try { ws.send(JSON.stringify({ type: "subscribe", userId })); } catch { /* noop */ }
+    // token lets the backend verify credentialed accounts before binding this socket to userId
+    try { ws.send(JSON.stringify({ type: "subscribe", userId, token: authToken() })); } catch { /* noop */ }
   }
 }
 
