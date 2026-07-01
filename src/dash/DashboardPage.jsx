@@ -116,6 +116,15 @@ const TIP = {
   pRetention: "Do users come back? D1 = of users whose first day was ≥1 day ago, the share active again the next day. D7 = active again within the following week. Cohort = how many users are old enough to count. Target: green ≥40%, amber ≥20%.",
   pDaily: "Activity per day: DAU (distinct active users, green) and new users first seen that day (amber). Watch the trend across match-days.",
   pEvents: "Raw event volume by type since the backend last restarted — a sanity check that each tracked action is firing.",
+  // Economics tab
+  eVaultBal: "The vault's current paper-USDC balance. Starts at $50,000; moves with vault trading PnL (at settlement) + net funding collected. The core capital line.",
+  eHouse: "Total house economics = realized (vault trading PnL + funding + fee revenue) + open-inventory unrealized. What the house has made on paper. Validates the money model before real capital.",
+  eFees: "Fee revenue = taker fees collected − maker rebates paid. In a well-hedged book this + funding is the reliable house revenue (vault trading PnL should net toward 0). Since backend restart.",
+  eFunding: "Net funding the vault has collected as the residual counterparty — a small steady revenue line that also pays traders to balance the book.",
+  eWaterfall: "How the house made (or lost) money, broken out: vault trading PnL + funding + fee revenue = realized house profit; add open-inventory mark-to-oracle for the total incl. open risk.",
+  eTrend: "House economics over time from periodic snapshots (every 5 min). Realized house = trading + funding + fees. Watch the slope — is the model compounding profit as volume grows?",
+  eLiq: "Liquidations since restart: how many positions were force-closed and their total notional. A spike means the leverage/risk settings may be too loose (or a big gap hit).",
+  eActivity: "Live platform activity at the latest snapshot: open interest (notional in open positions), open positions, active traders, live markets.",
 };
 
 function Login({ onAuthed }) {
@@ -569,9 +578,103 @@ function ProductTab({ data }) {
   );
 }
 
+// Engine economics — "is the vault-as-counterparty money model working, and trending up?".
+function EconomicsTab({ data }) {
+  if (!data) return <Panel title="Economics"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  if (!data.hasData) return (
+    <Panel title="Economics">
+      <div style={{ color: C.mut, fontSize: 13 }}>No snapshots yet — the first one is taken at boot, then every 5 minutes. Check back shortly.</div>
+    </Panel>
+  );
+  const w = data.waterfall || {};
+  const l = data.latest || {};
+  const d24 = data.deltas24h || {};
+  const liq = data.liquidations || {};
+  const sc = (n) => (n == null ? C.mut : n > 0 ? C.primaryLt : n < 0 ? C.red : C.text);
+  const delta = (n) => (n == null ? "" : ` (${n >= 0 ? "+" : "−"}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })} 24h)`);
+  // Waterfall rows: components then subtotals.
+  const rows = [
+    { label: "Vault trading PnL", v: w.tradingPnl, kind: "comp" },
+    { label: "Funding collected", v: w.funding, kind: "comp" },
+    { label: "Fee revenue", v: w.feeRevenue, kind: "comp" },
+    { label: "Realized house profit", v: w.realizedHouse, kind: "sub" },
+    { label: "Open inventory (unrealized)", v: w.unrealized, kind: "comp" },
+    { label: "Total house economics", v: w.totalHouse, kind: "total" },
+  ];
+  const chart = (data.series || []).map((p) => ({
+    ts: p.ts,
+    realizedHouse: +((p.vaultRealizedPnl || 0) + (p.funding || 0) + (p.feeRevenue || 0)).toFixed(2),
+    feeRevenue: p.feeRevenue,
+  }));
+  const fmtT = (ts) => { const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <Stat label="Vault balance" value={fmtUsd(l.vaultBalance)} sub={`from ${fmtUsd(data.vaultInitial)}${delta(d24.vaultBalance)}`} info={TIP.eVaultBal} />
+        <Stat label="Total house P&L" value={fmtSigned(w.totalHouse)} valueColor={sc(w.totalHouse)} sub="realized + open" info={TIP.eHouse} />
+        <Stat label="Fee revenue" value={fmtSigned(w.feeRevenue)} valueColor={sc(w.feeRevenue)} sub={`since restart${delta(d24.feeRevenue)}`} info={TIP.eFees} />
+        <Stat label="Funding" value={fmtSigned(w.funding)} valueColor={sc(w.funding)} info={TIP.eFunding} />
+        <Stat label="24h volume" value={fmtUsd(d24.volume)} info={TIP.pEvents} />
+      </div>
+
+      <Panel title="House P&L waterfall" info={TIP.eWaterfall}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {rows.map((r) => (
+            <div key={r.label} style={{
+              display: "flex", justifyContent: "space-between", padding: "8px 10px",
+              borderTop: r.kind !== "comp" ? `1px solid ${C.border}` : "none",
+              background: r.kind === "total" ? C.surface : "transparent", borderRadius: r.kind === "total" ? 8 : 0,
+            }}>
+              <span style={{ color: r.kind === "comp" ? C.mut : C.text, fontSize: 13, fontWeight: r.kind === "total" ? 700 : 500 }}>{r.label}</span>
+              <span style={{ color: sc(r.v), fontSize: 13, fontWeight: r.kind === "comp" ? 500 : 700, fontFamily: mono }}>{fmtSigned(r.v)}</span>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title="House economics over time" info={TIP.eTrend}>
+        {chart.length < 2
+          ? <div style={{ color: C.mut, fontSize: 13 }}>Need at least two snapshots to plot a trend — building history (every 5 min).</div>
+          : <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={chart} margin={{ top: 8, right: 12, bottom: 4, left: -6 }}>
+                <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+                <XAxis dataKey="ts" tick={{ fill: C.mut, fontSize: 10 }} tickFormatter={fmtT} />
+                <YAxis tick={{ fill: C.mut, fontSize: 10 }} />
+                <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} labelStyle={{ color: C.text }} labelFormatter={fmtT} formatter={(v) => "$" + (+v).toFixed(2)} />
+                <ReferenceLine y={0} stroke={C.mut} strokeDasharray="2 2" />
+                <Line type="monotone" dataKey="realizedHouse" stroke={C.primary} strokeWidth={2} dot={false} name="Realized house" />
+                <Line type="monotone" dataKey="feeRevenue" stroke={C.amber} strokeWidth={1.5} dot={false} name="Fee revenue" />
+              </LineChart>
+            </ResponsiveContainer>}
+      </Panel>
+
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 320px" }}>
+          <Panel title="Activity (latest snapshot)" info={TIP.eActivity}>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <Stat label="Open interest" value={fmtUsd(l.openInterest)} />
+              <Stat label="Open positions" value={l.openPositions ?? 0} />
+              <Stat label="Active traders" value={l.activeTraders ?? 0} sub={`${l.totalUsers ?? 0} total`} />
+              <Stat label="Live markets" value={l.liveMarkets ?? 0} />
+            </div>
+          </Panel>
+        </div>
+        <div style={{ flex: "1 1 220px" }}>
+          <Panel title="Liquidations (since restart)" info={TIP.eLiq}>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <Stat label="Count" value={liq.count ?? 0} valueColor={liq.count > 0 ? C.amber : C.primary} />
+              <Stat label="Notional" value={fmtUsd(liq.notional)} />
+            </div>
+          </Panel>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function DashboardPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(TOK));
-  const [tab, setTab] = useState("oracle"); // 'oracle' | 'vault' | 'health' | 'product'
+  const [tab, setTab] = useState("oracle"); // 'oracle' | 'vault' | 'health' | 'product' | 'economics'
   const [summary, setSummary] = useState(null);
   const [sources, setSources] = useState(null);
   const [coverage, setCoverage] = useState(null);
@@ -581,6 +684,7 @@ export function DashboardPage() {
   const [vaultHistory, setVaultHistory] = useState([]);
   const [healthData, setHealthData] = useState(null);
   const [productData, setProductData] = useState(null);
+  const [economicsData, setEconomicsData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -596,7 +700,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth, prod] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -606,6 +710,7 @@ export function DashboardPage() {
         safe(adminFetch("/admin/vault/history?limit=200")),
         safe(adminFetch("/admin/health")),
         safe(adminFetch("/admin/analytics")),
+        safe(adminFetch("/admin/economics")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -616,6 +721,7 @@ export function DashboardPage() {
       if (vh) setVaultHistory(vh.rows || []);
       if (hlth) setHealthData(hlth);
       if (prod) setProductData(prod);
+      if (econ) setEconomicsData(econ);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -634,11 +740,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : "Oracle accuracy"}</div>
-          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : "Internal dashboard · all sports · graded forecasts"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : "Oracle accuracy"}</div>
+          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -652,6 +758,8 @@ export function DashboardPage() {
       {tab === "health" && <HealthTab data={healthData} />}
 
       {tab === "product" && <ProductTab data={productData} />}
+
+      {tab === "economics" && <EconomicsTab data={economicsData} />}
 
       {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>
