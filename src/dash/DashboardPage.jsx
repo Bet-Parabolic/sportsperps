@@ -132,6 +132,13 @@ const TIP = {
   xSlippage: "Execution cost vs the oracle fair price, in cents (taker perspective). Positive = the taker paid above fair (the vault spread). Lower is a better fill. Watch p95 for worst-case fills.",
   xFillMix: "Where fills come from: the vault (house is counterparty) vs the order book (peer-to-peer). Early on the vault carries most flow; a growing book share = real two-sided liquidity.",
   xRejReasons: "Why orders were rejected, most common first. leverageRejected = above the gap-aware cap; perpMarginRejected = not enough balance; oracleRejected = limit too far from the oracle; marketClosed = market not open.",
+  // Risk tab
+  rDeficit: "Uncovered bad debt: total loss from liquidations that exceeded the trader's posted margin. The gap-aware leverage cap is designed to keep this at $0 — ANY nonzero value means a liquidation gapped into deficit and the cap needs tightening. The #1 pre-real-money gate.",
+  rCoverage: "Vault solvency: vault balance ÷ its total short-book liability. > 1.0 means the vault could cover every position settling against it at once. < 1.0 is under-collateralized (a hard blocker for real money).",
+  rSurplus: "Vault balance minus its total liability — the cushion above what it owes the book. Positive = solvent with room to spare.",
+  rLiq: "Liquidation activity since restart: how many positions were force-closed, their total notional, the single largest loss, and — critically — how many produced a deficit (bad debt).",
+  rExposure: "Per-game vault exposure vs the per-side cap (MAX_VAULT_EXPOSURE). 'Near cap' ≥ 80%, 'Over cap' > 100% (the vault is holding more one-sided risk than the cap allows). Bars show each game's worst side.",
+  rDrawdown: "Vault-balance drawdown from its running peak, from the economics snapshots. Max drawdown = worst peak-to-trough capital erosion; current = how far below peak right now.",
 };
 
 function Login({ onAuthed }) {
@@ -767,9 +774,84 @@ function ExecutionTab({ data }) {
   );
 }
 
+// Risk & solvency — the pre-real-money gate. Bad debt should be $0 and the vault should cover its book.
+function RiskTab({ data }) {
+  if (!data) return <Panel title="Risk"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const s = data.solvency || {};
+  const ex = data.exposure || {};
+  const lq = data.liquidations || {};
+  const dd = data.drawdown || {};
+  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
+  const badDebt = lq.totalDeficit || 0;
+  const solvent = badDebt === 0 && (s.coverage == null || s.coverage >= 1);
+  const covColor = s.coverage == null ? C.mut : s.coverage >= 1.5 ? C.primary : s.coverage >= 1 ? C.amber : C.red;
+  const utilColor = (u) => (u == null ? C.mut : u > 1 ? C.red : u >= 0.8 ? C.amber : C.primary);
+  return (
+    <>
+      {/* Hero: the one thing that must be true before real money. */}
+      <div style={{ background: (solvent ? C.primary : C.red) + "14", border: `1px solid ${(solvent ? C.primary : C.red)}55`, borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
+        <span style={{ color: solvent ? C.primary : C.red, fontWeight: 800, fontSize: 14 }}>{solvent ? "✓ Solvent — no bad debt" : "⚠ Risk flag"}</span>
+        <span style={{ color: C.text, fontSize: 13 }}> · {badDebt > 0 ? `$${badDebt.toLocaleString()} uncovered bad debt across ${lq.deficitCount} liquidation(s)` : "every liquidation stayed within posted margin"}{s.coverage != null && s.coverage < 1 ? ` · vault covers only ${pct(s.coverage)} of its book` : ""}</span>
+        <div style={{ color: C.mut, fontSize: 12, marginTop: 3 }}>The gap-aware leverage cap should keep bad debt at $0 and vault coverage ≥ 100%. Any red here is a hard blocker for real funds.</div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <Stat label="Uncovered bad debt" value={badDebt > 0 ? "−" + fmtUsd(badDebt) : "$0"} valueColor={badDebt > 0 ? C.red : C.primary} sub={`${lq.deficitCount || 0} deficit liq`} info={TIP.rDeficit} />
+        <Stat label="Vault coverage" value={s.coverage == null ? "—" : s.coverage.toFixed(2) + "×"} valueColor={covColor} sub="balance ÷ book" info={TIP.rCoverage} />
+        <Stat label="Surplus" value={fmtSigned(s.surplus)} valueColor={s.surplus >= 0 ? C.primaryLt : C.red} info={TIP.rSurplus} />
+        <Stat label="Liability" value={fmtUsd(s.liability)} sub="short book" />
+        <Stat label="Max drawdown" value={fmtUsd(dd.maxDrawdown)} sub={`peak ${fmtUsd(dd.peak)}`} info={TIP.rDrawdown} />
+      </div>
+
+      <Panel title="Liquidations (since restart)" info={TIP.rLiq}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: (lq.recent || []).length ? 12 : 0 }}>
+          <Stat label="Count" value={lq.count ?? 0} valueColor={lq.count > 0 ? C.amber : C.primary} />
+          <Stat label="Notional" value={fmtUsd(lq.notional)} />
+          <Stat label="Total loss" value={fmtSigned(lq.totalLoss)} valueColor={lq.totalLoss < 0 ? C.red : C.text} />
+          <Stat label="Largest loss" value={fmtSigned(lq.largestLoss)} valueColor={lq.largestLoss < 0 ? C.red : C.text} />
+          <Stat label="Deficit liq" value={lq.deficitCount ?? 0} valueColor={lq.deficitCount > 0 ? C.red : C.primary} />
+        </div>
+        {(lq.recent || []).length > 0 && (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>User</th><th style={th}>Game</th><th style={th}>Side</th><th style={th}>PnL</th><th style={th}>Deficit</th><th style={th}>Notional</th><th style={th}>When</th></tr></thead>
+            <tbody>{lq.recent.map((r, i) => (
+              <tr key={i}>
+                <td style={{ ...td, color: C.mut }}>{(r.userId || "").slice(0, 8)}</td>
+                <td style={{ ...td, color: C.mut }}>{r.gameId}</td>
+                <td style={{ ...td, color: r.side === "home" ? C.primaryLt : C.red }}>{r.side}</td>
+                <td style={{ ...td, color: r.pnl < 0 ? C.red : C.text }}>{fmtSigned(r.pnl)}</td>
+                <td style={{ ...td, color: r.deficit > 0 ? C.red : C.mut, fontWeight: r.deficit > 0 ? 700 : 400 }}>{r.deficit > 0 ? fmtSigned(-r.deficit) : "—"}</td>
+                <td style={td}>{fmtUsd(r.notional)}</td>
+                <td style={{ ...td, color: C.mut }}>{r.agoS}s ago</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </Panel>
+
+      <Panel title={`Vault exposure vs cap (${fmtUsd(ex.cap)}/side · ${ex.nearCap || 0} near · ${ex.overCap || 0} over)`} info={TIP.rExposure}>
+        {(ex.games || []).length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No vault inventory right now.</div>
+          : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>Game</th><th style={th}>Home short</th><th style={th}>Away short</th><th style={th}>Max util</th><th style={{ ...th, width: "30%" }}></th></tr></thead>
+              <tbody>{ex.games.map((g, i) => (
+                <tr key={i}>
+                  <td style={td}>{g.matchup} <span style={{ color: C.mut }}>{g.league}</span></td>
+                  <td style={td}>{fmtUsd(g.homeNotional)}</td>
+                  <td style={td}>{fmtUsd(g.awayNotional)}</td>
+                  <td style={{ ...td, color: utilColor(g.maxUtil) }}>{pct(g.maxUtil)}</td>
+                  <td style={td}><div style={{ background: C.surface, borderRadius: 5, height: 12 }}><div style={{ width: `${Math.min(100, (g.maxUtil || 0) * 100)}%`, height: "100%", background: utilColor(g.maxUtil), borderRadius: 5 }} /></div></td>
+                </tr>
+              ))}</tbody>
+            </table></div>}
+      </Panel>
+    </>
+  );
+}
+
 export function DashboardPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(TOK));
-  const [tab, setTab] = useState("oracle"); // oracle | vault | health | product | economics | execution
+  const [tab, setTab] = useState("oracle"); // oracle|vault|health|product|economics|execution|risk
   const [summary, setSummary] = useState(null);
   const [sources, setSources] = useState(null);
   const [coverage, setCoverage] = useState(null);
@@ -781,6 +863,7 @@ export function DashboardPage() {
   const [productData, setProductData] = useState(null);
   const [economicsData, setEconomicsData] = useState(null);
   const [executionData, setExecutionData] = useState(null);
+  const [riskData, setRiskData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -796,7 +879,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -808,6 +891,7 @@ export function DashboardPage() {
         safe(adminFetch("/admin/analytics")),
         safe(adminFetch("/admin/economics")),
         safe(adminFetch("/admin/execution")),
+        safe(adminFetch("/admin/risk")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -820,6 +904,7 @@ export function DashboardPage() {
       if (prod) setProductData(prod);
       if (econ) setEconomicsData(econ);
       if (exec) setExecutionData(exec);
+      if (rsk) setRiskData(rsk);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -838,11 +923,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : "Oracle accuracy"}</div>
-          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : tab === "execution" ? "Internal dashboard · fills · rejections · slippage · mix" : "Internal dashboard · all sports · graded forecasts"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : "Oracle accuracy"}</div>
+          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : tab === "execution" ? "Internal dashboard · fills · rejections · slippage · mix" : tab === "risk" ? "Internal dashboard · bad debt · solvency · exposure · drawdown" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"], ["risk", "Risk"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -860,6 +945,8 @@ export function DashboardPage() {
       {tab === "economics" && <EconomicsTab data={economicsData} />}
 
       {tab === "execution" && <ExecutionTab data={executionData} />}
+
+      {tab === "risk" && <RiskTab data={riskData} />}
 
       {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>
