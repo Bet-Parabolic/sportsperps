@@ -1,4 +1,5 @@
 import { WS_URL } from "./constants.js";
+import { currentUserId } from "./auth.js";
 
 /* ─────────────────────────────────────────────────────────────
    liveSocket — ONE shared WebSocket for the whole app.
@@ -19,13 +20,29 @@ let backoff = 1000;
 let lastMsgAt = 0;
 let started = false;
 let reconnectTimer = null;
+let liveUid = null; // the userId this socket is subscribed as (for private per-user pushes)
+
+// Tell the backend which user we are, so it routes private events (liquidations) only to us.
+// Sent on every (re)connect and whenever the identity changes (guest → logged-in).
+function sendSubscribe() {
+  const userId = liveUid || currentUserId();
+  if (ws && ws.readyState === 1 && userId) {
+    try { ws.send(JSON.stringify({ type: "subscribe", userId })); } catch { /* noop */ }
+  }
+}
+
+/* Update the subscribed user (call on login/logout). Re-subscribes immediately if connected. */
+export function setLiveUser(userId) {
+  liveUid = userId || null;
+  sendSubscribe();
+}
 
 function connect() {
   let sock;
   try { sock = new WebSocket(WS_URL); } catch { scheduleReconnect(); return; }
   ws = sock;
 
-  sock.onopen = () => { backoff = 1000; lastMsgAt = Date.now(); };
+  sock.onopen = () => { backoff = 1000; lastMsgAt = Date.now(); sendSubscribe(); };
 
   sock.onmessage = (ev) => {
     lastMsgAt = Date.now();

@@ -4,7 +4,7 @@ import { API_URL } from "../lib/constants.js";
 import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
-import { subscribeLive } from "../lib/liveSocket.js";
+import { subscribeLive, setLiveUser } from "../lib/liveSocket.js";
 import { TvChart } from "../components/TvChart.jsx";
 import { ProfilePage } from "../components/ProfilePage.jsx";
 import { AuthModal } from "../components/AuthModal.jsx";
@@ -417,6 +417,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // surface on the next local poll (up to 5s late, and liquidations were silent).
   useEffect(() => {
     if (initGame._espnKey) return; // ESPN-only games aren't backed by the CLOB
+    setLiveUser(userId); // subscribe our id so the backend routes our private liquidations to us
     const unsub = subscribeLive((msg) => {
       if (msg.gameId !== g.id) return;
       if (msg.type === 'liquidation' && msg.userId === userId) {
