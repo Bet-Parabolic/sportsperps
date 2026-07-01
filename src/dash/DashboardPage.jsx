@@ -98,6 +98,15 @@ const TIP = {
   vFundUser: "Net funding the user paid (−) or received (+) over the life of the position.",
   vVaultPnl: "The vault's PnL on Parabolic for this position — the zero-sum counterparty result (≈ −user PnL). Funding and platform fees are separate lines.",
   vHedgeShadow: "SHADOW hedge: the venue (P=Polymarket, K=Kalshi) and price the vault would have crossed at to flatten this position's side, at open / at close. No real order is placed yet (Phase 2).",
+  // Health tab
+  hUptime: "How long the backend has run since its last deploy/restart. The rolling counters below reset on restart.",
+  hWs: "Live WebSocket clients connected right now (browsers watching games), plus total connects since restart.",
+  hBlind: "In-play games running with NO fresh oracle source right now — priced blind / frozen. Should be 0; investigate any game listed below.",
+  hSingle: "In-play games priced by only ONE source right now — can't be cross-checked against a second feed. Fewer is better.",
+  hFetch: "Per data-source fetch success since restart: % of API calls that succeeded + the last error. A dropping rate = that feed is failing, which means mispriced or frozen markets.",
+  hMatch: "Of a league's eligible games, how many this source actually matched on the latest poll. A low rate means the source has markets but our matcher isn't joining them to our games (a coverage hole).",
+  hApi: "Per API route: request count and p50/p95 latency (ms) over the recent window, plus 4xx/5xx counts. Rising p95 or 5xx = backend trouble.",
+  hStale: "Times a fresh source quote was dropped for disagreeing with the live model (kept OUT of the blend), by source — plus the most recent incidents. A few is healthy (the guard working); a flood means a feed is persistently wrong.",
 };
 
 function Login({ onAuthed }) {
@@ -374,9 +383,109 @@ function VaultHistory({ rows }) {
   );
 }
 
+// Reliability & data-source health — "are the feeds and systems healthy?".
+function HealthTab({ data }) {
+  if (!data) return <Panel title="Health"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const live = data.live || { total: 0, noSource: 0, singleSource: 0, blind: [] };
+  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
+  const up = data.uptimeS || 0, upH = Math.floor(up / 3600), upM = Math.floor((up % 3600) / 60);
+  const fetchColor = (r) => r == null ? C.mut : r >= 0.98 ? C.primary : r >= 0.9 ? C.amber : C.red;
+  const matchColor = (r) => r == null ? C.mut : r >= 0.8 ? C.primary : r >= 0.5 ? C.amber : C.red;
+  const p95Color = (ms) => ms == null ? C.mut : ms <= 150 ? C.primary : ms <= 500 ? C.amber : C.red;
+  const errColor = (r) => r == null ? C.mut : r <= 0.005 ? C.primary : r <= 0.02 ? C.amber : C.red;
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <Stat label="Uptime" value={upH > 0 ? `${upH}h ${upM}m` : `${upM}m`} info={TIP.hUptime} />
+        <Stat label="WS clients" value={data.ws?.clients ?? 0} sub={`${data.ws?.totalConnects ?? 0} total connects`} info={TIP.hWs} />
+        <Stat label="Live games" value={live.total} />
+        <Stat label="Blind (no source)" value={live.noSource} valueColor={live.noSource > 0 ? C.red : C.primary} info={TIP.hBlind} />
+        <Stat label="Single-source" value={live.singleSource} valueColor={live.singleSource > 0 ? C.amber : C.primary} info={TIP.hSingle} />
+      </div>
+
+      {live.blind.length > 0 && (
+        <Panel title={`⚠ Live games running blind (${live.blind.length})`}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>Game</th><th style={th}>League</th><th style={th}>Sources</th></tr></thead>
+            <tbody>{live.blind.map((g) => (
+              <tr key={g.game_id}><td style={{ ...td, color: C.red }}>{g.away}@{g.home}</td><td style={{ ...td, color: C.mut }}>{g.league}</td><td style={td}>{g.sources}</td></tr>
+            ))}</tbody>
+          </table>
+        </Panel>
+      )}
+
+      <Panel title="Data-source fetch health" info={TIP.hFetch}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr><th style={th}>Source</th><th style={th}>OK rate</th><th style={th}>OK / Fail</th><th style={th}>Last OK</th><th style={th}>Last error</th></tr></thead>
+          <tbody>{(data.sources || []).map((s) => (
+            <tr key={s.source}>
+              <td style={td}>{s.source}</td>
+              <td style={{ ...td, color: fetchColor(s.okRate) }}>{pct(s.okRate)}</td>
+              <td style={{ ...td, color: C.mut }}>{s.ok} / {s.fail}</td>
+              <td style={{ ...td, color: C.mut }}>{s.lastOkAgoS == null ? "—" : s.lastOkAgoS + "s ago"}</td>
+              <td style={{ ...td, color: s.lastError ? C.red : C.mut, fontFamily: "inherit", maxWidth: 340, whiteSpace: "normal" }}>{s.lastError || "—"}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </Panel>
+
+      <Panel title="Market match rate by league (latest poll)" info={TIP.hMatch}>
+        {(data.match || []).length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No match data yet — no active games this poll.</div>
+          : <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>Source</th><th style={th}>League</th><th style={th}>Matched</th><th style={th}>Rate</th></tr></thead>
+              <tbody>{data.match.map((m) => (
+                <tr key={m.source + m.league}>
+                  <td style={td}>{m.source}</td><td style={{ ...td, color: C.mut }}>{m.league}</td>
+                  <td style={td}>{m.matched}/{m.eligible}</td>
+                  <td style={{ ...td, color: matchColor(m.rate) }}>{pct(m.rate)}</td>
+                </tr>
+              ))}</tbody>
+            </table>}
+      </Panel>
+
+      <Panel title="API latency & errors (recent window)" info={TIP.hApi}>
+        {(data.api || []).length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No requests recorded yet.</div>
+          : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+              <thead><tr><th style={th}>Route</th><th style={th}>Count</th><th style={th}>p50 ms</th><th style={th}>p95 ms</th><th style={th}>Max</th><th style={th}>4xx</th><th style={th}>5xx</th><th style={th}>Err%</th></tr></thead>
+              <tbody>{data.api.map((r) => (
+                <tr key={r.route}>
+                  <td style={{ ...td, fontFamily: "inherit" }}>{r.route}</td>
+                  <td style={td}>{r.count}</td>
+                  <td style={td}>{r.p50 == null ? "—" : r.p50.toFixed(0)}</td>
+                  <td style={{ ...td, color: p95Color(r.p95) }}>{r.p95 == null ? "—" : r.p95.toFixed(0)}</td>
+                  <td style={{ ...td, color: C.mut }}>{r.maxMs == null ? "—" : r.maxMs.toFixed(0)}</td>
+                  <td style={{ ...td, color: r.err4xx > 0 ? C.amber : C.mut }}>{r.err4xx}</td>
+                  <td style={{ ...td, color: r.err5xx > 0 ? C.red : C.mut }}>{r.err5xx}</td>
+                  <td style={{ ...td, color: errColor(r.errRate) }}>{(r.errRate * 100).toFixed(1)}%</td>
+                </tr>
+              ))}</tbody>
+            </table></div>}
+      </Panel>
+
+      <Panel title="Oracle stale-source drops" info={TIP.hStale}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: (data.staleIncidents || []).length ? 12 : 0 }}>
+          {(data.staleDrops || []).length === 0
+            ? <div style={{ color: C.mut, fontSize: 13 }}>None — no source has been dropped as stale since restart.</div>
+            : data.staleDrops.map((s) => <Stat key={s.source} label={s.source} value={s.count} sub="stale drops" />)}
+        </div>
+        {(data.staleIncidents || []).length > 0 && (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={th}>Game</th><th style={th}>Source</th><th style={th}>Reason</th><th style={th}>When</th></tr></thead>
+            <tbody>{data.staleIncidents.map((i, idx) => (
+              <tr key={idx}><td style={td}>{i.gameId}</td><td style={td}>{i.source}</td><td style={{ ...td, color: C.mut }}>{i.reason}</td><td style={{ ...td, color: C.mut }}>{i.agoS}s ago</td></tr>
+            ))}</tbody>
+          </table>
+        )}
+      </Panel>
+    </>
+  );
+}
+
 export function DashboardPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(TOK));
-  const [tab, setTab] = useState("oracle"); // 'oracle' | 'vault'
+  const [tab, setTab] = useState("oracle"); // 'oracle' | 'vault' | 'health'
   const [summary, setSummary] = useState(null);
   const [sources, setSources] = useState(null);
   const [coverage, setCoverage] = useState(null);
@@ -384,6 +493,7 @@ export function DashboardPage() {
   const [live, setLive] = useState([]);
   const [vault, setVault] = useState(null);
   const [vaultHistory, setVaultHistory] = useState([]);
+  const [healthData, setHealthData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -399,7 +509,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -407,6 +517,7 @@ export function DashboardPage() {
         safe(adminFetch("/admin/oracle/live")),
         safe(adminFetch("/admin/vault")),
         safe(adminFetch("/admin/vault/history?limit=200")),
+        safe(adminFetch("/admin/health")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -415,6 +526,7 @@ export function DashboardPage() {
       setLive(lv?.live || []);
       if (vlt) setVault(vlt);
       if (vh) setVaultHistory(vh.rows || []);
+      if (hlth) setHealthData(hlth);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -433,11 +545,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : "Oracle accuracy"}</div>
-          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : "Internal dashboard · all sports · graded forecasts"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : "Oracle accuracy"}</div>
+          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -447,6 +559,8 @@ export function DashboardPage() {
       {err && <div style={{ color: C.red, marginBottom: 12 }}>{err}</div>}
 
       {tab === "vault" && <VaultTab vault={vault} history={vaultHistory} />}
+
+      {tab === "health" && <HealthTab data={healthData} />}
 
       {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>
