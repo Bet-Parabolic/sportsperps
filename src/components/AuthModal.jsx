@@ -6,8 +6,8 @@ import { register, login } from "../lib/auth.js";
 // Login / sign-up modal. Username + password only (email is added later on the profile page for
 // 2FA). On success calls onAuth(authData). `reason` is an optional line explaining why it opened
 // (e.g. shown when a wager is gated behind sign-in).
-export function AuthModal({ onClose, onAuth, reason }) {
-  const [mode, setMode] = useState("signup"); // 'signup' | 'login'
+export function AuthModal({ onClose, onAuth, reason, defaultMode = "signup" }) {
+  const [mode, setMode] = useState(defaultMode); // 'signup' | 'login'
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

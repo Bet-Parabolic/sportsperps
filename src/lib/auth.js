@@ -57,3 +57,17 @@ export async function login(username, password) {
 }
 
 export function logout() { clearAuth(); }
+
+// ── Session-expired handling ─────────────────────────────────────────────
+// A stored token can stop validating (e.g. AUTH_SECRET rotated, or a future token expiry). Any
+// authenticated call that gets a 401 should route through handleUnauthorized(): it clears the dead
+// session and fires a single app-level handler (the terminal registers one that opens the sign-in
+// modal with a "session expired" notice) instead of the request silently failing.
+let sessionExpiredHandler = null;
+export function setSessionExpiredHandler(fn) { sessionExpiredHandler = fn; }
+
+export function handleUnauthorized() {
+  if (!getAuth()) return; // only meaningful if we believed we were logged in — ignore for guests
+  clearAuth();
+  if (sessionExpiredHandler) { try { sessionExpiredHandler(); } catch { /* noop */ } }
+}

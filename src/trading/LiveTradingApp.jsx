@@ -10,7 +10,7 @@ import { ProfilePage } from "../components/ProfilePage.jsx";
 import { AuthModal } from "../components/AuthModal.jsx";
 import { ChatPanel } from "../components/ChatPanel.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
-import { getAuth, currentUserId, authToken, isLoggedIn } from "../lib/auth.js";
+import { getAuth, currentUserId, authToken, isLoggedIn, handleUnauthorized, setSessionExpiredHandler } from "../lib/auth.js";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -43,6 +43,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [auth, setAuth] = useState(getAuth);          // { userId, username, token } | null
   const userId = auth?.userId || currentUserId();     // trade as the authed account, else guest
   const [showAuth, setShowAuth] = useState(false);    // login/signup modal
+  const [sessionExpired, setSessionExpired] = useState(false); // opened by a 401 (dead/rotated token)
 
   // Register user with backend on mount (idempotent; guests get a paper balance)
   useEffect(() => {
@@ -412,6 +413,18 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     return () => clearInterval(iv);
   }, [initGame.id, settled, userId]);
 
+  // ── session-expired handling: a 401 on any authed call (or a WS subscribe_error) routes here ──
+  // Clear the stale session in local state and open the sign-in modal with a clear notice, instead
+  // of the request failing silently. handleUnauthorized() (auth.js) has already cleared storage.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setAuth(null);
+      setSessionExpired(true);
+      setShowAuth(true);
+    });
+    return () => setSessionExpiredHandler(null);
+  }, []);
+
   // ── real-time push: instant liquidation + settlement via shared WS ────────
   // Backend broadcasts these from its 5s block loop; without this they'd only
   // surface on the next local poll (up to 5s late, and liquidations were silent).
@@ -474,6 +487,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           tp, sl,
         }),
       });
+      if (res.status === 401) { handleUnauthorized(); return; } // dead/rotated token → prompt re-login
       const result = await res.json();
       if (result.status === 'rejected') {
         if (result.reason === 'leverageRejected') {
@@ -1600,9 +1614,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       )}
       {showAuth && (
         <AuthModal
-          reason="Sign in or create an account to place a wager."
-          onClose={()=>setShowAuth(false)}
-          onAuth={(data)=>{ setAuth(data); setShowAuth(false); pollRef.current?.(); }}
+          reason={sessionExpired ? "Your session expired — please sign in again." : "Sign in or create an account to place a wager."}
+          defaultMode={sessionExpired ? "login" : "signup"}
+          onClose={()=>{ setShowAuth(false); setSessionExpired(false); }}
+          onAuth={(data)=>{ setAuth(data); setShowAuth(false); setSessionExpired(false); pollRef.current?.(); }}
         />
       )}
       {tradeCard && <TradeCard card={tradeCard} onClose={()=>setTradeCard(null)}/>}

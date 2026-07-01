@@ -1,5 +1,5 @@
 import { WS_URL } from "./constants.js";
-import { currentUserId, authToken } from "./auth.js";
+import { currentUserId, authToken, handleUnauthorized } from "./auth.js";
 
 /* ─────────────────────────────────────────────────────────────
    liveSocket — ONE shared WebSocket for the whole app.
@@ -49,6 +49,9 @@ function connect() {
     lastMsgAt = Date.now();
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
+    // Backend rejected our subscribe (credentialed account with a dead/rotated token) → treat as a
+    // session expiry so the UI prompts a clean re-login. After clearAuth we re-subscribe as guest.
+    if (msg.type === "subscribe_error") { handleUnauthorized(); return; }
     subscribers.forEach((fn) => { try { fn(msg); } catch { /* subscriber error — isolate */ } });
   };
 
