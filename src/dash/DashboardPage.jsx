@@ -107,6 +107,15 @@ const TIP = {
   hMatch: "Of a league's eligible games, how many this source actually matched on the latest poll. A low rate means the source has markets but our matcher isn't joining them to our games (a coverage hole).",
   hApi: "Per API route: request count and p50/p95 latency (ms) over the recent window, plus 4xx/5xx counts. Rising p95 or 5xx = backend trouble.",
   hStale: "Times a fresh source quote was dropped for disagreeing with the live model (kept OUT of the blend), by source — plus the most recent incidents. A few is healthy (the guard working); a flood means a feed is persistently wrong.",
+  // Product tab
+  pDau: "Daily active users — distinct users who took any tracked action (login, wager, account created) today (UTC).",
+  pWau: "Weekly active users — distinct users active in the last 7 days.",
+  pSignups: "Distinct users who created a username/password account (a signup event). Guests can wager without signing up, so this is lower than activated users.",
+  pActivation: "Activation rate = of all users seen, the share that placed at least one wager. The single most important early metric — are people actually trying the core action?",
+  pFunnel: "The activation journey: users seen → placed a wager → became a repeat trader (wagered on 2+ different days). '% of prev' is the conversion at each step. It's non-strict — signup isn't required to wager.",
+  pRetention: "Do users come back? D1 = of users whose first day was ≥1 day ago, the share active again the next day. D7 = active again within the following week. Cohort = how many users are old enough to count. Target: green ≥40%, amber ≥20%.",
+  pDaily: "Activity per day: DAU (distinct active users, green) and new users first seen that day (amber). Watch the trend across match-days.",
+  pEvents: "Raw event volume by type since the backend last restarted — a sanity check that each tracked action is firing.",
 };
 
 function Login({ onAuthed }) {
@@ -483,9 +492,86 @@ function HealthTab({ data }) {
   );
 }
 
+// Product analytics — "are users showing up, activating, and coming back?".
+function ProductTab({ data }) {
+  if (!data) return <Panel title="Product"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const f = data.funnel || { stages: [], activationRate: null, repeatRate: null, signups: 0 };
+  const r = data.retention || {};
+  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
+  const maxStage = Math.max(1, ...(f.stages || []).map((s) => s.count));
+  const retColor = (v) => (v == null ? C.mut : v >= 0.4 ? C.primary : v >= 0.2 ? C.amber : C.red);
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <Stat label="DAU (today)" value={data.dauToday ?? 0} info={TIP.pDau} />
+        <Stat label="WAU (7d)" value={data.wau ?? 0} info={TIP.pWau} />
+        <Stat label="Signups" value={f.signups ?? 0} info={TIP.pSignups} />
+        <Stat label="Activation" value={pct(f.activationRate)} sub="seen → wagered" info={TIP.pActivation} />
+        <Stat label="Total events" value={data.totalEvents ?? 0} />
+      </div>
+
+      <Panel title="Activation funnel" info={TIP.pFunnel}>
+        {(f.stages || []).length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No events yet.</div>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {f.stages.map((s, i) => {
+                const prev = i > 0 ? f.stages[i - 1].count : null;
+                const conv = prev ? s.count / prev : null;
+                return (
+                  <div key={s.key}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: C.text }}>{s.label}</span>
+                      <span style={{ color: C.mut, fontFamily: mono }}>{s.count}{conv != null && ` · ${pct(conv)} of prev`}</span>
+                    </div>
+                    <div style={{ background: C.surface, borderRadius: 6, height: 22, overflow: "hidden" }}>
+                      <div style={{ width: `${(s.count / maxStage) * 100}%`, height: "100%", background: C.primary, opacity: 1 - i * 0.22, borderRadius: 6, transition: "width .3s" }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>}
+      </Panel>
+
+      <Panel title="Retention" info={TIP.pRetention}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Stat label="D1 return" value={pct(r.d1)} sub={`${r.d1Cohort || 0} in cohort`} valueColor={retColor(r.d1)} />
+          <Stat label="D7 return" value={pct(r.d7)} sub={`${r.d7Cohort || 0} in cohort`} valueColor={retColor(r.d7)} />
+          <Stat label="Repeat traders" value={pct(f.repeatRate)} sub="wagered on 2+ days" />
+        </div>
+      </Panel>
+
+      <Panel title="Daily active users" info={TIP.pDaily}>
+        {(data.daily || []).length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No daily data yet.</div>
+          : <ResponsiveContainer width="100%" height={190}>
+              <LineChart data={data.daily} margin={{ top: 8, right: 12, bottom: 4, left: -18 }}>
+                <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
+                <XAxis dataKey="day" tick={{ fill: C.mut, fontSize: 10 }} tickFormatter={(d) => (d || "").slice(5)} />
+                <YAxis tick={{ fill: C.mut, fontSize: 10 }} allowDecimals={false} />
+                <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} labelStyle={{ color: C.text }} />
+                <Line type="monotone" dataKey="dau" stroke={C.primary} strokeWidth={2} dot={false} name="DAU" />
+                <Line type="monotone" dataKey="newUsers" stroke={C.amber} strokeWidth={1.5} dot={false} name="New users" />
+              </LineChart>
+            </ResponsiveContainer>}
+      </Panel>
+
+      <Panel title="Event volume (since restart)" info={TIP.pEvents}>
+        {(data.byEvent || []).length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No events yet.</div>
+          : <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>Event</th><th style={th}>Count</th><th style={th}>Distinct users</th></tr></thead>
+              <tbody>{data.byEvent.map((e) => (
+                <tr key={e.event}><td style={td}>{e.event}</td><td style={td}>{e.count}</td><td style={{ ...td, color: C.mut }}>{e.users}</td></tr>
+              ))}</tbody>
+            </table>}
+      </Panel>
+    </>
+  );
+}
+
 export function DashboardPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(TOK));
-  const [tab, setTab] = useState("oracle"); // 'oracle' | 'vault' | 'health'
+  const [tab, setTab] = useState("oracle"); // 'oracle' | 'vault' | 'health' | 'product'
   const [summary, setSummary] = useState(null);
   const [sources, setSources] = useState(null);
   const [coverage, setCoverage] = useState(null);
@@ -494,6 +580,7 @@ export function DashboardPage() {
   const [vault, setVault] = useState(null);
   const [vaultHistory, setVaultHistory] = useState([]);
   const [healthData, setHealthData] = useState(null);
+  const [productData, setProductData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -509,7 +596,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -518,6 +605,7 @@ export function DashboardPage() {
         safe(adminFetch("/admin/vault")),
         safe(adminFetch("/admin/vault/history?limit=200")),
         safe(adminFetch("/admin/health")),
+        safe(adminFetch("/admin/analytics")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -527,6 +615,7 @@ export function DashboardPage() {
       if (vlt) setVault(vlt);
       if (vh) setVaultHistory(vh.rows || []);
       if (hlth) setHealthData(hlth);
+      if (prod) setProductData(prod);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -545,11 +634,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : "Oracle accuracy"}</div>
-          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : "Internal dashboard · all sports · graded forecasts"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : "Oracle accuracy"}</div>
+          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -561,6 +650,8 @@ export function DashboardPage() {
       {tab === "vault" && <VaultTab vault={vault} history={vaultHistory} />}
 
       {tab === "health" && <HealthTab data={healthData} />}
+
+      {tab === "product" && <ProductTab data={productData} />}
 
       {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>
