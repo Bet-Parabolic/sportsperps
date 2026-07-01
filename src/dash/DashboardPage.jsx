@@ -125,6 +125,13 @@ const TIP = {
   eTrend: "House economics over time from periodic snapshots (every 5 min). Realized house = trading + funding + fees. Watch the slope — is the model compounding profit as volume grows?",
   eLiq: "Liquidations since restart: how many positions were force-closed and their total notional. A spike means the leverage/risk settings may be too loose (or a big gap hit).",
   eActivity: "Live platform activity at the latest snapshot: open interest (notional in open positions), open positions, active traders, live markets.",
+  // Execution tab
+  xOrders: "Total order submissions the engine has processed since restart (fills, rests, and rejections).",
+  xFillRate: "Share of orders that got at least a partial fill. Low fill rate = users are trying to trade but can't (illiquid book / no vault quote / rejections).",
+  xReject: "Share of orders rejected outright. Break down the reasons below — a spike in one reason points at a specific friction (leverage cap too tight, margin, price bounds).",
+  xSlippage: "Execution cost vs the oracle fair price, in cents (taker perspective). Positive = the taker paid above fair (the vault spread). Lower is a better fill. Watch p95 for worst-case fills.",
+  xFillMix: "Where fills come from: the vault (house is counterparty) vs the order book (peer-to-peer). Early on the vault carries most flow; a growing book share = real two-sided liquidity.",
+  xRejReasons: "Why orders were rejected, most common first. leverageRejected = above the gap-aware cap; perpMarginRejected = not enough balance; oracleRejected = limit too far from the oracle; marketClosed = market not open.",
 };
 
 function Login({ onAuthed }) {
@@ -672,9 +679,97 @@ function EconomicsTab({ data }) {
   );
 }
 
+// Trade-execution quality — "how good is the fill experience?".
+const REJ_LABEL = {
+  leverageRejected: "Leverage too high", perpMarginRejected: "Insufficient margin",
+  oracleRejected: "Price too far from oracle", tickRejected: "Invalid price tick",
+  reduceOnlyRejected: "Reduce-only mismatch", badAloPxRejected: "ALO would cross",
+  iocCancelRejected: "IOC — no fill", marketClosed: "Market not open", userNotFound: "User not found",
+};
+function ExecutionTab({ data }) {
+  if (!data) return <Panel title="Execution"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const o = data.outcomes || {};
+  const mix = data.fillMix || {};
+  const sl = data.slippage || {};
+  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
+  const cents = (v) => (v == null ? "—" : (v >= 0 ? "" : "−") + Math.abs(v).toFixed(2) + "¢");
+  const fillColor = data.fillRate == null ? C.mut : data.fillRate >= 0.8 ? C.primary : data.fillRate >= 0.5 ? C.amber : C.red;
+  const rejColor = data.rejectRate == null ? C.mut : data.rejectRate <= 0.05 ? C.primary : data.rejectRate <= 0.15 ? C.amber : C.red;
+  const slipColor = sl.avgCents == null ? C.mut : sl.avgCents <= 1 ? C.primary : sl.avgCents <= 3 ? C.amber : C.red;
+  const outcomeRows = [
+    { k: "filled", label: "Filled", c: C.primaryLt }, { k: "partialFill", label: "Partial", c: C.primary },
+    { k: "resting", label: "Resting (limit)", c: C.mut }, { k: "rejected", label: "Rejected", c: C.red },
+  ];
+  const maxOutcome = Math.max(1, ...outcomeRows.map((r) => o[r.k] || 0));
+  const maxRej = Math.max(1, ...(data.rejections || []).map((r) => r.count));
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <Stat label="Orders" value={data.orders ?? 0} info={TIP.xOrders} />
+        <Stat label="Fill rate" value={pct(data.fillRate)} valueColor={fillColor} info={TIP.xFillRate} />
+        <Stat label="Reject rate" value={pct(data.rejectRate)} valueColor={rejColor} info={TIP.xReject} />
+        <Stat label="Avg slippage" value={cents(sl.avgCents)} valueColor={slipColor} sub={`p95 ${cents(sl.p95Cents)}`} info={TIP.xSlippage} />
+        <Stat label="Vault-filled" value={pct(mix.vaultPct)} sub={`${mix.vault ?? 0} vault / ${mix.book ?? 0} book`} info={TIP.xFillMix} />
+      </div>
+
+      <Panel title="Order outcomes">
+        {(data.orders ?? 0) === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No orders processed since restart.</div>
+          : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {outcomeRows.map((r) => (
+                <div key={r.k}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+                    <span style={{ color: C.text }}>{r.label}</span><span style={{ color: C.mut, fontFamily: mono }}>{o[r.k] || 0}</span>
+                  </div>
+                  <div style={{ background: C.surface, borderRadius: 6, height: 18, overflow: "hidden" }}>
+                    <div style={{ width: `${((o[r.k] || 0) / maxOutcome) * 100}%`, height: "100%", background: r.c, borderRadius: 6 }} />
+                  </div>
+                </div>
+              ))}
+            </div>}
+      </Panel>
+
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 320px" }}>
+          <Panel title="Rejection reasons" info={TIP.xRejReasons}>
+            {(data.rejections || []).length === 0
+              ? <div style={{ color: C.mut, fontSize: 13 }}>No rejections — every order was fillable.</div>
+              : <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead><tr><th style={th}>Reason</th><th style={th}>Count</th><th style={{ ...th, width: "45%" }}></th></tr></thead>
+                  <tbody>{data.rejections.map((r) => (
+                    <tr key={r.reason}>
+                      <td style={td}>{REJ_LABEL[r.reason] || r.reason}</td>
+                      <td style={td}>{r.count}</td>
+                      <td style={td}><div style={{ background: C.surface, borderRadius: 5, height: 12 }}><div style={{ width: `${(r.count / maxRej) * 100}%`, height: "100%", background: C.red, borderRadius: 5 }} /></div></td>
+                    </tr>
+                  ))}</tbody>
+                </table>}
+          </Panel>
+        </div>
+        <div style={{ flex: "1 1 240px" }}>
+          <Panel title="Slippage vs oracle" info={TIP.xSlippage}>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <Stat label="Avg" value={cents(sl.avgCents)} valueColor={slipColor} sub={`${sl.count ?? 0} fills`} />
+              <Stat label="p50" value={cents(sl.p50Cents)} />
+              <Stat label="p95" value={cents(sl.p95Cents)} />
+              <Stat label="Max" value={cents(sl.maxCents)} />
+            </div>
+          </Panel>
+          <Panel title="Fill mix" info={TIP.xFillMix}>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <Stat label="Vault fills" value={mix.vault ?? 0} sub={fmtUsd(mix.vaultNotional)} />
+              <Stat label="Book fills" value={mix.book ?? 0} sub={fmtUsd(mix.bookNotional)} />
+            </div>
+          </Panel>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function DashboardPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(TOK));
-  const [tab, setTab] = useState("oracle"); // 'oracle' | 'vault' | 'health' | 'product' | 'economics'
+  const [tab, setTab] = useState("oracle"); // oracle | vault | health | product | economics | execution
   const [summary, setSummary] = useState(null);
   const [sources, setSources] = useState(null);
   const [coverage, setCoverage] = useState(null);
@@ -685,6 +780,7 @@ export function DashboardPage() {
   const [healthData, setHealthData] = useState(null);
   const [productData, setProductData] = useState(null);
   const [economicsData, setEconomicsData] = useState(null);
+  const [executionData, setExecutionData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -700,7 +796,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -711,6 +807,7 @@ export function DashboardPage() {
         safe(adminFetch("/admin/health")),
         safe(adminFetch("/admin/analytics")),
         safe(adminFetch("/admin/economics")),
+        safe(adminFetch("/admin/execution")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -722,6 +819,7 @@ export function DashboardPage() {
       if (hlth) setHealthData(hlth);
       if (prod) setProductData(prod);
       if (econ) setEconomicsData(econ);
+      if (exec) setExecutionData(exec);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -740,11 +838,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : "Oracle accuracy"}</div>
-          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : "Internal dashboard · all sports · graded forecasts"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : "Oracle accuracy"}</div>
+          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : tab === "execution" ? "Internal dashboard · fills · rejections · slippage · mix" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -760,6 +858,8 @@ export function DashboardPage() {
       {tab === "product" && <ProductTab data={productData} />}
 
       {tab === "economics" && <EconomicsTab data={economicsData} />}
+
+      {tab === "execution" && <ExecutionTab data={executionData} />}
 
       {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>
