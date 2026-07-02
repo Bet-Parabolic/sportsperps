@@ -911,7 +911,14 @@ export function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => { if (authed) load(); }, [authed, load]);
+  // Load on auth, then AUTO-REFRESH every 60s — the dashboard was pull-only (audit finding), so a
+  // dead feed or blind game sat unnoticed until someone clicked Refresh.
+  useEffect(() => {
+    if (!authed) return;
+    load();
+    const iv = setInterval(load, 60_000);
+    return () => clearInterval(iv);
+  }, [authed, load]);
 
   if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
 
@@ -935,6 +942,22 @@ export function DashboardPage() {
       </div>
 
       {err && <div style={{ color: C.red, marginBottom: 12 }}>{err}</div>}
+
+      {/* Global alert banner — server-computed conditions (feeds down, blind games, bad debt,
+          under-collateralized vault). Shown on EVERY tab so nothing hides behind tab choice. */}
+      {(healthData?.alerts || []).length > 0 && (
+        <div style={{ background: C.red + "14", border: `1px solid ${C.red}66`, borderRadius: 12, padding: "11px 16px", marginBottom: 16 }}>
+          <div style={{ color: C.red, fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
+            ⚠ {healthData.alerts.length} active alert{healthData.alerts.length > 1 ? "s" : ""}
+          </div>
+          {healthData.alerts.map((a) => (
+            <div key={a.key} style={{ color: a.severity === "crit" ? C.red : C.amber, fontSize: 12, lineHeight: 1.6 }}>
+              <span style={{ fontWeight: 700 }}>{a.severity === "crit" ? "CRIT" : "WARN"}</span>
+              <span style={{ color: C.text }}> · {a.msg}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {tab === "vault" && <VaultTab vault={vault} history={vaultHistory} />}
 
