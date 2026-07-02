@@ -51,9 +51,11 @@ export function makeBook(mid){
 // Max leverage by win-probability extremity — mirrors backend risk.js maxLeverageForPrice.
 // d = distance from a 0/1 bound = 1 - extremity. Leverage tightens as an outcome firms up.
 export function maxLev(p){const d=Math.min(p,1-p);if(d>=.40)return 10;if(d>=.25)return 5;if(d>=.15)return 3;if(d>=.05)return 2;return 1;}
-/* Liquidation price in HOME-scale (matches backend getLiqPrice: liq = entry ∓ entryCost/lev).
-   home: entry - entry/lev = entry*(1-1/lev);  away: entry + (1-entry)/lev. */
-export function liqPrice(side,entry,lev){return side==="home"?entry*(1-1/lev):entry+(1-entry)/lev;}
+/* Liquidation price in HOME-scale — the MAINTENANCE-margin trigger (matches backend getLiqPrice).
+   Liq fires when equity hits ½ the initial margin (a cushion above bankruptcy), so the buffer is
+   (entryCost/lev)·(1−MAINT). home entryCost=entry, away entryCost=1−entry.  MAINT=0.5. */
+const LIQ_MAINT = 0.5;
+export function liqPrice(side,entry,lev){const buf=(side==="home"?entry:1-entry)/lev*(1-LIQ_MAINT);return side==="home"?entry-buf:entry+buf;}
 export function calcPnL(side,exposure,entry,mark){return side==="home"?exposure*(mark-entry)/entry:exposure*(entry-mark)/entry;}
 
 /* Sport-appropriate period label */

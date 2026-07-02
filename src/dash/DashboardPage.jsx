@@ -80,6 +80,8 @@ const TIP = {
   ticks: "Price points logged for this game so far. 0 on a settled game = it was already over when capture started.",
   // Vault tab
   vBalance: "The vault's paper-USDC balance — its capital base. Grows with fees + winning inventory; shrinks on losing inventory.",
+  vInsurance: "Insurance fund reserve. Capitalized by net trading fees + liquidation penalties; absorbs bad debt (underwater settlements/liquidations) BEFORE the vault's LP capital. 'covered' = lifetime bad debt it has paid.",
+  vBadDebt: "Bad debt the VAULT backstopped after the insurance fund was exhausted — a direct hit to LP capital. Should stay near 0 while the insurance fund is funded.",
   vPnl: "Realized PnL booked from settled games (vault collected premium, then paid out the outcome). Lifetime.",
   vUnreal: "Open inventory marked at the current oracle price across all active games. What realized PnL would be if every game settled at today's price.",
   vLiability: "Total notional the vault is currently short across all games (sum of per-side exposure). The book it would need to hedge.",
@@ -275,6 +277,8 @@ function VaultTab({ vault, history = [] }) {
         <Stat label="Active games" value={v.activeGames ?? 0} info={TIP.vActive} />
         <Stat label="Volume" value={fmtUsd(v.totalVolume)} />
         <Stat label="Funding collected" value={fmtSigned(v.fundingCollected)} sub="net carry" info={TIP.vFunding} />
+        {vault.insurance && <Stat label="Insurance fund" value={fmtUsd(vault.insurance.balance)} sub={`covered ${fmtUsd(vault.insurance.deficitsCovered)}`} info={TIP.vInsurance} />}
+        <Stat label="Vault bad debt" value={fmtUsd(v.badDebt || 0)} sub="backstopped" info={TIP.vBadDebt} />
         {vault.shadow && <Stat label="Hedge coverage" value={vault.shadow.coverageRate != null ? (vault.shadow.coverageRate * 100).toFixed(0) + "%" : "—"} sub={`${vault.shadow.samples || 0} samples`} />}
       </div>
 
