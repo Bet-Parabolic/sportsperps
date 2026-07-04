@@ -141,6 +141,7 @@ const TIP = {
   rLiq: "Liquidation activity since restart: how many positions were force-closed, their total notional, the single largest loss, and — critically — how many produced a deficit (bad debt).",
   rExposure: "Per-game vault exposure vs the per-side cap (MAX_VAULT_EXPOSURE). 'Near cap' ≥ 80%, 'Over cap' > 100% (the vault is holding more one-sided risk than the cap allows). Bars show each game's worst side.",
   rDrawdown: "Vault-balance drawdown from its running peak, from the economics snapshots. Max drawdown = worst peak-to-trough capital erosion; current = how far below peak right now.",
+  rDelev: "Force-deleverage keeps a held position's liquidation buffer ≥ the game's largest plausible single-event swing as that swing grows late-game (the at-open leverage cap only binds at open). Phase 1 is LOG-ONLY: these are the trims it WOULD apply (est. bad-debt avoided = what those contracts would add on a full adverse gap). If this rarely fires, the at-open cap already suffices; if it fires a lot late-game, enforce it. Not ADL — it reduces the at-risk holder's own position, zero-sum vs the vault.",
 };
 
 function Login({ onAuthed }) {
@@ -784,6 +785,7 @@ function RiskTab({ data }) {
   const s = data.solvency || {};
   const ex = data.exposure || {};
   const lq = data.liquidations || {};
+  const dv = data.deleverage || {};
   const dd = data.drawdown || {};
   const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
   const badDebt = lq.totalDeficit || 0;
@@ -831,6 +833,32 @@ function RiskTab({ data }) {
             ))}</tbody>
           </table>
         )}
+      </Panel>
+
+      <Panel title={`Force-deleverage ${dv.enforcedCount > 0 ? "(ENFORCING)" : "(log-only — would-be trims)"}`} info={TIP.rDelev}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: (dv.recent || []).length ? 12 : 0 }}>
+          <Stat label="Events" value={dv.count ?? 0} valueColor={dv.count > 0 ? C.amber : C.primary} sub={`${dv.enforcedCount || 0} enforced`} />
+          <Stat label="Contracts trimmed" value={(dv.contractsTrimmed || 0).toLocaleString()} />
+          <Stat label="Bad debt avoided (est.)" value={dv.deficitAvoided > 0 ? fmtUsd(dv.deficitAvoided) : "$0"} valueColor={dv.deficitAvoided > 0 ? C.amber : C.primary} />
+        </div>
+        {(dv.recent || []).length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No positions have outgrown their buffer yet — the at-open leverage cap is holding.</div>
+          : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>User</th><th style={th}>Game</th><th style={th}>Side</th><th style={th}>Size→</th><th style={th}>Buffer</th><th style={th}>Swing</th><th style={th}>Avoided</th><th style={th}>Mode</th><th style={th}>When</th></tr></thead>
+              <tbody>{dv.recent.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ ...td, color: C.mut }}>{(r.userId || "").slice(0, 8)}</td>
+                  <td style={{ ...td, color: C.mut }}>{r.gameId}</td>
+                  <td style={{ ...td, color: r.side === "home" ? C.primaryLt : C.red }}>{r.side}</td>
+                  <td style={td}>{r.fromSize?.toLocaleString()}→{r.targetSize?.toLocaleString()}</td>
+                  <td style={{ ...td, color: C.mut }}>{(r.buffer * 100).toFixed(1)}%</td>
+                  <td style={{ ...td, color: C.amber }}>{(r.swing * 100).toFixed(1)}%</td>
+                  <td style={{ ...td, color: r.deficitAvoided > 0 ? C.amber : C.mut }}>{r.deficitAvoided > 0 ? fmtUsd(r.deficitAvoided) : "—"}</td>
+                  <td style={{ ...td, color: r.enforced ? C.red : C.mut }}>{r.enforced ? "enforced" : "log"}</td>
+                  <td style={{ ...td, color: C.mut }}>{r.agoS}s ago</td>
+                </tr>
+              ))}</tbody>
+            </table></div>}
       </Panel>
 
       <Panel title={`Vault exposure vs cap (${fmtUsd(ex.cap)}/side · ${ex.nearCap || 0} near · ${ex.overCap || 0} over)`} info={TIP.rExposure}>
