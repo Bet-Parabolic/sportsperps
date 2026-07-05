@@ -41,12 +41,9 @@ export function WaitlistPage() {
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: T, display: "inline-block", animation: "pulse 2s infinite" }} />
             Early Access
           </span>
-          <h1 style={{ fontFamily: fd, fontSize: 40, fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.01em", margin: "0 0 12px" }}>
+          <h1 style={{ fontFamily: fd, fontSize: 40, fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.01em", margin: 0 }}>
             Join the <span style={{ color: T }}>waitlist</span>
           </h1>
-          <p style={{ fontSize: 15.5, lineHeight: 1.6, color: "#888", margin: 0 }}>
-            Leveraged sports perpetuals. Tell us who you are and we'll reach out with early access.
-          </p>
         </div>
 
         {/* form card */}
@@ -54,8 +51,6 @@ export function WaitlistPage() {
           transform: vis ? "translateY(0)" : "translateY(20px)", transition: "all .8s cubic-bezier(0.16,1,0.3,1) .16s" }}>
           <WaitlistForm />
         </div>
-
-        <a href="https://parabolic.gg" style={{ marginTop: 22, color: "#666", fontSize: 13, textDecoration: "none" }}>← Back to parabolic.gg</a>
       </div>
     </div>
   );
