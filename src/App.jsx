@@ -10,6 +10,7 @@ import { LandingPage } from "./components/LandingPage.jsx";
 const TradingApp = lazy(() => import("./trading/TradingApp.jsx").then(m => ({ default: m.TradingApp })));
 const LiveTradingApp = lazy(() => import("./trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
 const DashboardPage = lazy(() => import("./dash/DashboardPage.jsx").then(m => ({ default: m.DashboardPage })));
+const WaitlistPage = lazy(() => import("./components/WaitlistPage.jsx").then(m => ({ default: m.WaitlistPage })));
 
 const Splash = () => (
   <div style={{minHeight:"100vh",background:"#000",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -28,6 +29,8 @@ export default function App() {
   const isProdLanding = host === "parabolic.gg" || host === "www.parabolic.gg";
   // Internal oracle-accuracy dashboard — /dash on any host (admin-gated, unlinked, noindex).
   const isDash = typeof window !== "undefined" && window.location.pathname.startsWith("/dash");
+  // Public waitlist page — /waitlist on any host (parabolic.gg/waitlist).
+  const isWaitlist = typeof window !== "undefined" && window.location.pathname.startsWith("/waitlist");
 
   const [page, setPage] = useState(isAppDomain ? "trading" : "landing");
   const [sel, setSel] = useState(PROC_GAMES[0]);
@@ -57,7 +60,7 @@ export default function App() {
   // page_view for the live-game terminal. Tab-level page_views fire inside the terminals.
   useEffect(() => { initTracking(); }, []);
   useEffect(() => {
-    if (isDash) return; // the internal dashboard is not product traffic
+    if (isDash || isWaitlist) return; // dashboard + standalone waitlist page aren't landing traffic
     if (page === "landing") track("landing_view");
     else if (page === "trading") track("app_open", { terminal: "home" });
     else if (page === "live-trading") track("page_view", { page: "live-trading" });
@@ -81,7 +84,9 @@ export default function App() {
         button:hover:not(:disabled){filter:brightness(1.15);}button:active:not(:disabled){transform:scale(0.98);}
         *{box-sizing:border-box;margin:0;padding:0;}
       `}</style>
-      {isDash
+      {isWaitlist
+        ? <Suspense fallback={<Splash/>}><WaitlistPage/></Suspense>
+        : isDash
         ? <Suspense fallback={<Splash/>}><DashboardPage/></Suspense>
         : page==="landing"
         ? <LandingPage onLaunch={launchApp} onDocs={()=>window.open("https://docs.parabolic.gg/docs","_blank","noopener,noreferrer")}/>

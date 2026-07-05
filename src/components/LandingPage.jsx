@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { B, fb, fd, fm } from "../lib/theme.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
+import { WaitlistModal } from "./WaitlistModal.jsx";
 
 export function LandingPage({ onLaunch, onDocs }) {
   const [vis, setVis] = useState(false);
+  const [showWaitlist, setShowWaitlist] = useState(false);
   const [tick, setTick] = useState(0);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => { setTimeout(() => setVis(true), 50); }, []);
@@ -70,15 +72,19 @@ export function LandingPage({ onLaunch, onDocs }) {
           <p style={{...a(0.15),fontSize:isMobile?15:18,lineHeight:1.7,color:"#888",maxWidth:560,margin:isMobile?"0 auto 24px":"0 auto 36px",fontWeight:400}}>
             Trade live win probability with up to 10x leverage. Multi-oracle pricing. Trustless settlement. No counterparty risk.
           </p>
-          <div style={{...a(0.2),display:"flex",gap:12,justifyContent:"center"}}>
+          <div style={{...a(0.2),display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
             <button onClick={onLaunch} style={{padding:isMobile?"12px 28px":"14px 36px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:`linear-gradient(135deg, ${R}, ${TL})`,color:"#fff",borderRadius:12}}>
               Launch App
             </button>
             <button onClick={onDocs} style={{padding:isMobile?"12px 28px":"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:600,fontSize:isMobile?14:15,background:"transparent",color:"#888",borderRadius:12}}>
               Read Docs
             </button>
+            <button onClick={() => setShowWaitlist(true)} style={{padding:isMobile?"12px 28px":"14px 36px",border:`1px solid ${R}55`,cursor:"pointer",fontFamily:fb,fontWeight:600,fontSize:isMobile?14:15,background:R+"14",color:R,borderRadius:12}}>
+              Join Waitlist
+            </button>
           </div>
         </section>
+        {showWaitlist && <WaitlistModal onClose={() => setShowWaitlist(false)} />}
 
         {/* TERMINAL PREVIEW — accurate trading experience */}
         <div style={{...a(0.25),maxWidth:isMobile?"100%":960,margin:"0 auto",padding:isMobile?"0 12px 60px":"0 32px 80px"}}>

@@ -1,6 +1,8 @@
 {
   "rewrites": [
     { "source": "/dash", "destination": "/" },
-    { "source": "/dash/(.*)", "destination": "/" }
+    { "source": "/dash/(.*)", "destination": "/" },
+    { "source": "/waitlist", "destination": "/" },
+    { "source": "/waitlist/(.*)", "destination": "/" }
   ]
 }
