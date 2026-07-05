@@ -49,7 +49,7 @@ export function WaitlistPage() {
         {/* form card */}
         <div style={{ width: "100%", maxWidth: 460, opacity: vis ? 1 : 0,
           transform: vis ? "translateY(0)" : "translateY(20px)", transition: "all .8s cubic-bezier(0.16,1,0.3,1) .16s" }}>
-          <WaitlistForm />
+          <WaitlistForm heading={false} />
         </div>
       </div>
     </div>

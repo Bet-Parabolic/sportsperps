@@ -937,6 +937,83 @@ function RiskTab({ data }) {
   );
 }
 
+function WaitlistTab({ data }) {
+  if (!data) return <Panel title="Waitlist"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const rows = data.recent || [];
+  const yn = (v) => (v === 1 ? "Yes" : v === 0 ? "No" : "—");
+  const when = (ts) => (ts ? new Date(ts).toLocaleString() : "—");
+  const contact = (r) => r.email || (r.x_handle ? "@" + r.x_handle : "—");
+  const Tally = ({ title, obj }) => {
+    const ents = Object.entries(obj || {}).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...ents.map(([, n]) => n));
+    return (
+      <Panel title={title}>
+        {ents.length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No responses yet.</div>
+          : ents.map(([k, n]) => (
+            <div key={k} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+              <div style={{ width: 130, fontSize: 12.5, color: C.text }}>{k}</div>
+              <div style={{ flex: 1, background: C.surface, borderRadius: 5, height: 12 }}>
+                <div style={{ width: `${(n / max) * 100}%`, height: "100%", background: C.primary, borderRadius: 5 }} />
+              </div>
+              <div style={{ width: 28, textAlign: "right", fontSize: 12.5, color: C.mut }}>{n}</div>
+            </div>
+          ))}
+      </Panel>
+    );
+  };
+
+  const exportCsv = () => {
+    const cols = ["ts", "when", "kind", "email", "x_handle", "fav_sport", "traded_perps", "traded_predictions", "runs_perps", "makes_predictions", "perp_vol", "pred_vol", "ip"];
+    const esc = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const lines = [cols.join(",")].concat(rows.map((r) => cols.map((c) => esc(c === "when" ? when(r.ts) : r[c])).join(",")));
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `waitlist-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+        <Stat label="Total signups" value={data.total ?? 0} />
+        <Stat label="Traders" value={data.users ?? 0} />
+        <Stat label="Market makers" value={data.marketMakers ?? 0} />
+        <button onClick={exportCsv} disabled={!rows.length} style={{ marginLeft: "auto", background: C.surface, border: `1px solid ${C.border}`, color: rows.length ? C.text : C.mut, borderRadius: 8, padding: "9px 16px", cursor: rows.length ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600 }}>Export CSV</button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginBottom: 12 }}>
+        <Tally title="Traders — favorite sport" obj={data.bySport} />
+        <Tally title="Market makers — weekly perp volume" obj={data.byPerpVol} />
+        <Tally title="Market makers — weekly prediction volume" obj={data.byPredVol} />
+      </div>
+
+      <Panel title={`Recent signups (${rows.length})`}>
+        {rows.length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No signups yet.</div>
+          : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={th}>When</th><th style={th}>Type</th><th style={th}>Contact</th>
+                <th style={th}>Sport</th><th style={th}>Perps?</th><th style={th}>Pred?</th><th style={th}>Perp vol</th><th style={th}>Pred vol</th>
+              </tr></thead>
+              <tbody>{rows.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ ...td, color: C.mut, whiteSpace: "nowrap" }}>{when(r.ts)}</td>
+                  <td style={td}><span style={{ color: r.kind === "mm" ? C.primaryLt : C.text, fontWeight: 600 }}>{r.kind === "mm" ? "Market maker" : "Trader"}</span></td>
+                  <td style={td}>{contact(r)}</td>
+                  <td style={td}>{r.fav_sport || "—"}</td>
+                  <td style={td}>{r.kind === "mm" ? yn(r.runs_perps) : yn(r.traded_perps)}</td>
+                  <td style={td}>{r.kind === "mm" ? yn(r.makes_predictions) : yn(r.traded_predictions)}</td>
+                  <td style={td}>{r.perp_vol || "—"}</td>
+                  <td style={td}>{r.pred_vol || "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table></div>}
+      </Panel>
+    </>
+  );
+}
+
 export function DashboardPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(TOK));
   const [tab, setTab] = useState("oracle"); // oracle|vault|health|product|economics|execution|risk
@@ -953,6 +1030,7 @@ export function DashboardPage() {
   const [economicsData, setEconomicsData] = useState(null);
   const [executionData, setExecutionData] = useState(null);
   const [riskData, setRiskData] = useState(null);
+  const [waitlistData, setWaitlistData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -968,7 +1046,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg, wl] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -982,6 +1060,7 @@ export function DashboardPage() {
         safe(adminFetch("/admin/execution")),
         safe(adminFetch("/admin/risk")),
         safe(adminFetch("/vault/hedge")),
+        safe(adminFetch("/admin/waitlist?limit=500")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -996,6 +1075,7 @@ export function DashboardPage() {
       if (exec) setExecutionData(exec);
       if (rsk) setRiskData(rsk);
       if (hdg) setHedgeData(hdg);
+      if (wl) setWaitlistData(wl);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -1021,11 +1101,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : "Oracle accuracy"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : tab === "waitlist" ? "Waitlist" : "Oracle accuracy"}</div>
           <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : tab === "execution" ? "Internal dashboard · fills · rejections · slippage · mix" : tab === "risk" ? "Internal dashboard · bad debt · solvency · exposure · drawdown" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"], ["risk", "Risk"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"], ["risk", "Risk"], ["waitlist", "Waitlist"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -1061,6 +1141,8 @@ export function DashboardPage() {
       {tab === "execution" && <ExecutionTab data={executionData} />}
 
       {tab === "risk" && <RiskTab data={riskData} />}
+
+      {tab === "waitlist" && <WaitlistTab data={waitlistData} />}
 
       {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>

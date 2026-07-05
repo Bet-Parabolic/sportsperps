@@ -7,6 +7,7 @@ import { API_URL } from "../lib/constants.js";
 // Step 0: user vs market maker → Step 1: track-specific questions → Step 2: contact.
 // Collects email and/or X handle (at least one required).
 // Props: onClose? — if provided, renders a × (modal use). onDone? — fired after a successful submit.
+//        heading? (default true) — the "Join the waitlist" title block; hidden on /waitlist (hero covers it).
 
 const SPORTS = ["Soccer", "American Football", "Basketball", "Baseball", "MMA", "Hockey", "Other"];
 const PERP_VOL = ["< $10M", "$10–50M", "$50–100M", "$100M+"];
@@ -14,7 +15,7 @@ const PRED_VOL = ["< $1M", "$1–5M", "$5–10M", "$10M+"];
 
 const G = "#1fd182", GL = "#52e0a3";
 
-export function WaitlistForm({ onClose, onDone }) {
+export function WaitlistForm({ onClose, onDone, heading = true }) {
   const [step, setStep] = useState(0);
   const [kind, setKind] = useState(null); // 'user' | 'mm'
 
@@ -116,12 +117,14 @@ export function WaitlistForm({ onClose, onDone }) {
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: 4 }}>
-            <h3 style={{ fontFamily: fd, fontSize: 23, fontWeight: 700, margin: "0 0 6px", color: "#fff" }}>Join the waitlist</h3>
-            <p style={{ color: B.dim, fontSize: 13.5, lineHeight: 1.55, margin: 0 }}>
-              {step === 0 ? "Get early access to Parabolic." : step === 1 ? "Tell us a bit about you." : "Where should we reach you?"}
-            </p>
-          </div>
+          {heading && (
+            <div style={{ marginBottom: 4 }}>
+              <h3 style={{ fontFamily: fd, fontSize: 23, fontWeight: 700, margin: "0 0 6px", color: "#fff" }}>Join the waitlist</h3>
+              <p style={{ color: B.dim, fontSize: 13.5, lineHeight: 1.55, margin: 0 }}>
+                {step === 0 ? "Get early access to Parabolic." : step === 1 ? "Tell us a bit about you." : "Where should we reach you?"}
+              </p>
+            </div>
+          )}
 
           {/* progress dots */}
           <div style={{ display: "flex", gap: 6, margin: "16px 0 4px" }}>
