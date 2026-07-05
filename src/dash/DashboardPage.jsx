@@ -97,6 +97,7 @@ const TIP = {
   vFundRow: "Current funding rate for this game, %/hr (already tapered). + → home longs pay (away + vault receive); − → away longs pay (home + vault receive). Driven by book premium + vault inventory skew, per-sport calibrated. ·t = the time-to-settlement taper (1 early → 0.1 at the final whistle) shrinking the carry near game end. See FUNDING_SPEC.",
   vPin: "Funding→exposure coupling. When one side stays heavily one-sided (|skew| ≥ 0.8) the vault throttles how much MORE inventory it'll take on that side — its cap shrinks from ×1.00 toward ×0.50 over ~30 min of sustained pinning, then recovers as skew normalizes. Shows the pinned side (HOME/AWAY), how long it's been pinned, and the current cap multiplier. Applies symmetrically to either side.",
   vHistory: "Every position taken against the vault, full lifecycle: the user's entry + close, and the vault's mirror PnL on Parabolic plus the shadow hedge prices. Open episodes first, then closed.",
+  vHedgePhase2: "Phase-2a hedging: each block, the vault's net delta on an MLB game is driven to ZERO by holding an offsetting Polymarket position, priced off the LIVE CLOB book (full delta-flat — no inventory liability). PAPER mode computes + books the fills it WOULD send; no capital, no orders. 'Hedge PnL (realized)' should OFFSET the vault's inventory PnL, leaving only ~0.5–1¢/contract crossing cost — the proof the hedge works before deploying capital (Phase 2b).",
   vFundUser: "Net funding the user paid (−) or received (+) over the life of the position.",
   vVaultPnl: "The vault's PnL on Parabolic for this position — the zero-sum counterparty result (≈ −user PnL). Funding and platform fees are separate lines.",
   vHedgeShadow: "SHADOW hedge: the venue (P=Polymarket, K=Kalshi) and price the vault would have crossed at to flatten this position's side, at open / at close. No real order is placed yet (Phase 2).",
@@ -141,7 +142,7 @@ const TIP = {
   rLiq: "Liquidation activity since restart: how many positions were force-closed, their total notional, the single largest loss, and — critically — how many produced a deficit (bad debt).",
   rExposure: "Per-game vault exposure vs the per-side cap (MAX_VAULT_EXPOSURE). 'Near cap' ≥ 80%, 'Over cap' > 100% (the vault is holding more one-sided risk than the cap allows). Bars show each game's worst side.",
   rDrawdown: "Vault-balance drawdown from its running peak, from the economics snapshots. Max drawdown = worst peak-to-trough capital erosion; current = how far below peak right now.",
-  rDelev: "Force-deleverage keeps a held position's liquidation buffer ≥ the game's largest plausible single-event swing as that swing grows late-game (the at-open leverage cap only binds at open). Phase 1 is LOG-ONLY: these are the trims it WOULD apply (est. bad-debt avoided = what those contracts would add on a full adverse gap). If this rarely fires, the at-open cap already suffices; if it fires a lot late-game, enforce it. Not ADL — it reduces the at-risk holder's own position, zero-sum vs the vault.",
+  rDelev: "Force-deleverage keeps a held position's liquidation buffer ≥ the game's largest plausible single-event swing as that swing grows late-game (the at-open leverage cap only binds at open). Phase 2: ENFORCED for all sports except soccer (wcup/mls stay log-only — terminal-gap calibration undersampled n=14; hedging is the real fix for the 38.7¢ tail). 'enforced' rows actually trimmed — margin retained, PnL on the slice realized to the user, who is notified via WS + push + tray toast. 'log' rows are the trims it would apply. Est. bad-debt avoided = what those contracts would add on a full adverse gap. Not ADL — it reduces the at-risk holder's own position, zero-sum vs the vault.",
 };
 
 function Login({ onAuthed }) {
@@ -260,7 +261,7 @@ function GameExplorer({ gameId, onClose }) {
   );
 }
 
-function VaultTab({ vault, history = [] }) {
+function VaultTab({ vault, history = [], hedge = null }) {
   const [sub, setSub] = useState("live"); // 'live' | 'history'
   if (!vault) return <Panel title="Vault"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   const v = vault.vault || {};
@@ -291,6 +292,49 @@ function VaultTab({ vault, history = [] }) {
 
       {sub === "history" && <VaultHistory rows={history} />}
       {sub === "live" && <>
+
+      {hedge && (hedge.mode === "paper" || hedge.mode === "live") && (
+        <Panel title={`Phase-2 hedging — ${hedge.mode === "paper" ? "PAPER (no capital)" : "LIVE"} · ${(hedge.leagues || []).join(", ").toUpperCase()} · full delta-flat`} info={TIP.vHedgePhase2}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: (hedge.recent || []).length ? 12 : 0 }}>
+            <Stat label="Open hedge positions" value={(hedge.openPositions || []).length} />
+            <Stat label="Settled games hedged" value={hedge.scorecard?.games ?? 0} />
+            <Stat label="Hedge PnL (realized)" value={fmtSigned(hedge.scorecard?.hedgePnl)} valueColor={signColor(hedge.scorecard?.hedgePnl)} sub="offsets vault inventory" />
+            <Stat label="Per-game cap" value={fmtUsd(hedge.perGameCap)} sub={`min lot ${hedge.minLot}`} />
+          </div>
+          {(hedge.openPositions || []).length > 0 && (
+            <div style={{ overflowX: "auto", marginBottom: 10 }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>Game</th><th style={th}>Home tok</th><th style={th}>Away tok</th><th style={th}>Net Δ (home-eq)</th><th style={th}>Gross notional</th><th style={th}>Realized</th></tr></thead>
+              <tbody>{hedge.openPositions.map((p, i) => (
+                <tr key={i}>
+                  <td style={{ ...td, color: C.mut }}>{p.gameId}</td>
+                  <td style={td}>{p.homeTok}</td><td style={td}>{p.awayTok}</td>
+                  <td style={{ ...td, color: signColor(p.homeEquiv) }}>{p.homeEquiv}</td>
+                  <td style={td}>{fmtUsd(p.grossNotional)}</td>
+                  <td style={{ ...td, color: signColor(p.realized) }}>{fmtSigned(p.realized)}</td>
+                </tr>
+              ))}</tbody>
+            </table></div>
+          )}
+          {(hedge.recent || []).length > 0 && (
+            <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr><th style={th}>When</th><th style={th}>Game</th><th style={th}>Kind</th><th style={th}>Net Δ</th><th style={th}>Home-eq</th><th style={th}>Traded</th><th style={th}>Exec px</th><th style={th}>Note</th></tr></thead>
+              <tbody>{hedge.recent.map((e, i) => (
+                <tr key={i}>
+                  <td style={{ ...td, color: C.mut }}>{e.ts ? Math.round((Date.now() - e.ts) / 1000) + "s" : "—"}</td>
+                  <td style={{ ...td, color: C.mut }}>{e.gameId}</td>
+                  <td style={{ ...td, color: e.kind === "settle" ? C.primaryLt : e.kind === "uncovered" || e.kind === "no-book" ? "#f5a524" : C.text }}>{e.kind}</td>
+                  <td style={td}>{e.netDelta != null ? Math.round(e.netDelta) : "—"}</td>
+                  <td style={td}>{e.homeEquiv != null ? Math.round(e.homeEquiv) : "—"}</td>
+                  <td style={td}>{e.traded != null ? Math.round(e.traded) : "—"}</td>
+                  <td style={td}>{e.execPx != null ? e.execPx.toFixed(3) : "—"}</td>
+                  <td style={{ ...td, color: C.mut, fontSize: 11 }}>{e.note || (e.realized != null ? `pnl ${e.realized}` : "")}</td>
+                </tr>
+              ))}</tbody>
+            </table></div>
+          )}
+        </Panel>
+      )}
+
 
       <Panel title={`Positions & hedges by game (${games.length})`} info={TIP.vHedge}>
         {games.length === 0
@@ -891,6 +935,7 @@ export function DashboardPage() {
   const [live, setLive] = useState([]);
   const [vault, setVault] = useState(null);
   const [vaultHistory, setVaultHistory] = useState([]);
+  const [hedgeData, setHedgeData] = useState(null);
   const [healthData, setHealthData] = useState(null);
   const [productData, setProductData] = useState(null);
   const [economicsData, setEconomicsData] = useState(null);
@@ -911,7 +956,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -924,6 +969,7 @@ export function DashboardPage() {
         safe(adminFetch("/admin/economics")),
         safe(adminFetch("/admin/execution")),
         safe(adminFetch("/admin/risk")),
+        safe(adminFetch("/vault/hedge")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -937,6 +983,7 @@ export function DashboardPage() {
       if (econ) setEconomicsData(econ);
       if (exec) setExecutionData(exec);
       if (rsk) setRiskData(rsk);
+      if (hdg) setHedgeData(hdg);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -991,7 +1038,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      {tab === "vault" && <VaultTab vault={vault} history={vaultHistory} />}
+      {tab === "vault" && <VaultTab vault={vault} history={vaultHistory} hedge={hedgeData} />}
 
       {tab === "health" && <HealthTab data={healthData} />}
 

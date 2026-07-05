@@ -436,6 +436,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       if (msg.type === 'liquidation' && msg.userId === userId) {
         notify('☠ LIQUIDATED — ' + fmtUsd(msg.pnl ?? 0), 'red');
         pollRef.current?.(); // reconcile positions/balance immediately
+      } else if (msg.type === 'deleverage' && msg.userId === userId) {
+        // House trimmed the position to keep its buffer ≥ the growing late-game swing — the user
+        // keeps their margin + realized PnL on the slice. MUST be surfaced (never silent).
+        notify(`⚠ POSITION REDUCED — sold ${Math.round(msg.trim)} of ${Math.round(msg.fromSize)} @ ${(msg.execPx * 100).toFixed(1)}¢ to guard against a late-game swing (${fmtUsd(msg.pnl ?? 0)} realized)`, 'yellow');
+        pollRef.current?.(); // reconcile size/leverage/balance immediately
       } else if (msg.type === 'settlement') {
         pollRef.current?.(); // poll() detects final state + settles
       }
@@ -1425,9 +1430,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:170,overflowY:'auto'}}>
                   {notifs.map(n=>(
                     <div key={n.id} style={{padding:'8px 10px',borderRadius:9,fontWeight:600,fontSize:11.5,lineHeight:1.35,
-                      background:n.type==='green'?B.green+'18':n.type==='red'?B.red+'18':'#161616',
-                      border:`1px solid ${n.type==='green'?B.green+'40':n.type==='red'?B.red+'40':'#262626'}`,
-                      color:n.type==='green'?B.green:n.type==='red'?B.red:'#bbb'}}>
+                      background:n.type==='green'?B.green+'18':n.type==='red'?B.red+'18':n.type==='yellow'?'#f5a62318':'#161616',
+                      border:`1px solid ${n.type==='green'?B.green+'40':n.type==='red'?B.red+'40':n.type==='yellow'?'#f5a62340':'#262626'}`,
+                      color:n.type==='green'?B.green:n.type==='red'?B.red:n.type==='yellow'?'#f5a623':'#bbb'}}>
                       {n.msg}
                     </div>
                   ))}
