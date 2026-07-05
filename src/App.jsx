@@ -1,9 +1,10 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 
 import { FONT_URL } from "./lib/theme.js";
 import { PROC_GAMES } from "./lib/games.js";
 import { LOGO_MARK } from "./lib/logos.js";
 import { useLiveGames } from "./lib/useLiveGames.js";
+import { track, initTracking, withVisitorId } from "./lib/track.js";
 
 import { LandingPage } from "./components/LandingPage.jsx";
 const TradingApp = lazy(() => import("./trading/TradingApp.jsx").then(m => ({ default: m.TradingApp })));
@@ -36,9 +37,10 @@ export default function App() {
   const tradeLive = (g) => { setLiveGame(g); setPage("live-trading"); };
   const navTo = (tab) => { setTradingTab(tab); setPage("trading"); };
 
-  // Launch App: from the marketing domain, cross over to the app subdomain.
+  // Launch App: from the marketing domain, cross over to the app subdomain. The visitor id rides
+  // along (?pv=) so landing → app conversion survives the cross-subdomain localStorage split.
   const launchApp = () => {
-    if (isProdLanding) window.location.href = "https://app.parabolic.gg";
+    if (isProdLanding) window.location.href = withVisitorId("https://app.parabolic.gg");
     else setPage("trading");
   };
   // Exit terminal: on the app subdomain, go back to the marketing site.
@@ -49,6 +51,18 @@ export default function App() {
 
   // Real-time games over WebSocket (init + game_update push), REST fallback.
   const liveGames = useLiveGames();
+
+  // Analytics beacon: 60s visibility-aware session heartbeat + top-of-funnel page events.
+  // landing_view on the marketing page, app_open when a terminal mounts (boot or Launch App),
+  // page_view for the live-game terminal. Tab-level page_views fire inside the terminals.
+  useEffect(() => { initTracking(); }, []);
+  useEffect(() => {
+    if (isDash) return; // the internal dashboard is not product traffic
+    if (page === "landing") track("landing_view");
+    else if (page === "trading") track("app_open", { terminal: "home" });
+    else if (page === "live-trading") track("page_view", { page: "live-trading" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   return (
     <div>

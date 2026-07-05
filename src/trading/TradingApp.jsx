@@ -8,6 +8,7 @@ import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { BOX } from "../lib/games.js";
 import { AwayMarkerDot, HomeMarkerDot, ScoreMarkerDot } from "../lib/markers.jsx";
 import { useChartZoom } from "../lib/useChartZoom.js";
+import { track } from "../lib/track.js";
 import { ChartTip } from "../components/shared/ChartTip.jsx";
 import { ProfilePage } from "../components/ProfilePage.jsx";
 import { LeaderboardPage } from "../components/LeaderboardPage.jsx";
@@ -35,6 +36,9 @@ export function TradingApp({ game, onBack, onChangeGame, onSwitchGame, liveGames
   useEffect(() => {
     fetch(`${API_URL}/users`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId}) }).catch(()=>{});
   }, [userId]);
+  // Analytics: a page_view per terminal tab/page change (watches the state, so every setter
+  // call site is covered without touching them; the mount firing doubles as the initial view).
+  useEffect(() => { track("page_view", { page: terminalPage, tab: sportTab }); }, [terminalPage, sportTab]);
   // Single ESPN fetch — all sport data, one 30s interval, shared across all pages
   const [espnData, setEspnData] = useState(() =>
     Object.fromEntries(ESPN_SOURCES.map(s => [s.key, {events:[], loading:true, error:false}]))

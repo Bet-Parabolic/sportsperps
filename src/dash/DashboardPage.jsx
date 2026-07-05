@@ -582,6 +582,18 @@ function ProductTab({ data }) {
         <Stat label="Total events" value={data.totalEvents ?? 0} />
       </div>
 
+      {data.visitors && (
+        <Panel title="Visitors — top of funnel (client beacon, incl. anonymous)">
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Stat label="Visitor DAU" value={data.visitors.dauToday ?? 0} sub="all ids incl. anon" />
+            <Stat label="Visitor WAU" value={data.visitors.wau ?? 0} />
+            <Stat label="Sessions (7d)" value={data.visitors.sessions7d ?? 0} sub="from 60s heartbeats" />
+            <Stat label="Median session" value={data.visitors.medianSessionMin != null ? `${data.visitors.medianSessionMin}m` : "—"} />
+            <Stat label="Landing → App" value={pct(data.visitors.landingToApp)} sub={`${data.visitors.landingViews ?? 0} landing views`} />
+          </div>
+        </Panel>
+      )}
+
       <Panel title="Activation funnel" info={TIP.pFunnel}>
         {(f.stages || []).length === 0
           ? <div style={{ color: C.mut, fontSize: 13 }}>No events yet.</div>
