@@ -81,7 +81,7 @@ function LevSlider({ eL, ml, onChange, compact = false }) {
   );
 }
 
-export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade }) {
+export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade, onOnboard }) {
   // ── normalise team colors from backend ──────────────────────────────────
   const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
 
@@ -498,7 +498,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
   // ── placeOrder (backend CLOB) ────────────────────────────────────────────
   const placeOrder = useCallback(async () => {
-    if (!isLoggedIn()) { setShowAuth(true); return; }  // gate: must sign in / sign up to wager
+    if (!isLoggedIn()) { onOnboard ? onOnboard() : setShowAuth(true); return; }  // gate: signup runs the full onboarding flow (falls back to the bare modal)
     if (settled) return;
     const op = oR.current;
     const ml2 = maxLev(op), lev = Math.min(orderLev, ml2);

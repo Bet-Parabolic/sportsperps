@@ -3,7 +3,7 @@ import { B, fb, fd, fm } from "../lib/theme.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { WaitlistModal } from "./WaitlistModal.jsx";
 
-export function LandingPage({ onLaunch, onDocs }) {
+export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
   const [vis, setVis] = useState(false);
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [tick, setTick] = useState(0);
@@ -76,6 +76,11 @@ export function LandingPage({ onLaunch, onDocs }) {
             <button onClick={onLaunch} style={{padding:isMobile?"12px 28px":"14px 36px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:`linear-gradient(135deg, ${R}, ${TL})`,color:"#fff",borderRadius:12}}>
               Launch App
             </button>
+            {onCreateAccount && (
+              <button onClick={onCreateAccount} style={{padding:isMobile?"12px 28px":"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:"#161616",color:"#fff",borderRadius:12}}>
+                Create account
+              </button>
+            )}
             <button onClick={onDocs} style={{padding:isMobile?"12px 28px":"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:600,fontSize:isMobile?14:15,background:"transparent",color:"#888",borderRadius:12}}>
               Read Docs
             </button>

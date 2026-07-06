@@ -3,6 +3,7 @@ import { B, fd, fb, fm } from "../lib/theme.js";
 import { fmtUsd, fmtPct } from "../lib/helpers.js";
 import { API_URL } from "../lib/constants.js";
 import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "../lib/auth.js";
+import { CardOverlay } from "./onboarding/CardOverlay.jsx";
 
 // League metadata for bet cards + the favorite-discipline card (league comes from gameId prefix).
 const LEAGUE_META = {
@@ -38,6 +39,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
   const [tab, setTab] = useState("bets");       // 'bets' | 'badges'
   const [betFilter, setBetFilter] = useState("all"); // 'all' | 'wins' | 'loses'
   const [view, setView] = useState("main");     // 'main' | 'settings' | 'account' | 'transactions' | 'referrals' | 'help'
+  const [showCard, setShowCard] = useState(false); // member-card overlay (front/QR back)
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -142,12 +144,16 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
   const isWide = typeof window !== "undefined" && window.innerWidth >= 980;
   return (
     <div style={wrap}><div style={wideInner}>
-      {/* Header — title + gear (settings) */}
+      {/* Header — title + card + gear (settings) */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 2px 14px" }}>
         <button onClick={onClose} style={iconBtn} title="Close">✕</button>
         <div style={{ fontFamily: fd, fontSize: 16, fontWeight: 700, color: B.white }}>My profile</div>
-        <button onClick={() => setView("settings")} style={iconBtn} title="Settings">⚙</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setShowCard(true)} style={iconBtn} title="My member card">▤</button>
+          <button onClick={() => setView("settings")} style={iconBtn} title="Settings">⚙</button>
+        </div>
       </div>
+      {showCard && <CardOverlay onClose={() => setShowCard(false)} />}
 
       <div style={{ display: "grid", gridTemplateColumns: isWide ? "380px 1fr" : "1fr", gap: 24, alignItems: "start" }}>
         {/* LEFT column — identity, discipline, stats, open positions */}

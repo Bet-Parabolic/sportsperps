@@ -10,6 +10,7 @@ const TradingApp = lazy(() => import("./trading/TradingApp.jsx").then(m => ({ de
 const LiveTradingApp = lazy(() => import("./trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
 const DashboardPage = lazy(() => import("./dash/DashboardPage.jsx").then(m => ({ default: m.DashboardPage })));
 const WaitlistPage = lazy(() => import("./components/WaitlistPage.jsx").then(m => ({ default: m.WaitlistPage })));
+const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow.jsx").then(m => ({ default: m.OnboardingFlow })));
 
 const Splash = () => (
   <div style={{minHeight:"100vh",background:"#000",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -92,11 +93,13 @@ export default function App() {
         ? <Suspense fallback={<Splash/>}><WaitlistPage/></Suspense>
         : isDash
         ? <Suspense fallback={<Splash/>}><DashboardPage/></Suspense>
+        : page==="onboarding"
+        ? <Suspense fallback={<Splash/>}><OnboardingFlow onDone={()=>setPage("trading")} onGuest={()=>setPage("trading")}/></Suspense>
         : page==="landing"
-        ? <LandingPage onLaunch={launchApp} onDocs={()=>window.open("https://docs.parabolic.gg/docs","_blank","noopener,noreferrer")}/>
+        ? <LandingPage onLaunch={launchApp} onCreateAccount={()=>setPage("onboarding")} onDocs={()=>window.open("https://docs.parabolic.gg/docs","_blank","noopener,noreferrer")}/>
         : <Suspense fallback={<Splash/>}>
             {page==="live-trading"&&liveGame
-              ? <LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
+              ? <LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive} onOnboard={()=>setPage("onboarding")}/>
               : <TradingApp onBack={goLanding} onChangeGame={goLanding} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>}
           </Suspense>}
     </div>
