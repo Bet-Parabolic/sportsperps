@@ -46,6 +46,32 @@ export function LeaderboardPage({ userId }) {
           {pts ? "Ranked by points earned — wager volume + daily streaks." : "Ranked by return % on the initial $10,000 balance."}
         </p>
         <Toggle />
+        {/* How points work — mirrors the backend rules in src/points.js (keep in sync) */}
+        {pts && (
+          <div style={{ marginTop: 14, padding: "14px 16px", background: "#101010", borderRadius: 12, border: "1px solid #1c1c1c", maxWidth: 720 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.1em", fontFamily: fm, marginBottom: 8 }}>HOW POINTS WORK</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 3 }}>Wager volume</div>
+                <div style={{ fontSize: 11.5, color: "#888", lineHeight: 1.55 }}>
+                  <strong style={{ color: "#bbb" }}>1 point per $10 of margin</strong> committed when you open a wager (closing earns nothing). Capped at <strong style={{ color: "#bbb" }}>500 points/day</strong>.
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 3 }}>Daily streak 🔥</div>
+                <div style={{ fontSize: 11.5, color: "#888", lineHeight: 1.55 }}>
+                  Your first wager of <strong style={{ color: "#bbb" }}>$50+ margin</strong> each day (UTC) extends your streak: <strong style={{ color: "#bbb" }}>+10 points</strong>, growing +5 per consecutive day (max +50/day).
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 3 }}>Milestones</div>
+                <div style={{ fontSize: 11.5, color: "#888", lineHeight: 1.55 }}>
+                  One-time bonuses: <strong style={{ color: "#bbb" }}>+100</strong> at a 7-day streak, <strong style={{ color: "#bbb" }}>+500</strong> at 30 days. Miss a day and the streak resets.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading ? <div style={{ textAlign: "center", padding: 60, color: "#555" }}>Loading leaderboard...</div> :

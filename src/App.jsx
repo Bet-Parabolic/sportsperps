@@ -1,7 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 
 import { FONT_URL } from "./lib/theme.js";
-import { PROC_GAMES } from "./lib/games.js";
 import { LOGO_MARK } from "./lib/logos.js";
 import { useLiveGames } from "./lib/useLiveGames.js";
 import { track, initTracking, withVisitorId } from "./lib/track.js";
@@ -33,10 +32,8 @@ export default function App() {
   const isWaitlist = typeof window !== "undefined" && window.location.pathname.startsWith("/waitlist");
 
   const [page, setPage] = useState(isAppDomain ? "trading" : "landing");
-  const [sel, setSel] = useState(PROC_GAMES[0]);
   const [liveGame, setLiveGame] = useState(null);
   const [tradingTab, setTradingTab] = useState("home");
-  const pick = (g) => { setSel(g); setPage("trading"); };
   const tradeLive = (g) => { setLiveGame(g); setPage("live-trading"); };
   const navTo = (tab) => { setTradingTab(tab); setPage("trading"); };
 
@@ -77,6 +74,13 @@ export default function App() {
         input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
         @keyframes slideUp { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
         @keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
+        /* Leverage slider — progress-bar track is painted by the input's background gradient;
+           the thumb is a slim mint handle riding on top. */
+        .lev-slider { -webkit-appearance:none; appearance:none; width:100%; height:14px; border-radius:7px; outline:none; cursor:pointer; }
+        .lev-slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:6px; height:22px; border-radius:3px; background:#fff; border:none; box-shadow:0 0 6px rgba(31,209,130,.8); cursor:grab; }
+        .lev-slider::-webkit-slider-thumb:active { cursor:grabbing; }
+        .lev-slider::-moz-range-thumb { width:6px; height:22px; border-radius:3px; background:#fff; border:none; box-shadow:0 0 6px rgba(31,209,130,.8); cursor:grab; }
+        .lev-slider::-moz-range-track { background:transparent; }
         .mob-nav::-webkit-scrollbar { display:none; }
         .mob-nav { -ms-overflow-style:none; scrollbar-width:none; }
         input[type=number]{-moz-appearance:textfield;}
@@ -93,9 +97,7 @@ export default function App() {
         : <Suspense fallback={<Splash/>}>
             {page==="live-trading"&&liveGame
               ? <LiveTradingApp game={liveGame} onBack={()=>setPage("trading")} liveGames={liveGames} onNavTo={navTo} onTrade={tradeLive}/>
-              : sel
-                ? <TradingApp game={sel} onBack={goLanding} onChangeGame={goLanding} onSwitchGame={pick} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>
-                : null}
+              : <TradingApp onBack={goLanding} onChangeGame={goLanding} liveGames={liveGames} onTrade={tradeLive} initialTab={tradingTab}/>}
           </Suspense>}
     </div>
   );

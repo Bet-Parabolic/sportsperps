@@ -36,6 +36,51 @@ function startsInLabel(startTime) {
   return h > 0 ? `Pregame · ${h}h ${m % 60}m` : `Pregame · ${m}m`;
 }
 
+/**
+ * Leverage slider with a progress-bar track spanning the FULL 1–10x scale:
+ * mint fill → chosen leverage, dark open zone → the live max cap, hatched locked zone beyond it.
+ * The cap segment moves as the backend's gap-aware per-side max changes; dragging past the cap
+ * clamps to it. Replaces the old quick-buttons + bare range input.
+ */
+function LevSlider({ eL, ml, onChange, compact = false }) {
+  const ABS_MAX = 10;
+  const pct = (v) => ((v - 1) / (ABS_MAX - 1)) * 100;
+  const fillPct = pct(eL), capPct = pct(ml);
+  const track = `linear-gradient(to right,
+    ${B.primary} 0%, ${B.primary} ${fillPct}%,
+    #1e2622 ${fillPct}%, #1e2622 ${capPct}%,
+    #15151a ${capPct}%, #15151a 100%)`;
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
+        <span style={{fontSize:compact?11:10,color:'#555',fontWeight:600}}>Leverage</span>
+        <span style={{fontSize:compact?14:13,fontWeight:800,color:B.primaryLight,fontFamily:fm}}>{eL}x</span>
+      </div>
+      <div style={{position:'relative'}}>
+        <input type="range" className="lev-slider" min={1} max={ABS_MAX} step={1} value={eL}
+          onChange={e=>onChange(Math.min(+e.target.value, ml))}
+          style={{background:track, border:'1px solid #23262b'}}/>
+        {/* Locked-zone stripes + cap marker (only when the cap is below the absolute max) */}
+        {ml < ABS_MAX && (
+          <div style={{position:'absolute',top:0,bottom:0,left:`${capPct}%`,right:0,borderRadius:'0 7px 7px 0',pointerEvents:'none',
+            background:'repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,82,71,0.10) 4px, rgba(255,82,71,0.10) 8px)',
+            borderLeft:'2px solid '+B.red}}/>
+        )}
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',marginTop:5}}>
+        <span style={{fontSize:9,color:'#444',fontFamily:fm}}>1x</span>
+        <span style={{fontSize:9,fontWeight:700,color:ml<ABS_MAX?B.red:'#444',fontFamily:fm}}>{ml}x max</span>
+        <span style={{fontSize:9,color:'#444',fontFamily:fm}}>{ABS_MAX}x</span>
+      </div>
+      {ml < ABS_MAX && (
+        <div style={{fontSize:9,color:'#666',marginTop:4}}>
+          Max {ml}x — leverage is limited as an outcome becomes more certain, so one play can't wipe you out.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade }) {
   // ── normalise team colors from backend ──────────────────────────────────
   const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
@@ -822,7 +867,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         </div>
         {/* CENTER — sport tabs */}
         <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
-          {[['home','Home',sportCounts.live],['demos','Demos',null],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.soccer],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
+          {[['home','Home',sportCounts.live],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.soccer],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='home'
                 ? <span style={{display:'flex',alignItems:'center',gap:5}}>
@@ -1294,27 +1339,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 </div>
               </div>
               <div style={{fontSize:10,color:'#555',textAlign:'center',marginBottom:12}}>@ {(entryP*100).toFixed(1)}¢ per share</div>
-              {/* Leverage slider */}
-              <div>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                  <span style={{fontSize:10,color:'#555',fontWeight:600}}>Leverage</span>
-                  <div style={{display:'flex',gap:3}}>
-                    {[2,3,5].filter(l=>l<=ml).map(l=>(
-                      <button key={l} onClick={()=>setOrderLev(l)} style={{padding:'2px 8px',fontSize:10,fontWeight:700,border:'none',cursor:'pointer',fontFamily:fm,borderRadius:6,
-                        background:eL===l?B.primary+'30':'#1a1a1a',color:eL===l?B.primaryLight:'#555'}}>{l}x</button>
-                    ))}
-                    <span style={{fontSize:10,fontWeight:800,color:B.primaryLight,fontFamily:fm,padding:'2px 8px'}}>{eL}x</span>
-                  </div>
-                  <span style={{fontSize:10,color:'#444'}}>{ml}x max</span>
-                </div>
-                <input type="range" min={1} max={ml} step={1} value={eL} onChange={e=>setOrderLev(+e.target.value)}
-                  style={{width:'100%',accentColor:B.primary,cursor:'pointer',height:4}}/>
-                {ml < 10 && (
-                  <div style={{fontSize:9,color:'#666',marginTop:5}}>
-                    Max {ml}x — leverage is limited as an outcome becomes more certain, so one play can't wipe you out.
-                  </div>
-                )}
-              </div>
+              {/* Leverage slider — progress-bar track, cap-aware (see LevSlider) */}
+              <LevSlider eL={eL} ml={ml} onChange={setOrderLev}/>
             </div>
             {/* Limit price */}
             {orderType==='limit'&&(
@@ -1560,16 +1586,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       ))}
                     </div>
                     <div style={{marginBottom:12}}>
-                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                        <span style={{fontSize:11,color:'#555',fontWeight:600}}>Leverage</span>
-                        <span><span style={{fontSize:14,fontWeight:800,color:B.primaryLight,fontFamily:fm}}>{eL}x</span><span style={{fontSize:10,color:'#444',marginLeft:6}}>{ml}x max</span></span>
-                      </div>
-                      <input type="range" min={1} max={ml} step={1} value={eL} onChange={e=>setOrderLev(+e.target.value)} style={{width:'100%',accentColor:B.primary,height:4}}/>
-                      {ml < 10 && (
-                        <div style={{fontSize:9,color:'#666',marginTop:5}}>
-                          Max {ml}x — leverage is limited as an outcome becomes more certain, so one play can't wipe you out.
-                        </div>
-                      )}
+                      <LevSlider eL={eL} ml={ml} onChange={setOrderLev} compact/>
                     </div>
                     <div style={{background:'#111',borderRadius:12,padding:'10px 14px',marginBottom:14,fontSize:12}}>
                       {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Liquidation',(liqP*100).toFixed(1)+'¢',B.red],['If '+team.name+' wins','+'+fmtUsd(orderSide==='home'?expo*(1-oPrice)/oPrice:expo*oPrice/(1-oPrice)),B.green]].map(([l,v,c],i)=>(
