@@ -4,18 +4,40 @@ import { fmtUsd, fmtPct } from "../lib/helpers.js";
 import { API_URL } from "../lib/constants.js";
 import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "../lib/auth.js";
 
-// Full-screen profile / settings page, organized like the app's Settings mockup:
-//   • top: identity + performance + open positions + Stats/Bets toggle (Stats is default)
-//   • grouped settings: Account (Account details, Transactions), Privacy (public/private),
-//     Support (Help & Support, Referrals), and Log out.
-// Sub-screens (Account details, Transactions, Referrals, Help) push in with a back arrow.
+// League metadata for bet cards + the favorite-discipline card (league comes from gameId prefix).
+const LEAGUE_META = {
+  mlb:   { emoji: "⚾", label: "BASEBALL · MLB", name: "Baseball" },
+  wcup:  { emoji: "⚽", label: "SOCCER · WORLD CUP", name: "World Cup" },
+  mls:   { emoji: "⚽", label: "SOCCER · MLS", name: "Soccer" },
+  nba:   { emoji: "🏀", label: "BASKETBALL · NBA", name: "Basketball" },
+  ncaam: { emoji: "🏀", label: "BASKETBALL · NCAA", name: "College Hoops" },
+  nfl:   { emoji: "🏈", label: "FOOTBALL · NFL", name: "Football" },
+  nhl:   { emoji: "🏒", label: "HOCKEY · NHL", name: "Hockey" },
+};
+const leagueOf = (gameId) => LEAGUE_META[(gameId || "").split("_")[0]] || { emoji: "🎯", label: "MARKET", name: "Markets" };
+
+// Points-derived tier chip (client-side flavor — mirrors nothing on the backend yet).
+function tierOf(points) {
+  if (points >= 50000) return { name: "LEGEND", color: "#f5a623" };
+  if (points >= 10000) return { name: "SHARP", color: "#b58cff" };
+  if (points >= 2000)  return { name: "TACTICIAN", color: "#2dd4bf" };
+  if (points >= 500)   return { name: "GRINDER", color: "#60a5fa" };
+  return { name: "ROOKIE", color: "#9aa4b2" };
+}
+
+// Full-screen profile, mirroring the mobile app's My-profile + Settings designs (desktop format):
+//   • Profile view: identity (avatar, points, tier), favorite discipline, stat grid, open
+//     positions, Bets/Badges tabs with All/Wins/Loses filter. (No performance-grade section.)
+//   • Settings view (gear): Account / Security / Preferences / About groups + Log out.
+// Sub-screens (Account details, Payment & deposits, Invite friends, Help) push in with a back arrow.
 export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
   const userId = userIdProp || currentUserId();
   const [profile, setProfile] = useState(null);
   const [positions, setPositions] = useState([]);
   const [trades, setTrades] = useState([]);
-  const [tab, setTab] = useState("stats");      // 'stats' | 'bets' — Stats is the default
-  const [view, setView] = useState("main");     // 'main' | 'account' | 'transactions' | 'referrals' | 'help'
+  const [tab, setTab] = useState("bets");       // 'bets' | 'badges'
+  const [betFilter, setBetFilter] = useState("all"); // 'all' | 'wins' | 'loses'
+  const [view, setView] = useState("main");     // 'main' | 'settings' | 'account' | 'transactions' | 'referrals' | 'help'
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -40,19 +62,32 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
   const returnPct = profile?.returnPct ?? 0;
   const wins = trades.filter((t) => t.pnl > 0).length;
   const winRate = trades.length ? Math.round((wins / trades.length) * 100) : 0;
-  const score = Math.max(0, Math.min(100, Math.round(50 + returnPct)));
+  const points = profile?.points ?? 0;
+  const tier = tierOf(points);
+
+  // Favorite discipline = the league this account has bet the most.
+  const favDiscipline = (() => {
+    if (!trades.length) return null;
+    const counts = {};
+    for (const t of trades) { const k = (t.gameId || "").split("_")[0]; counts[k] = (counts[k] || 0) + 1; }
+    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    return top ? { ...leagueOf(top[0] + "_"), bets: top[1] } : null;
+  })();
+
+  const filteredTrades = trades.filter((t) => betFilter === "all" ? true : betFilter === "wins" ? t.pnl >= 0 : t.pnl < 0);
 
   const handleLogout = () => { doLogout(); onLoggedOut?.(); };
 
   const wrap = { position: "fixed", inset: 0, zIndex: 900, background: B.bg, overflowY: "auto", fontFamily: fb };
   const inner = { maxWidth: 640, margin: "0 auto", padding: "16px 16px 70px" };
+  const wideInner = { maxWidth: 1020, margin: "0 auto", padding: "16px 24px 70px" };
 
   // ── Sub-screens ──────────────────────────────────────────────────────────
-  if (view !== "main") {
-    const titles = { account: "Account details", transactions: "Transactions", referrals: "Referrals", help: "Help & support" };
+  if (view !== "main" && view !== "settings") {
+    const titles = { account: "Account details", transactions: "Payment & deposits", referrals: "Invite your friends", help: "Help & support" };
     return (
       <div style={wrap}><div style={inner}>
-        <TopBar title={titles[view]} onBack={() => setView("main")} />
+        <TopBar title={titles[view]} onBack={() => setView("settings")} />
         {view === "account" && <AccountDetails userId={userId} profile={profile} onSaved={load} />}
         {view === "transactions" && <Transactions profile={profile} onLinkWallet={() => setView("account")} />}
         {view === "referrals" && <Referrals username={username} />}
@@ -61,110 +96,167 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
     );
   }
 
-  // ── Main ─────────────────────────────────────────────────────────────────
+  // ── Settings view (gear) — mirrors the mobile Settings design, desktop width ──
+  if (view === "settings") {
+    return (
+      <div style={wrap}><div style={inner}>
+        <TopBar title="Settings" onBack={() => setView("main")} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, margin: "8px 0 22px" }}>
+          <div style={avatar}>{username.charAt(0).toUpperCase()}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: B.white, fontFamily: fd }}>{username}</div>
+          <button onClick={() => setView("account")} style={editBtn}>Edit</button>
+        </div>
+
+        <SectionTitle>Account</SectionTitle>
+        <Group>
+          <Row label="Account details" onClick={() => setView("account")} />
+          <Row label="Payment & deposits" onClick={() => setView("transactions")} />
+          <Row label="Deposit limit" value="Coming soon" last />
+        </Group>
+
+        <SectionTitle>Security</SectionTitle>
+        <Group>
+          <PrivacyRow userId={userId} profile={profile} onSaved={load} />
+        </Group>
+
+        <SectionTitle>Preferences</SectionTitle>
+        <Group>
+          <Row label="Language" value="English" />
+          <Row label="Currency" value="USD" last />
+        </Group>
+
+        <SectionTitle>About</SectionTitle>
+        <Group>
+          <Row label="About Parabolic" onClick={() => window.open("https://docs.parabolic.gg/docs", "_blank", "noopener,noreferrer")} />
+          <Row label="Help & support" onClick={() => setView("help")} />
+          <Row label="Invite your friends" onClick={() => setView("referrals")} />
+          <Row label="Follow on X" value="@betparabolic" onClick={() => window.open("https://x.com/betparabolic", "_blank")} last />
+        </Group>
+
+        <button onClick={handleLogout} style={logoutBtn}>Log out</button>
+      </div></div>
+    );
+  }
+
+  // ── Main: My profile (desktop two-column) ────────────────────────────────
+  const isWide = typeof window !== "undefined" && window.innerWidth >= 980;
   return (
-    <div style={wrap}><div style={inner}>
-      <TopBar title="Profile" onClose={onClose} />
-
-      {/* Identity */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 20 }}>
-        <div style={avatar}>{username.charAt(0).toUpperCase()}</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: B.white, fontFamily: fd }}>{username}</div>
-        <div style={{ fontSize: 12, color: B.dim }}>Joined {joined}</div>
-        <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: fm, color: B.primaryLight, background: B.primary + "18", padding: "4px 11px", borderRadius: 999 }}>⚡ {(profile?.points || 0).toLocaleString()} pts</span>
-          {profile?.streak > 0 && <span style={{ fontSize: 12, fontWeight: 700, fontFamily: fm, color: "#ff9f1c", background: "#ff9f1c18", padding: "4px 11px", borderRadius: 999 }}>🔥 {profile.streak}-day streak</span>}
-        </div>
-        <button onClick={() => setView("account")} style={editBtn}>Edit</button>
+    <div style={wrap}><div style={wideInner}>
+      {/* Header — title + gear (settings) */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 2px 14px" }}>
+        <button onClick={onClose} style={iconBtn} title="Close">✕</button>
+        <div style={{ fontFamily: fd, fontSize: 16, fontWeight: 700, color: B.white }}>My profile</div>
+        <button onClick={() => setView("settings")} style={iconBtn} title="Settings">⚙</button>
       </div>
 
-      {/* Performance */}
-      <div style={card}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div style={{ fontFamily: fd, fontSize: 16, fontWeight: 600, color: B.white }}>Performance</div>
-          <div style={{ fontFamily: fm, fontSize: 22, fontWeight: 800, color: B.white }}>{score}<span style={{ color: B.mute, fontSize: 14 }}> /100</span></div>
-        </div>
-        <div style={{ marginTop: 12, height: 8, borderRadius: 6, background: B.bg, overflow: "hidden" }}>
-          <div style={{ width: `${score}%`, height: "100%", background: returnPct >= 0 ? B.primary : B.red }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-          <Metric label="Account value" value={fmtUsd(profile?.balance ?? 10000)} />
-          <Metric label="Return" value={fmtPct(returnPct)} color={returnPct >= 0 ? B.primary : B.red} alignRight />
-        </div>
-      </div>
-
-      {/* Open positions */}
-      <SectionTitle>Open positions</SectionTitle>
-      {positions.length === 0 ? (
-        <div style={{ ...card, color: B.dim, fontSize: 14 }}>No open positions.</div>
-      ) : positions.map((p, i) => (
-        <div key={i} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: B.white, textTransform: "capitalize" }}>{p.side}</div>
-            <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{fmtUsd(p.margin)} · {(p.entryPx * 100).toFixed(0)}¢ · {p.leverage}x</div>
-          </div>
-          <div style={{ fontFamily: fm, fontWeight: 700, color: p.pnl >= 0 ? B.primary : B.red }}>{p.pnl >= 0 ? "+" : ""}{fmtUsd(p.pnl)}</div>
-        </div>
-      ))}
-
-      {/* Stats / Bets toggle — Stats default */}
-      <div style={{ display: "flex", gap: 20, margin: "22px 4px 12px" }}>
-        {["stats", "bets"].map((t) => (
-          <span key={t} onClick={() => setTab(t)} style={{ fontFamily: fd, fontSize: 16, fontWeight: 700, cursor: "pointer", textTransform: "capitalize", color: tab === t ? B.white : B.mute }}>{t}</span>
-        ))}
-      </div>
-
-      {tab === "stats" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <StatBox label="All-time P&L" value={`${(profile?.closedPnl ?? 0) >= 0 ? "+" : ""}${fmtUsd(profile?.closedPnl ?? 0)}`} color={(profile?.closedPnl ?? 0) >= 0 ? B.primary : B.red} />
-          <StatBox label="ROI" value={fmtPct(returnPct)} color={returnPct >= 0 ? B.primary : B.red} />
-          <StatBox label="Win rate" value={`${winRate}%`} />
-          <StatBox label="Volume" value={fmtUsd(profile?.totalVolume ?? 0)} />
-          <StatBox label="Points" value={(profile?.points ?? 0).toLocaleString()} color={B.primaryLight} />
-          <StatBox label="Day streak" value={profile?.streak ? "🔥 " + profile.streak : "0"} />
-          <StatBox label="Settled bets" value={String(profile?.tradeCount ?? 0)} />
-          <StatBox label="Open positions" value={String(profile?.openPositions ?? positions.length)} />
-        </div>
-      ) : (
-        trades.length === 0 ? (
-          <div style={{ ...card, color: B.dim, fontSize: 14 }}>{loading ? "Loading…" : "No settled bets yet."}</div>
-        ) : trades.map((t) => {
-          const win = t.pnl >= 0;
-          return (
-            <div key={t.id} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isWide ? "380px 1fr" : "1fr", gap: 24, alignItems: "start" }}>
+        {/* LEFT column — identity, discipline, stats, open positions */}
+        <div>
+          {/* Identity */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+              <div style={avatar}>{username.charAt(0).toUpperCase()}</div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: B.white, textTransform: "capitalize" }}>{t.side} · {t.leverage}x</div>
-                <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{(t.entryPx * 100).toFixed(0)}¢ → {t.exitPx != null ? (t.exitPx * 100).toFixed(0) + "¢" : "—"}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontFamily: fm, fontWeight: 700, color: win ? B.primary : B.red }}>{win ? "+" : ""}{fmtUsd(t.pnl)}</div>
-                <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "2px 7px", borderRadius: 5, background: win ? "rgba(31,209,130,0.15)" : "rgba(255,82,71,0.15)", color: win ? B.primary : B.red }}>{win ? "WIN" : "LOSS"}</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ddd", background: "#1a1d22", padding: "3px 9px", borderRadius: 999 }}>★ {points.toLocaleString()}</span>
+                  <span style={{ fontSize: 10, fontWeight: 800, fontFamily: fm, letterSpacing: "0.08em", color: tier.color, background: tier.color + "1c", padding: "3px 9px", borderRadius: 6 }}>{tier.name}</span>
+                  {profile?.streak > 0 && <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ff9f1c", background: "#ff9f1c18", padding: "3px 9px", borderRadius: 999 }}>🔥 {profile.streak}</span>}
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: B.white, fontFamily: fd, letterSpacing: "-0.02em" }}>{username}</div>
+                <div style={{ fontSize: 12, color: B.dim }}>Joined {joined}</div>
               </div>
             </div>
-          );
-        })
-      )}
+          </div>
 
-      {/* Settings groups */}
-      <SectionTitle>Account</SectionTitle>
-      <Group>
-        <Row label="Account details" onClick={() => setView("account")} />
-        <Row label="Transactions" sub="Deposits & withdrawals" onClick={() => setView("transactions")} last />
-      </Group>
+          {/* Favorite discipline */}
+          {favDiscipline && (
+            <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", background: "linear-gradient(135deg, #14181f, #0e1116)", border: "1px solid #222833" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ fontSize: 26 }}>{favDiscipline.emoji}</div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: B.white }}>{favDiscipline.name}</div>
+                  <div style={{ fontSize: 11, color: B.dim }}>Favorite discipline</div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: fm, fontSize: 18, fontWeight: 800, color: B.white }}>{favDiscipline.bets}</div>
+                <div style={{ fontSize: 10, color: B.dim }}>🏅 Bets</div>
+              </div>
+            </div>
+          )}
 
-      <SectionTitle>Privacy</SectionTitle>
-      <Group>
-        <PrivacyRow userId={userId} profile={profile} onSaved={load} />
-      </Group>
+          {/* Stat grid — All-time P&L / ROI / Win rate / Volume (matches the design's 2x2) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+            <StatBox label="All-time P&L" value={`${(profile?.closedPnl ?? 0) >= 0 ? "+" : ""}${fmtUsd(profile?.closedPnl ?? 0)}`} color={(profile?.closedPnl ?? 0) >= 0 ? B.primary : B.red} />
+            <StatBox label="ROI" value={fmtPct(returnPct)} color={returnPct >= 0 ? B.primary : B.red} />
+            <StatBox label="Win rate" value={`${winRate}%`} />
+            <StatBox label="Volume" value={fmtUsd(profile?.totalVolume ?? 0)} />
+          </div>
 
-      <SectionTitle>Support</SectionTitle>
-      <Group>
-        <Row label="Help & support" onClick={() => setView("help")} />
-        <Row label="Referrals" onClick={() => setView("referrals")} />
-        <Row label="Follow on X" value="@betparabolic" onClick={() => window.open("https://x.com/betparabolic", "_blank")} last />
-      </Group>
+          {/* Open positions */}
+          <SectionTitle>Open positions</SectionTitle>
+          {positions.length === 0 ? (
+            <div style={{ ...card, color: B.dim, fontSize: 14 }}>No open positions.</div>
+          ) : positions.map((p, i) => (
+            <div key={i} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: B.white, textTransform: "capitalize" }}>{p.side}</div>
+                <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{fmtUsd(p.margin)} · {(p.entryPx * 100).toFixed(0)}¢ · {p.leverage}x</div>
+              </div>
+              <div style={{ fontFamily: fm, fontWeight: 700, color: p.pnl >= 0 ? B.primary : B.red }}>{p.pnl >= 0 ? "+" : ""}{fmtUsd(p.pnl)}</div>
+            </div>
+          ))}
+        </div>
 
-      <button onClick={handleLogout} style={logoutBtn}>Log out</button>
+        {/* RIGHT column — Bets | Badges */}
+        <div>
+          <div style={{ display: "flex", gap: 20, margin: "2px 4px 12px" }}>
+            {["bets", "badges"].map((t) => (
+              <span key={t} onClick={() => setTab(t)} style={{ fontFamily: fd, fontSize: 17, fontWeight: 700, cursor: "pointer", textTransform: "capitalize", color: tab === t ? B.white : B.mute }}>{t}</span>
+            ))}
+          </div>
+
+          {tab === "badges" ? (
+            <div style={{ ...card, textAlign: "center", padding: "40px 20px" }}>
+              <div style={{ fontSize: 30, marginBottom: 8 }}>🏅</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: B.white, marginBottom: 4 }}>Badges are coming soon</div>
+              <div style={{ fontSize: 12.5, color: B.dim, lineHeight: 1.5 }}>Milestone badges for wins, streaks, and volume land with the next points update.</div>
+            </div>
+          ) : (
+            <>
+              {/* All / Wins / Loses filter */}
+              <div style={{ display: "inline-flex", background: "#111", border: "1px solid #1f1f1f", borderRadius: 999, padding: 3, gap: 3, marginBottom: 12 }}>
+                {[["all", "All"], ["wins", "Wins"], ["loses", "Loses"]].map(([k, label]) => (
+                  <button key={k} onClick={() => setBetFilter(k)} style={{
+                    padding: "6px 22px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: fd, fontWeight: 700, fontSize: 13,
+                    background: betFilter === k ? "#fff" : "transparent", color: betFilter === k ? "#0a0a0a" : "#888",
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {filteredTrades.length === 0 ? (
+                <div style={{ ...card, color: B.dim, fontSize: 14 }}>{loading ? "Loading…" : betFilter === "all" ? "No settled bets yet." : `No ${betFilter} yet.`}</div>
+              ) : filteredTrades.map((t) => {
+                const win = t.pnl >= 0;
+                const lg = leagueOf(t.gameId);
+                return (
+                  <div key={t.id} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px" }}>
+                    <div>
+                      <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: fm, letterSpacing: "0.1em", color: B.dim, marginBottom: 4 }}>{lg.emoji} {lg.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: B.white, textTransform: "capitalize" }}>{t.side} · {t.leverage}x</div>
+                      <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{(t.entryPx * 100).toFixed(0)}¢ → {t.exitPx != null ? (t.exitPx * 100).toFixed(0) + "¢" : "—"}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontFamily: fm, fontWeight: 700, color: win ? B.primary : B.red }}>{win ? "+" : ""}{fmtUsd(t.pnl)}</div>
+                      <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "2px 7px", borderRadius: 5, background: win ? "rgba(31,209,130,0.15)" : "rgba(255,82,71,0.15)", color: win ? B.primary : B.red }}>{win ? "WIN" : "LOSE"}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      </div>
     </div></div>
   );
 }
@@ -301,6 +393,7 @@ function HelpSupport() {
 
 // ── Shared presentational pieces ───────────────────────────────────────────
 const card = { background: B.card, border: `1px solid ${B.border}`, borderRadius: 16, padding: 16, marginBottom: 10 };
+const iconBtn = { width: 34, height: 34, borderRadius: "50%", background: B.surface, border: `1px solid ${B.border2}`, color: "#ccc", fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 const avatar = { width: 76, height: 76, borderRadius: "50%", background: `linear-gradient(140deg, ${B.primary}, ${B.cyan})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, fontWeight: 800, color: "#04130c", fontFamily: fd };
 const editBtn = { marginTop: 4, padding: "7px 22px", borderRadius: 999, background: B.surface, border: `1px solid ${B.border2}`, color: B.white, fontFamily: fd, fontWeight: 600, fontSize: 13, cursor: "pointer" };
 const logoutBtn = { width: "100%", marginTop: 18, padding: "13px", borderRadius: 12, background: "transparent", border: `1px solid ${B.border2}`, color: B.red, fontFamily: fd, fontWeight: 600, fontSize: 14, cursor: "pointer" };
