@@ -15,6 +15,8 @@ import { MMAPage } from "../components/sports/MMAPage.jsx";
 import { HomePage } from "../components/sports/HomePage.jsx";
 import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
 import { loadCard } from "../lib/onboarding.js";
+import { DepositModal } from "../components/DepositModal.jsx";
+import { currentUserId } from "../lib/auth.js";
 
 /**
  * Home terminal shell — sport tabs, home page, leaderboard, profile. All TRADING happens in
@@ -29,6 +31,17 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
   // card edits may have just changed it).
   const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
   useEffect(() => { if (!showProfile) setCardAvatar(loadCard().avatar); }, [showProfile]);
+  // Header balance (every account starts with $10,000 paper funds). Refreshes every 30s and
+  // when the profile closes (a trade/settlement elsewhere may have moved it).
+  const [balance, setBalance] = useState(null);
+  const [showDeposit, setShowDeposit] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const fetchBal = () => fetch(`${API_URL}/balance/${currentUserId()}`).then(r => r.ok ? r.json() : null).then(b => { if (live && b && typeof b.balance === "number") setBalance(b.balance); }).catch(() => {});
+    fetchBal();
+    const iv = setInterval(fetchBal, 30000);
+    return () => { live = false; clearInterval(iv); };
+  }, [showProfile]);
   const [userId] = useState(() => {
     let id = localStorage.getItem('perpdictions_userId');
     if (!id) { id = crypto.randomUUID(); localStorage.setItem('perpdictions_userId', id); }
@@ -117,9 +130,15 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           );})}
         </div>
 
-        {/* RIGHT — deposit + profile */}
+        {/* RIGHT — balance + deposit + profile */}
         <div style={{display:"flex",alignItems:"center",gap:10,justifySelf:"end"}}>
-          <button style={{padding:"8px 20px",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:10,background:B.green,color:"#fff"}}>
+          {balance != null && (
+            <div style={{padding:isMobile?"6px 10px":"7px 14px",borderRadius:10,background:"#111",border:"1px solid #1f1f1f",textAlign:"right"}}>
+              {!isMobile && <div style={{fontSize:8.5,color:"#555",fontWeight:700,letterSpacing:"0.08em",fontFamily:fm,lineHeight:1.2}}>BALANCE</div>}
+              <div style={{fontSize:isMobile?12:13,fontWeight:800,color:"#fff",fontFamily:fm,lineHeight:1.2}}>${balance.toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2})}</div>
+            </div>
+          )}
+          <button onClick={()=>setShowDeposit(true)} style={{padding:"8px 20px",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:10,background:B.green,color:"#fff"}}>
             Deposit
           </button>
           <div onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden"}}>
@@ -140,6 +159,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
         :<HomePage liveGames={liveGames} onTrade={onTrade}/>}
       </div>
 
+      {showDeposit && <DepositModal balance={balance} onClose={()=>setShowDeposit(false)}/>}
       {showProfile && <ProfilePage onClose={()=>setShowProfile(false)} onLoggedOut={()=>setShowProfile(false)}/>}
     </div>
   );

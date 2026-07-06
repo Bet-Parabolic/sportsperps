@@ -14,6 +14,7 @@ import { getAuth, currentUserId, authToken, isLoggedIn, handleUnauthorized, setS
 import { track } from "../lib/track.js";
 import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
 import { loadCard } from "../lib/onboarding.js";
+import { DepositModal } from "../components/DepositModal.jsx";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -137,6 +138,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // Account pfp mirrors the member-card avatar (re-read when the profile closes).
   const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
   useEffect(() => { if (!showProfile) setCardAvatar(loadCard().avatar); }, [showProfile]);
+  const [showDeposit, setShowDeposit] = useState(false); // deposit/withdrawal coming-soon modal
   const [tradeCard, setTradeCard] = useState(null);
   const [isMobile,   setIsMobile]   = useState(()=>window.innerWidth<768);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
@@ -890,7 +892,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
             LIVE
           </span>}
-          <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
+          <div style={{padding:isMobile?'6px 10px':'6px 14px',borderRadius:10,background:'#111',border:'1px solid #1f1f1f',textAlign:'right'}}>
+            {!isMobile && <div style={{fontSize:8.5,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,lineHeight:1.2}}>BALANCE</div>}
+            <div style={{fontSize:isMobile?12:13,fontWeight:800,color:'#fff',fontFamily:fm,lineHeight:1.2}}>${balance.toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2})}</div>
+          </div>
+          <button onClick={()=>setShowDeposit(true)} style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
           <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14,overflow:'hidden'}}>
             {cardAvatar ? <AvatarCircle avatar={cardAvatar} size={32}/> : '👤'}
           </div>
@@ -1644,6 +1650,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           onLoggedOut={()=>{ setAuth(null); setShowProfile(false); }}
         />
       )}
+      {showDeposit && <DepositModal balance={balance} onClose={()=>setShowDeposit(false)}/>}
       {showAuth && (
         <AuthModal
           reason={sessionExpired ? "Your session expired — please sign in again." : "Sign in or create an account to place a wager."}
