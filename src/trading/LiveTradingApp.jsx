@@ -12,6 +12,8 @@ import { ChatPanel } from "../components/ChatPanel.jsx";
 import { TradeCard } from "../components/TradeCard.jsx";
 import { getAuth, currentUserId, authToken, isLoggedIn, handleUnauthorized, setSessionExpiredHandler } from "../lib/auth.js";
 import { track } from "../lib/track.js";
+import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
+import { loadCard } from "../lib/onboarding.js";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -132,6 +134,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [markers,    setMarkers]    = useState([]);
   const [showWager,  setShowWager]  = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  // Account pfp mirrors the member-card avatar (re-read when the profile closes).
+  const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
+  useEffect(() => { if (!showProfile) setCardAvatar(loadCard().avatar); }, [showProfile]);
   const [tradeCard, setTradeCard] = useState(null);
   const [isMobile,   setIsMobile]   = useState(()=>window.innerWidth<768);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
@@ -886,7 +891,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             LIVE
           </span>}
           <button style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
-          <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14}}>👤</div>
+          <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14,overflow:'hidden'}}>
+            {cardAvatar ? <AvatarCircle avatar={cardAvatar} size={32}/> : '👤'}
+          </div>
         </div>
       </div>
 

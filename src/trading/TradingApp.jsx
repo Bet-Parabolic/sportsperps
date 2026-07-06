@@ -13,6 +13,8 @@ import { HockeyPage } from "../components/sports/HockeyPage.jsx";
 import { SoccerPage } from "../components/sports/SoccerPage.jsx";
 import { MMAPage } from "../components/sports/MMAPage.jsx";
 import { HomePage } from "../components/sports/HomePage.jsx";
+import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
+import { loadCard } from "../lib/onboarding.js";
 
 /**
  * Home terminal shell — sport tabs, home page, leaderboard, profile. All TRADING happens in
@@ -23,6 +25,10 @@ import { HomePage } from "../components/sports/HomePage.jsx";
 export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, initialTab }) {
   const [terminalPage, setTerminalPage] = useState(initialTab || "home");
   const [showProfile, setShowProfile] = useState(false);
+  // Account pfp mirrors the member-card avatar (re-read when the profile closes — onboarding/
+  // card edits may have just changed it).
+  const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
+  useEffect(() => { if (!showProfile) setCardAvatar(loadCard().avatar); }, [showProfile]);
   const [userId] = useState(() => {
     let id = localStorage.getItem('perpdictions_userId');
     if (!id) { id = crypto.randomUUID(); localStorage.setItem('perpdictions_userId', id); }
@@ -116,8 +122,8 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           <button style={{padding:"8px 20px",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:10,background:B.green,color:"#fff"}}>
             Deposit
           </button>
-          <div onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-            <span style={{fontSize:14,color:"#888"}}>👤</span>
+          <div onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden"}}>
+            {cardAvatar ? <AvatarCircle avatar={cardAvatar} size={34}/> : <span style={{fontSize:14,color:"#888"}}>👤</span>}
           </div>
         </div>
       </div>

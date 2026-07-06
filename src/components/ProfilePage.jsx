@@ -4,6 +4,8 @@ import { fmtUsd, fmtPct } from "../lib/helpers.js";
 import { API_URL } from "../lib/constants.js";
 import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "../lib/auth.js";
 import { CardOverlay } from "./onboarding/CardOverlay.jsx";
+import { MemberCard, AvatarCircle } from "./onboarding/MemberCard.jsx";
+import { loadCard, referralCodeFor } from "../lib/onboarding.js";
 
 // League metadata for bet cards + the favorite-discipline card (league comes from gameId prefix).
 const LEAGUE_META = {
@@ -40,6 +42,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
   const [betFilter, setBetFilter] = useState("all"); // 'all' | 'wins' | 'loses'
   const [view, setView] = useState("main");     // 'main' | 'settings' | 'account' | 'transactions' | 'referrals' | 'help'
   const [showCard, setShowCard] = useState(false); // member-card overlay (front/QR back)
+  const [memberCard] = useState(() => loadCard()); // device-local card (sport/avatar/signature)
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -104,7 +107,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
       <div style={wrap}><div style={inner}>
         <TopBar title="Settings" onBack={() => setView("main")} />
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, margin: "8px 0 22px" }}>
-          <div style={avatar}>{username.charAt(0).toUpperCase()}</div>
+          {memberCard.avatar ? <AvatarCircle avatar={memberCard.avatar} size={76} /> : <div style={avatar}>{username.charAt(0).toUpperCase()}</div>}
           <div style={{ fontSize: 20, fontWeight: 700, color: B.white, fontFamily: fd }}>{username}</div>
           <button onClick={() => setView("account")} style={editBtn}>Edit</button>
         </div>
@@ -158,10 +161,10 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
       <div style={{ display: "grid", gridTemplateColumns: isWide ? "380px 1fr" : "1fr", gap: 24, alignItems: "start" }}>
         {/* LEFT column — identity, discipline, stats, open positions */}
         <div>
-          {/* Identity */}
+          {/* Identity — pfp mirrors the member-card avatar when one was chosen */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
-              <div style={avatar}>{username.charAt(0).toUpperCase()}</div>
+              {memberCard.avatar ? <AvatarCircle avatar={memberCard.avatar} size={76} /> : <div style={avatar}>{username.charAt(0).toUpperCase()}</div>}
               <div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ddd", background: "#1a1d22", padding: "3px 9px", borderRadius: 999 }}>★ {points.toLocaleString()}</span>
@@ -172,6 +175,12 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
                 <div style={{ fontSize: 12, color: B.dim }}>Joined {joined}</div>
               </div>
             </div>
+          </div>
+
+          {/* Member card — always visible; click for the full overlay (flip/QR/share) */}
+          <div onClick={() => setShowCard(true)} style={{ cursor: "pointer", marginBottom: 12 }} title="Open my card">
+            <MemberCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={memberCard.avatar} signature={memberCard.signature} referralCode={referralCodeFor(userId)} />
+            <div style={{ fontSize: 11, color: B.dim, marginTop: 6, textAlign: "center" }}>Tap the card to flip &amp; share</div>
           </div>
 
           {/* Favorite discipline */}
