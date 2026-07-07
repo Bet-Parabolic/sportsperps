@@ -66,8 +66,8 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
             </span>
           </div>
           <h1 style={{...a(0.1),fontFamily:fd,fontSize:isMobile?38:72,fontWeight:800,lineHeight:1.0,letterSpacing:"-0.01em",wordSpacing:"0.12em",margin:isMobile?"0 0 16px":"0 0 24px"}}>
-            Leveraged sports<br/>
-            <span style={{color:R}}>perpetuals.</span>
+            Trade live sports<br/>
+            with <span style={{color:R}}>leverage.</span>
           </h1>
           <p style={{...a(0.15),fontSize:isMobile?15:18,lineHeight:1.7,color:"#888",maxWidth:560,margin:isMobile?"0 auto 24px":"0 auto 36px",fontWeight:400}}>
             Trade live win probability with up to 10x leverage. Multi-oracle pricing. Trustless settlement. No counterparty risk.
@@ -76,11 +76,6 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
             <button onClick={onLaunch} style={{padding:isMobile?"12px 28px":"14px 36px",border:"none",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:`linear-gradient(135deg, ${R}, ${TL})`,color:"#fff",borderRadius:12}}>
               Launch App
             </button>
-            {onCreateAccount && (
-              <button onClick={onCreateAccount} style={{padding:isMobile?"12px 28px":"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:700,fontSize:isMobile?14:15,background:"#161616",color:"#fff",borderRadius:12}}>
-                Create account
-              </button>
-            )}
             <button onClick={onDocs} style={{padding:isMobile?"12px 28px":"14px 36px",border:"1px solid #2a2a2a",cursor:"pointer",fontFamily:fb,fontWeight:600,fontSize:isMobile?14:15,background:"transparent",color:"#888",borderRadius:12}}>
               Read Docs
             </button>

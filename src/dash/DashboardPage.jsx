@@ -101,6 +101,8 @@ const TIP = {
   vFundUser: "Net funding the user paid (−) or received (+) over the life of the position.",
   vVaultPnl: "The vault's PnL on Parabolic for this position — the zero-sum counterparty result (≈ −user PnL). Funding and platform fees are separate lines.",
   vHedgeShadow: "SHADOW hedge: the venue (P=Polymarket, K=Kalshi) and price the vault would have crossed at to flatten this position's side, at open / at close. No real order is placed yet (Phase 2).",
+  vHedgeShares: "Polymarket outcome-token shares the vault holds to hedge this game. 'Home shares' pay out if the home team wins, 'Away shares' if the away team wins. Holding both offsets the vault's directional risk; the difference between them is the residual delta the hedge is driving to zero.",
+  vHedgeKind: "What the hedge engine did this block. rebalance = adjusted the Polymarket position to flatten the vault's net delta · settle = closed the hedge at the game's final outcome · uncovered = no Polymarket market for this game, so the vault's delta is running UNHEDGED · no-book = the Polymarket market exists but had no liquidity to trade against.",
   // Health tab
   hUptime: "How long the backend has run since its last deploy/restart. The rolling counters below reset on restart.",
   hWs: "Live WebSocket clients connected right now (browsers watching games), plus total connects since restart.",
@@ -303,10 +305,10 @@ function VaultTab({ vault, history = [], hedge = null }) {
           </div>
           {(hedge.openPositions || []).length > 0 && (
             <div style={{ overflowX: "auto", marginBottom: 10 }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={th}>Game</th><th style={th}>Home tok</th><th style={th}>Away tok</th><th style={th}>Net Δ (home-eq)</th><th style={th}>Gross notional</th><th style={th}>Realized</th></tr></thead>
+              <thead><tr><th style={th}>Game</th><th style={th}>Home shares<Info text={TIP.vHedgeShares} /></th><th style={th}>Away shares<Info text={TIP.vHedgeShares} /></th><th style={th}>Net Δ (home-eq)</th><th style={th}>Gross notional</th><th style={th}>Realized</th></tr></thead>
               <tbody>{hedge.openPositions.map((p, i) => (
                 <tr key={i}>
-                  <td style={{ ...td, color: C.mut }}>{p.gameId}</td>
+                  <td style={td}>{p.matchup || p.gameId}</td>
                   <td style={td}>{p.homeTok}</td><td style={td}>{p.awayTok}</td>
                   <td style={{ ...td, color: signColor(p.homeEquiv) }}>{p.homeEquiv}</td>
                   <td style={td}>{fmtUsd(p.grossNotional)}</td>
@@ -317,11 +319,11 @@ function VaultTab({ vault, history = [], hedge = null }) {
           )}
           {(hedge.recent || []).length > 0 && (
             <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={th}>When</th><th style={th}>Game</th><th style={th}>Kind</th><th style={th}>Net Δ</th><th style={th}>Home-eq</th><th style={th}>Traded</th><th style={th}>Exec px</th><th style={th}>Note</th></tr></thead>
+              <thead><tr><th style={th}>When</th><th style={th}>Game</th><th style={th}>Event<Info text={TIP.vHedgeKind} /></th><th style={th}>Net Δ</th><th style={th}>Home-eq</th><th style={th}>Traded</th><th style={th}>Exec px</th><th style={th}>Note</th></tr></thead>
               <tbody>{hedge.recent.map((e, i) => (
                 <tr key={i}>
                   <td style={{ ...td, color: C.mut }}>{e.ts ? Math.round((Date.now() - e.ts) / 1000) + "s" : "—"}</td>
-                  <td style={{ ...td, color: C.mut }}>{e.gameId}</td>
+                  <td style={{ ...td, color: C.mut }}>{e.matchup || e.gameId}</td>
                   <td style={{ ...td, color: e.kind === "settle" ? C.primaryLt : e.kind === "uncovered" || e.kind === "no-book" ? "#f5a524" : C.text }}>{e.kind}</td>
                   <td style={td}>{e.netDelta != null ? Math.round(e.netDelta) : "—"}</td>
                   <td style={td}>{e.homeEquiv != null ? Math.round(e.homeEquiv) : "—"}</td>
@@ -845,6 +847,7 @@ function RiskTab({ data }) {
   const dd = data.drawdown || {};
   const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
   const badDebt = lq.totalDeficit || 0;
+  const deficitGames = [...new Set((lq.recent || []).filter((r) => r.deficit > 0).map((r) => r.matchup || r.gameId))];
   const solvent = badDebt === 0 && (s.coverage == null || s.coverage >= 1);
   const covColor = s.coverage == null ? C.mut : s.coverage >= 1.5 ? C.primary : s.coverage >= 1 ? C.amber : C.red;
   const utilColor = (u) => (u == null ? C.mut : u > 1 ? C.red : u >= 0.8 ? C.amber : C.primary);
@@ -856,6 +859,18 @@ function RiskTab({ data }) {
         <span style={{ color: C.text, fontSize: 13 }}> · {badDebt > 0 ? `$${badDebt.toLocaleString()} uncovered bad debt across ${lq.deficitCount} liquidation(s)` : "every liquidation stayed within posted margin"}{s.coverage != null && s.coverage < 1 ? ` · vault covers only ${pct(s.coverage)} of its book` : ""}</span>
         <div style={{ color: C.mut, fontSize: 12, marginTop: 3 }}>The gap-aware leverage cap should keep bad debt at $0 and vault coverage ≥ 100%. Any red here is a hard blocker for real funds.</div>
       </div>
+
+      {badDebt > 0 && (
+        <div style={{ background: C.red + "0d", border: `1px solid ${C.red}33`, borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
+          <div style={{ color: C.red, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>What happened{deficitGames.length ? ` — ${deficitGames.join(", ")}` : ""}</div>
+          <div style={{ color: C.text, fontSize: 12.5, lineHeight: 1.6 }}>
+            A liquidation closed a position for more than the trader's posted margin: the price gapped through both the maintenance trigger and the bankruptcy price before the position could be closed, so the vault had to absorb the shortfall.
+            <div style={{ marginTop: 8, color: C.mut }}>
+              This is a leverage-cap issue, not a hedging one. The Phase-2 hedge only flattens the vault's own directional inventory on Polymarket; it can't stop a single trader's position from gapping past bankruptcy. The gap-aware cap is meant to size leverage so the liquidation buffer covers the largest plausible single-event swing, so any bad debt means the cap was too loose for that game's gap and needs tightening.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <Stat label="Uncovered bad debt" value={badDebt > 0 ? "−" + fmtUsd(badDebt) : "$0"} valueColor={badDebt > 0 ? C.red : C.primary} sub={`${lq.deficitCount || 0} deficit liq`} info={TIP.rDeficit} />
@@ -879,7 +894,7 @@ function RiskTab({ data }) {
             <tbody>{lq.recent.map((r, i) => (
               <tr key={i}>
                 <td style={{ ...td, color: C.mut }}>{(r.userId || "").slice(0, 8)}</td>
-                <td style={{ ...td, color: C.mut }}>{r.gameId}</td>
+                <td style={td}>{r.matchup || r.gameId}</td>
                 <td style={{ ...td, color: r.side === "home" ? C.primaryLt : C.red }}>{r.side}</td>
                 <td style={{ ...td, color: r.pnl < 0 ? C.red : C.text }}>{fmtSigned(r.pnl)}</td>
                 <td style={{ ...td, color: r.deficit > 0 ? C.red : C.mut, fontWeight: r.deficit > 0 ? 700 : 400 }}>{r.deficit > 0 ? fmtSigned(-r.deficit) : "—"}</td>
