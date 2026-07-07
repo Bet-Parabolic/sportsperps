@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { B, brighten, fb, fm } from "../lib/theme.js";
+import { B, brighten, fb, fd, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
@@ -44,44 +44,50 @@ function startsInLabel(startTime) {
 }
 
 /**
- * Leverage slider with a progress-bar track spanning the FULL 1–10x scale:
- * mint fill → chosen leverage, dark open zone → the live max cap, hatched locked zone beyond it.
- * The cap segment moves as the backend's gap-aware per-side max changes; dragging past the cap
- * clamps to it. Replaces the old quick-buttons + bare range input.
+ * Leverage control (mobile-design port): big "Nx" readout, − / + steppers flanking ten pill
+ * segments (white fill → chosen leverage; dark → available; near-black → locked beyond the live
+ * gap-aware cap), 1x/10x rail labels, and a liquidation card ("Liquidation at ~X% · Only Y pts
+ * away"). Pills are clickable; everything clamps to the per-side max.
  */
-function LevSlider({ eL, ml, onChange, compact = false }) {
+function LevSlider({ eL, ml, onChange, compact = false, liq = null }) {
   const ABS_MAX = 10;
-  const pct = (v) => ((v - 1) / (ABS_MAX - 1)) * 100;
-  const fillPct = pct(eL), capPct = pct(ml);
-  const track = `linear-gradient(to right,
-    ${B.primary} 0%, ${B.primary} ${fillPct}%,
-    #1e2622 ${fillPct}%, #1e2622 ${capPct}%,
-    #15151a ${capPct}%, #15151a 100%)`;
+  const set = (v) => onChange(Math.min(Math.max(1, v), ml));
+  const ptsClose = liq && liq.pts < 5;
   return (
     <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}}>
-        <span style={{fontSize:compact?11:10,color:'#555',fontWeight:600}}>Leverage</span>
-        <span style={{fontSize:compact?14:13,fontWeight:800,color:B.primaryLight,fontFamily:fm}}>{eL}x</span>
+      {/* readout */}
+      <div style={{textAlign:'center',marginBottom:2}}>
+        <div style={{fontSize:compact?30:34,fontWeight:800,color:'#fff',fontFamily:fd,lineHeight:1.1,letterSpacing:'-0.02em'}}>{eL}x</div>
+        <div style={{fontSize:compact?13:12,color:'#8a8f98',marginTop:2}}>Leverage</div>
       </div>
-      <div style={{position:'relative'}}>
-        <input type="range" className="lev-slider" min={1} max={ABS_MAX} step={1} value={eL}
-          onChange={e=>onChange(Math.min(+e.target.value, ml))}
-          style={{background:track, border:'1px solid #23262b'}}/>
-        {/* Locked-zone stripes + cap marker (only when the cap is below the absolute max) */}
-        {ml < ABS_MAX && (
-          <div style={{position:'absolute',top:0,bottom:0,left:`${capPct}%`,right:0,borderRadius:'0 7px 7px 0',pointerEvents:'none',
-            background:'repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,82,71,0.10) 4px, rgba(255,82,71,0.10) 8px)',
-            borderLeft:'2px solid '+B.red}}/>
-        )}
+      {/* − pills + */}
+      <div style={{display:'flex',alignItems:'center',gap:10,marginTop:12}}>
+        <button onClick={()=>set(eL-1)} disabled={eL<=1} style={{width:38,height:38,borderRadius:'50%',border:'none',background:'#1a1d22',color:eL<=1?'#3a3d43':'#fff',fontSize:18,fontWeight:700,cursor:eL<=1?'default':'pointer',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:fb}}>−</button>
+        <div style={{flex:1,display:'flex',gap:5}}>
+          {Array.from({length:ABS_MAX},(_,i)=>{
+            const v=i+1, filled=v<=eL, locked=v>ml;
+            return <div key={v} onClick={()=>!locked&&set(v)} style={{flex:1,height:15,borderRadius:999,cursor:locked?'default':'pointer',
+              background: filled?'#fff':locked?'#101216':'#1e2126', transition:'background .12s'}}/>;
+          })}
+        </div>
+        <button onClick={()=>set(eL+1)} disabled={eL>=ml} style={{width:38,height:38,borderRadius:'50%',border:'none',background:'#1a1d22',color:eL>=ml?'#3a3d43':'#fff',fontSize:18,fontWeight:700,cursor:eL>=ml?'default':'pointer',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:fb}}>+</button>
       </div>
-      <div style={{display:'flex',justifyContent:'space-between',marginTop:5}}>
-        <span style={{fontSize:9,color:'#444',fontFamily:fm}}>1x</span>
-        <span style={{fontSize:9,fontWeight:700,color:ml<ABS_MAX?B.red:'#444',fontFamily:fm}}>{ml}x max</span>
-        <span style={{fontSize:9,color:'#444',fontFamily:fm}}>{ABS_MAX}x</span>
+      {/* rail labels */}
+      <div style={{display:'flex',justifyContent:'space-between',padding:'6px 52px 0'}}>
+        <span style={{fontSize:12,color:'#6a6f77'}}>1x</span>
+        {ml<ABS_MAX && <span style={{fontSize:12,fontWeight:700,color:B.red}}>{ml}x max</span>}
+        <span style={{fontSize:12,color:'#6a6f77'}}>{ABS_MAX}x</span>
       </div>
-      {ml < ABS_MAX && (
-        <div style={{fontSize:9,color:'#666',marginTop:4}}>
-          Max {ml}x — leverage is limited as an outcome becomes more certain, so one play can't wipe you out.
+      {ml<ABS_MAX && (
+        <div style={{fontSize:9,color:'#666',marginTop:4,textAlign:'center'}}>
+          Leverage is limited as an outcome becomes more certain, so one play can't wipe you out.
+        </div>
+      )}
+      {/* liquidation card */}
+      {liq && Number.isFinite(liq.pct) && (
+        <div style={{marginTop:10,background:'#101216',border:'1px solid #1c1f24',borderRadius:14,padding:'13px 16px'}}>
+          <div style={{fontSize:15,fontWeight:800,color:'#fff',fontFamily:fd,letterSpacing:'-0.01em'}}>Liquidation at ~{Math.round(liq.pct)}%</div>
+          <div style={{fontSize:12.5,color:ptsClose?B.red:'#8a8f98',marginTop:3,fontWeight:ptsClose?700:400}}>Only {liq.pts.toFixed(1)} pts away</div>
         </div>
       )}
     </div>
@@ -709,6 +715,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
   const team = orderSide==='home' ? HOME : AWAY;
   const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL);
+  // Liquidation info for the leverage control's card, in the ORDER'S OWN side scale.
+  const liqSideShown = orderSide==='home' ? liqP : 1-liqP;
+  const liqPtsAway = Math.abs((orderSide==='home' ? oPrice : 1-oPrice) - liqSideShown) * 100;
+  const levLiq = { pct: liqSideShown*100, pts: liqPtsAway };
   const entryP = orderSide==='home' ? oPrice : 1-oPrice;
   const shareCount = Math.max(1, Math.round(expo/entryP));
   const awayProb = 1 - oPrice;
@@ -1389,7 +1399,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
               <div style={{fontSize:10,color:'#555',textAlign:'center',marginBottom:12}}>@ {(entryP*100).toFixed(1)}¢ per share</div>
               {/* Leverage slider — progress-bar track, cap-aware (see LevSlider) */}
-              <LevSlider eL={eL} ml={ml} onChange={setOrderLev}/>
+              <LevSlider eL={eL} ml={ml} onChange={setOrderLev} liq={levLiq}/>
             </div>
             {/* Limit price */}
             {orderType==='limit'&&(
@@ -1436,14 +1446,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>-{fmtUsd(eM)}</span>
               </div>
             </div>
-            {/* Liquidation callout */}
-            <div style={{background:liqCol+'10',border:'1px solid '+liqCol+'30',borderRadius:10,padding:'10px 12px',marginBottom:10,display:'flex',alignItems:'center',gap:10}}>
-              <div style={{fontSize:18,flexShrink:0}}>{liqDist>15?'🟢':liqDist>5?'🟡':'🔴'}</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:700,color:liqCol,fontFamily:fm}}>Liquidation @ {(liqShown*100).toFixed(1)}¢</div>
-                <div style={{fontSize:10,color:'#888',marginTop:2}}>{liqDist.toFixed(1)}% from current price</div>
-              </div>
-            </div>
+            {/* (Liquidation now lives on the leverage control's card - see LevSlider.) */}
+
             {/* Net-position notice: betting the other side nets against the existing one */}
             {oppPos&&<div style={{fontSize:11,color:'#ff9f1c',marginBottom:8,padding:'7px 10px',background:'#ff9f1c10',borderRadius:8,border:'1px solid #ff9f1c22',lineHeight:1.5}}>
               You already hold <b>{oppPos.side==='home'?HOME.short:AWAY.short}</b> on this game. Buying {team.short} is the opposite side — it will <b>reduce or close</b> that position, not open a second one.
@@ -1635,10 +1639,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       ))}
                     </div>
                     <div style={{marginBottom:12}}>
-                      <LevSlider eL={eL} ml={ml} onChange={setOrderLev} compact/>
+                      <LevSlider eL={eL} ml={ml} onChange={setOrderLev} compact liq={levLiq}/>
                     </div>
                     <div style={{background:'#111',borderRadius:12,padding:'10px 14px',marginBottom:14,fontSize:12}}>
-                      {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Liquidation',(liqP*100).toFixed(1)+'¢',B.red],['If '+team.name+' wins','+'+fmtUsd(orderSide==='home'?expo*(1-oPrice)/oPrice:expo*oPrice/(1-oPrice)),B.green]].map(([l,v,c],i)=>(
+                      {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['If '+team.name+' wins','+'+fmtUsd(orderSide==='home'?expo*(1-oPrice)/oPrice:expo*oPrice/(1-oPrice)),B.green]].map(([l,v,c],i)=>(
                         <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderTop:i>0?'1px solid #1a1a1a':'none'}}>
                           <span style={{color:'#555'}}>{l}</span><span style={{color:c,fontWeight:600,fontFamily:fm}}>{v}</span>
                         </div>
