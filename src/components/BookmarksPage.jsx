@@ -1,14 +1,17 @@
 /**
  * Bookmarked markets page (nav-rail bookmark icon) — every market the user bookmarked via the
- * bookmark toggle in a game's header. Bookmarks are device-local (localStorage), matching the
- * mobile app. Stale ids (settled/pruned games) simply don't render.
+ * bookmark toggle in a game's header. Account-backed (GET /api/bookmarks) with a local cache,
+ * so the list follows the user across devices. Stale ids (settled/pruned games) don't render.
  */
+import { useEffect, useState } from "react";
 import { Bookmark } from "lucide-react";
 import { B, fd, fm } from "../lib/theme.js";
+import { cachedBookmarks, syncBookmarks } from "../lib/bookmarks.js";
 
 export function BookmarksPage({ liveGames = [], onTrade }) {
-  let ids = [];
-  try { ids = JSON.parse(localStorage.getItem("parabolic_bookmarks")) || []; } catch { /* ignore */ }
+  // Cache renders instantly; the account list (cross-device) reconciles right behind it.
+  const [ids, setIds] = useState(() => cachedBookmarks());
+  useEffect(() => { let live = true; syncBookmarks().then((x) => { if (live) setIds(x); }); return () => { live = false; }; }, []);
   const marked = liveGames.filter((g) => ids.includes(g.id));
 
   const card = { background: "#101114", border: "1px solid #1c1e24", borderRadius: 14, padding: "14px 16px", marginBottom: 8 };

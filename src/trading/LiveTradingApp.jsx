@@ -17,6 +17,7 @@ import { loadCard } from "../lib/onboarding.js";
 import { DepositModal } from "../components/DepositModal.jsx";
 import { NavRail } from "../components/NavRail.jsx";
 import { FloatingChat } from "../components/FloatingChat.jsx";
+import { isBookmarked, syncBookmarks, toggleBookmark as toggleBookmarkStore } from "../lib/bookmarks.js";
 import { MessageCircle, Bookmark, Share2 } from "lucide-react";
 
 // Accurate, user-facing labels for the backend oracle source names.
@@ -146,19 +147,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [showChatPop, setShowChatPop] = useState(false);
   const showChatPopRef = useRef(false); showChatPopRef.current = showChatPop;
   const [chatUnread, setChatUnread] = useState(false);
-  const [bookmarked, setBookmarked] = useState(() => {
-    try { return (JSON.parse(localStorage.getItem("parabolic_bookmarks")) || []).includes(initGame.id); } catch { return false; }
-  });
-  const toggleBookmark = () => {
-    setBookmarked((was) => {
-      try {
-        const set = new Set(JSON.parse(localStorage.getItem("parabolic_bookmarks")) || []);
-        was ? set.delete(initGame.id) : set.add(initGame.id);
-        localStorage.setItem("parabolic_bookmarks", JSON.stringify([...set]));
-      } catch { /* ignore */ }
-      return !was;
-    });
-  };
+  const [bookmarked, setBookmarked] = useState(() => isBookmarked(initGame.id));
+  useEffect(() => { let live = true; syncBookmarks().then((ids) => { if (live) setBookmarked(ids.includes(initGame.id)); }); return () => { live = false; }; }, [initGame.id]);
+  const toggleBookmark = () => setBookmarked((was) => { toggleBookmarkStore(initGame.id, !was); return !was; });
   const shareMarket = async () => {
     const url = "https://app.parabolic.gg";
     const text = `Trading ${initGame.home?.name ?? "Home"} vs ${initGame.away?.name ?? "Away"} live on Parabolic — ${url}`;
