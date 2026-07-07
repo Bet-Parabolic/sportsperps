@@ -1383,9 +1383,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             </div>
             {/* Summary */}
-            {(()=>{const estFee=expo*0.01;const liqShown=orderSide==='home'?liqP:1-liqP;const curBet=orderSide==='home'?oPrice:1-oPrice;const liqDist=curBet>0?Math.abs(curBet-liqShown)/curBet*100:0;const liqCol=liqDist>15?B.green:liqDist>5?'#ff9f1c':B.red;const balPct=balance>0?eM/balance*100:0;const oppPos=!reduceOnly&&positions.find(p=>p.gameId===g.id&&p.side!==orderSide);return(<>
+            {(()=>{const estFee=expo*0.015;const liqShown=orderSide==='home'?liqP:1-liqP;const curBet=orderSide==='home'?oPrice:1-oPrice;const liqDist=curBet>0?Math.abs(curBet-liqShown)/curBet*100:0;const liqCol=liqDist>15?B.green:liqDist>5?'#ff9f1c':B.red;const balPct=balance>0?eM/balance*100:0;const oppPos=!reduceOnly&&positions.find(p=>p.gameId===g.id&&p.side!==orderSide);return(<>
             <div style={{background:'#0a0a0a',borderRadius:12,padding:'10px 12px',marginBottom:10,fontSize:12}}>
-              {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Est. Fee (1%)',fmtUsd(estFee),'#888']].map(([l,v,c])=>(
+              {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['Est. Fee (1.5%)',fmtUsd(estFee),'#888']].map(([l,v,c])=>(
                 <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'3px 0'}}>
                   <span style={{color:'#555'}}>{l}</span><span style={{color:c,fontWeight:600,fontFamily:fm}}>{v}</span>
                 </div>
