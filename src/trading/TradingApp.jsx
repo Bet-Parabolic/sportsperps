@@ -20,6 +20,7 @@ import { currentUserId } from "../lib/auth.js";
 import { NavRail } from "../components/NavRail.jsx";
 import { ActiveBetsPage } from "../components/ActiveBetsPage.jsx";
 import { NewsPage } from "../components/NewsPage.jsx";
+import { BookmarksPage } from "../components/BookmarksPage.jsx";
 
 /**
  * Home terminal shell — sport tabs, home page, leaderboard, profile. All TRADING happens in
@@ -83,14 +84,16 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
   // sportCounts derived from espnData — zero extra fetches
   const sportCounts = useMemo(() => {
     const countLive = evts => (evts||[]).filter(ev => LIVE_STATUS.includes(ev.status?.type?.name)).length;
+    // "Active" = tradeable now: live/halftime OR a pre-game market inside the wager window.
+    const active = g => g.status==="live" || g.status==="halftime" || (g.status==="scheduled" && (g.pregame || g.tradeable));
     return {
-      live: liveGames.filter(g => g.status==="live"||g.status==="halftime").length,
-      nba: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && (!g.league || g.league==="nba" || g.league==="ncaam")).length,
-      nfl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="nfl").length || countLive(espnData.nfl?.events),
-      mlb: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="mlb").length || countLive(espnData.mlb?.events),
-      nhl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="nhl").length || countLive(espnData.nhl?.events),
-      soccer: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && (g.league==="mls"||g.league==="wcup")).length || countLive(espnData.wcup?.events),
-      wcup: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="wcup").length || countLive(espnData.wcup?.events),
+      live: liveGames.filter(active).length,
+      nba: liveGames.filter(g => active(g) && (!g.league || g.league==="nba" || g.league==="ncaam")).length,
+      nfl: liveGames.filter(g => active(g) && g.league==="nfl").length || countLive(espnData.nfl?.events),
+      mlb: liveGames.filter(g => active(g) && g.league==="mlb").length || countLive(espnData.mlb?.events),
+      nhl: liveGames.filter(g => active(g) && g.league==="nhl").length || countLive(espnData.nhl?.events),
+      soccer: liveGames.filter(g => active(g) && (g.league==="mls"||g.league==="wcup")).length || countLive(espnData.wcup?.events),
+      wcup: liveGames.filter(g => active(g) && g.league==="wcup").length || countLive(espnData.wcup?.events),
       ufc: countLive(espnData.ufc?.events),
     };
   }, [espnData, liveGames]);
@@ -160,6 +163,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
         {!isMobile && <NavRail active={terminalPage} onNav={setTerminalPage} liveGames={liveGames} onTrade={onTrade}/>}
         {terminalPage==="bets"?<ActiveBetsPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="news"?<NewsPage/>
+        :terminalPage==="bookmarks"?<BookmarksPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="wcup"?<SoccerPage data={espnData.wcup} onTrade={onTrade} liveGames={liveGames.filter(g=>g.league==="wcup")}/>
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade} liveGames={liveGames}/>
