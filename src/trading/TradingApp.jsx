@@ -17,6 +17,9 @@ import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
 import { loadCard } from "../lib/onboarding.js";
 import { DepositModal } from "../components/DepositModal.jsx";
 import { currentUserId } from "../lib/auth.js";
+import { NavRail } from "../components/NavRail.jsx";
+import { ActiveBetsPage } from "../components/ActiveBetsPage.jsx";
+import { NewsPage } from "../components/NewsPage.jsx";
 
 /**
  * Home terminal shell — sport tabs, home page, leaderboard, profile. All TRADING happens in
@@ -112,8 +115,12 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
 
         {/* CENTER — sport tabs (natural width, centered) */}
         <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",justifySelf:"center",maxWidth:"100%",minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
-          {["Home","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"].map((sport)=>{
-            const pageOf = {Home:"home",Basketball:"basketball",Football:"nfl",Baseball:"baseball",Soccer:"soccer",Hockey:"hockey",MMA:"mma",Leaderboard:"leaderboard"};
+          {/* Desktop: home/bets/news/leaderboard live on the left rail — the top bar is sports only.
+              Mobile: no rail, so Bets/News fold into the scrollable tab bar. */}
+          {(isMobile
+            ? ["Home","Bets","News","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"]
+            : ["Basketball","Football","Baseball","Soccer","Hockey","MMA"]).map((sport)=>{
+            const pageOf = {Home:"home",Bets:"bets",News:"news",Basketball:"basketball",Football:"nfl",Baseball:"baseball",Soccer:"soccer",Hockey:"hockey",MMA:"mma",Leaderboard:"leaderboard"};
             const isActive = terminalPage===pageOf[sport];
             return (
             <button key={sport} onClick={()=>setTerminalPage(pageOf[sport])} style={{padding:isMobile?"4px 8px":"6px 14px",fontSize:isMobile?10:12,fontWeight:isActive?600:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
@@ -149,7 +156,10 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
 
       {/* BODY */}
       <div style={{display:"flex",height:isMobile?"auto":"calc(100vh - 56px)",flexDirection:isMobile?"column":"row",minHeight:isMobile?"calc(100vh - 56px)":"auto"}}>
-        {terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
+        {!isMobile && <NavRail active={terminalPage} onNav={setTerminalPage} liveGames={liveGames} onTrade={onTrade}/>}
+        {terminalPage==="bets"?<ActiveBetsPage liveGames={liveGames} onTrade={onTrade}/>
+        :terminalPage==="news"?<NewsPage/>
+        :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="soccer"?<SoccerPage data={espnData.wcup} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="hockey"?<HockeyPage data={espnData.nhl} onTrade={onTrade} liveGames={liveGames}/>

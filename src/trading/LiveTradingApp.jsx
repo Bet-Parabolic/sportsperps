@@ -15,6 +15,7 @@ import { track } from "../lib/track.js";
 import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
 import { loadCard } from "../lib/onboarding.js";
 import { DepositModal } from "../components/DepositModal.jsx";
+import { NavRail } from "../components/NavRail.jsx";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -905,6 +906,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
       {/* BODY */}
       <div style={{display:'flex',height:isMobile?'auto':'calc(100vh - 56px)',flexDirection:isMobile?'column':'row',minHeight:isMobile?'calc(100vh - 56px)':'auto'}}>
+        {!isMobile && <NavRail active={null} onNav={(tab)=>onNavTo?.(tab)} liveGames={liveGames} onTrade={onTrade}/>}
 
         {/* LEFT SIDEBAR */}
         {!isMobile&&<div style={{width:260,borderRight:'1px solid #1a1a1a',overflow:'auto',flexShrink:0,padding:'16px 0'}}>
