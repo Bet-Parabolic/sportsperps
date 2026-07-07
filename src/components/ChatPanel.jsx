@@ -7,7 +7,7 @@ import { isLoggedIn, authToken, currentUserId } from "../lib/auth.js";
 // Per-event chat + bettors feed. Loads recent messages over REST, then appends live ones from the
 // shared WebSocket (bet messages are auto-posted by the backend on open/close). Only logged-in
 // profiles can send; a sender's current position (team + notional) shows next to their name.
-export function ChatPanel({ gameId, userId, homeShort = "Home", awayShort = "Away", onRequireAuth }) {
+export function ChatPanel({ gameId, userId, homeShort = "Home", awayShort = "Away", onRequireAuth, fill = false }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const scrollRef = useRef(null);
@@ -56,7 +56,7 @@ export function ChatPanel({ gameId, userId, homeShort = "Home", awayShort = "Awa
   const teamColor = (side) => (side === "home" ? B.primary : B.red);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: 300 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: fill ? "100%" : 300, ...(fill ? { flex: 1, minHeight: 0, padding: "12px 14px" } : {}) }}>
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, paddingRight: 4 }}>
         {messages.length === 0 && <div style={{ textAlign: "center", fontSize: 13, color: "#555", padding: "28px 0" }}>💬 No messages yet — say something.</div>}
         {messages.map((m) => m.type === "bet" ? <BetRow key={m.id} m={m} teamOf={teamOf} teamColor={teamColor} /> : <UserRow key={m.id} m={m} mine={m.userId === userId} teamOf={teamOf} teamColor={teamColor} />)}

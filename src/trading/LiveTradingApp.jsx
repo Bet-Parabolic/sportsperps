@@ -16,6 +16,8 @@ import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
 import { loadCard } from "../lib/onboarding.js";
 import { DepositModal } from "../components/DepositModal.jsx";
 import { NavRail } from "../components/NavRail.jsx";
+import { FloatingChat } from "../components/FloatingChat.jsx";
+import { MessageCircle, Bookmark, Share2 } from "lucide-react";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -140,6 +142,29 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
   useEffect(() => { if (!showProfile) setCardAvatar(loadCard().avatar); }, [showProfile]);
   const [showDeposit, setShowDeposit] = useState(false); // deposit/withdrawal coming-soon modal
+  // Chat popout (draggable window) + unread dot; bookmark is device-local like the mobile app.
+  const [showChatPop, setShowChatPop] = useState(false);
+  const showChatPopRef = useRef(false); showChatPopRef.current = showChatPop;
+  const [chatUnread, setChatUnread] = useState(false);
+  const [bookmarked, setBookmarked] = useState(() => {
+    try { return (JSON.parse(localStorage.getItem("parabolic_bookmarks")) || []).includes(initGame.id); } catch { return false; }
+  });
+  const toggleBookmark = () => {
+    setBookmarked((was) => {
+      try {
+        const set = new Set(JSON.parse(localStorage.getItem("parabolic_bookmarks")) || []);
+        was ? set.delete(initGame.id) : set.add(initGame.id);
+        localStorage.setItem("parabolic_bookmarks", JSON.stringify([...set]));
+      } catch { /* ignore */ }
+      return !was;
+    });
+  };
+  const shareMarket = async () => {
+    const url = "https://app.parabolic.gg";
+    const text = `Trading ${initGame.home?.name ?? "Home"} vs ${initGame.away?.name ?? "Away"} live on Parabolic — ${url}`;
+    if (navigator.share) { try { await navigator.share({ text, url }); return; } catch { /* cancelled */ } }
+    try { await navigator.clipboard.writeText(text); notify("Link copied to clipboard", "green"); } catch { /* ignore */ }
+  };
   const [tradeCard, setTradeCard] = useState(null);
   const [isMobile,   setIsMobile]   = useState(()=>window.innerWidth<768);
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
@@ -488,6 +513,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     if (initGame._espnKey) return; // ESPN-only games aren't backed by the CLOB
     setLiveUser(userId); // subscribe our id so the backend routes our private liquidations to us
     const unsub = subscribeLive((msg) => {
+      // Chat rides with gameId nested in the message; light a dot on the chat icon while the
+      // popout is closed (and it's not our own message).
+      if (msg.type === 'chat' && msg.message?.gameId === g.id) {
+        if (!showChatPopRef.current && msg.message?.userId !== userId) setChatUnread(true);
+        return;
+      }
       if (msg.gameId !== g.id) return;
       if (msg.type === 'liquidation' && msg.userId === userId) {
         notify('☠ LIQUIDATED — ' + fmtUsd(msg.pnl ?? 0), 'red');
@@ -887,8 +918,20 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </button>
           ))}
         </div>
-        {/* RIGHT — live indicator + deposit + profile */}
+        {/* RIGHT — market actions (chat/bookmark/share) + live indicator + balance + deposit + profile */}
         <div style={{display:'flex',alignItems:'center',gap:10,justifySelf:'end'}}>
+          {!isMobile && <div style={{display:'flex',alignItems:'center',gap:4,marginRight:2}}>
+            <button onClick={()=>{ setShowChatPop(v=>!v); setChatUnread(false); }} title="Live chat" style={{position:'relative',width:34,height:34,borderRadius:'50%',border:'none',background:showChatPop?'#22252b':'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <MessageCircle size={17} color={showChatPop?'#fff':'#9aa0a8'}/>
+              {chatUnread && <span style={{position:'absolute',top:5,right:5,width:8,height:8,borderRadius:'50%',background:'#ff5b3a',border:'1.5px solid #0a0a0a'}}/>}
+            </button>
+            <button onClick={toggleBookmark} title={bookmarked?'Remove bookmark':'Bookmark this market'} style={{width:34,height:34,borderRadius:'50%',border:'none',background:'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <Bookmark size={17} color={bookmarked?B.primary:'#9aa0a8'} fill={bookmarked?B.primary:'none'}/>
+            </button>
+            <button onClick={shareMarket} title="Share this market" style={{width:34,height:34,borderRadius:'50%',border:'none',background:'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <Share2 size={16} color='#9aa0a8'/>
+            </button>
+          </div>}
           {!isMobile&&<span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 10px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
             LIVE
@@ -1651,6 +1694,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           onClose={()=>setShowProfile(false)}
           onLoggedOut={()=>{ setAuth(null); setShowProfile(false); }}
         />
+      )}
+      {showChatPop && !isMobile && (
+        <FloatingChat gameId={g.id} userId={userId} homeShort={HOME.short} awayShort={AWAY.short}
+          onRequireAuth={()=>setShowAuth(true)} onClose={()=>setShowChatPop(false)}/>
       )}
       {showDeposit && <DepositModal balance={balance} onClose={()=>setShowDeposit(false)}/>}
       {showAuth && (

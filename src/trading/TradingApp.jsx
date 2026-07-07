@@ -90,6 +90,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
       mlb: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="mlb").length || countLive(espnData.mlb?.events),
       nhl: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="nhl").length || countLive(espnData.nhl?.events),
       soccer: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && (g.league==="mls"||g.league==="wcup")).length || countLive(espnData.wcup?.events),
+      wcup: liveGames.filter(g => (g.status==="live"||g.status==="halftime") && g.league==="wcup").length || countLive(espnData.wcup?.events),
       ufc: countLive(espnData.ufc?.events),
     };
   }, [espnData, liveGames]);
@@ -118,9 +119,9 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           {/* Desktop: home/bets/news/leaderboard live on the left rail — the top bar is sports only.
               Mobile: no rail, so Bets/News fold into the scrollable tab bar. */}
           {(isMobile
-            ? ["Home","Bets","News","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"]
-            : ["Basketball","Football","Baseball","Soccer","Hockey","MMA"]).map((sport)=>{
-            const pageOf = {Home:"home",Bets:"bets",News:"news",Basketball:"basketball",Football:"nfl",Baseball:"baseball",Soccer:"soccer",Hockey:"hockey",MMA:"mma",Leaderboard:"leaderboard"};
+            ? ["Home","Bets","News","World Cup","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"]
+            : ["World Cup","Basketball","Football","Baseball","Soccer","Hockey","MMA"]).map((sport)=>{
+            const pageOf = {Home:"home",Bets:"bets",News:"news","World Cup":"wcup",Basketball:"basketball",Football:"nfl",Baseball:"baseball",Soccer:"soccer",Hockey:"hockey",MMA:"mma",Leaderboard:"leaderboard"};
             const isActive = terminalPage===pageOf[sport];
             return (
             <button key={sport} onClick={()=>setTerminalPage(pageOf[sport])} style={{padding:isMobile?"4px 8px":"6px 14px",fontSize:isMobile?10:12,fontWeight:isActive?600:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
@@ -131,7 +132,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
                     Home
                   </span>
                 : sport}{(() => {
-                  const c = sport==="Home"?sportCounts.live:sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.soccer:sport==="MMA"?sportCounts.ufc:null;
+                  const c = sport==="Home"?sportCounts.live:sport==="World Cup"?sportCounts.wcup:sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.soccer:sport==="MMA"?sportCounts.ufc:null;
                   return c>0?<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({c})</span>:null;
                 })()}</button>
           );})}
@@ -159,6 +160,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
         {!isMobile && <NavRail active={terminalPage} onNav={setTerminalPage} liveGames={liveGames} onTrade={onTrade}/>}
         {terminalPage==="bets"?<ActiveBetsPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="news"?<NewsPage/>
+        :terminalPage==="wcup"?<SoccerPage data={espnData.wcup} onTrade={onTrade} liveGames={liveGames.filter(g=>g.league==="wcup")}/>
         :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="soccer"?<SoccerPage data={espnData.wcup} onTrade={onTrade} liveGames={liveGames}/>

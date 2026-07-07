@@ -7,7 +7,6 @@
  */
 import { Home, Ticket, Newspaper, Trophy } from "lucide-react";
 import { B, fm } from "../lib/theme.js";
-import { LOGO_MARK } from "../lib/logos.js";
 
 const RAIL_W = 76;
 
@@ -28,11 +27,6 @@ export function NavRail({ active, onNav, liveGames = [], onTrade }) {
 
   return (
     <div style={{ width: RAIL_W, flexShrink: 0, borderRight: "1px solid #16181d", background: "#0a0a0a", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0 18px", gap: 6, overflowY: "auto", height: "100%" }} className="mob-nav">
-      {/* brand mark */}
-      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18, flexShrink: 0 }}>
-        <img src={LOGO_MARK} alt="Parabolic" style={{ width: 26, height: 26, filter: "invert(1)" }} />
-      </div>
-
       {/* destinations */}
       {items.map(({ key, Icon, label }) => {
         const on = active === key;
