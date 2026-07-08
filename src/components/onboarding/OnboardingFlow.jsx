@@ -80,7 +80,7 @@ const WALLETS = [
 
 /* ── main flow ────────────────────────────────────────────────────────────── */
 
-export function OnboardingFlow({ onDone, onGuest }) {
+export function OnboardingFlow({ onDone, onGuest, worldcup = false }) {
   const [step, setStep] = useState("welcome"); // welcome|email|referral|sport|username|image|signature|done
   const [sheet, setSheet] = useState("none");  // none|account|wallet
   const [showLogin, setShowLogin] = useState(false);
@@ -125,7 +125,7 @@ export function OnboardingFlow({ onDone, onGuest }) {
           </div>
           {/* CTAs */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <button onClick={() => setSheet("account")} style={ctaBtn}>Create account</button>
+            <button onClick={() => worldcup ? setStep("email") : setSheet("account")} style={ctaBtn}>Create account</button>
             <button onClick={onLogin} style={{ ...ctaBtn, background: "rgba(255,255,255,0.08)", color: "#fff" }}>Log in</button>
           </div>
         </div>
@@ -177,9 +177,11 @@ export function OnboardingFlow({ onDone, onGuest }) {
   /* ── steps ── */
   return (
     <div style={wrap}>
-      {step === "email" && <EmailStep onBack={() => setStep("welcome")} onNext={() => setStep("referral")} />}
+      {step === "email" && <EmailStep onBack={() => setStep("welcome")} onNext={() => setStep(worldcup ? "everify" : "referral")} />}
+      {step === "everify" && <EmailCodeStep onBack={() => setStep("email")} onNext={() => setStep("phone")} />}
+      {step === "phone" && <PhoneStep onBack={() => setStep("everify")} onNext={() => setStep("sport")} />}
       {step === "referral" && <ReferralStep onBack={() => setStep("email")} onNext={() => setStep("sport")} say={say} />}
-      {step === "sport" && <SportStep onBack={() => setStep("referral")} onNext={() => setStep("username")} />}
+      {step === "sport" && <SportStep onBack={() => setStep(worldcup ? "phone" : "referral")} onNext={() => setStep("username")} />}
       {step === "username" && <UsernameStep onBack={() => setStep("sport")} onNext={() => setStep("image")} />}
       {step === "image" && <ImageStep onBack={() => setStep("username")} onNext={() => setStep("signature")} />}
       {step === "signature" && <SignatureStep onBack={() => setStep("image")} onNext={() => setStep("done")} />}
@@ -213,6 +215,148 @@ function EmailStep({ onBack, onNext }) {
     </Frame>
   );
 }
+
+/* ── WC identity steps (worldcup onboarding) — real email + phone verification, bound to the
+      guest UUID; the username step's register CLAIMS that UUID so the flags carry over. ── */
+
+function useCooldown() {
+  const [cooldown, setCooldown] = useState(0);
+  const timer = useRef(null);
+  useEffect(() => () => clearInterval(timer.current), []);
+  const start = (ms) => {
+    setCooldown(Math.ceil(ms / 1000));
+    clearInterval(timer.current);
+    timer.current = setInterval(() => setCooldown((c) => { if (c <= 1) { clearInterval(timer.current); return 0; } return c - 1; }), 1000);
+  };
+  return [cooldown, start];
+}
+
+async function verifyPost(path, body) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: currentUserId(), token: authToken(), ...body }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(d.error || "Something went wrong"), { cooldownMs: d.cooldownMs });
+  return d;
+}
+
+function CodeBoxes({ code, onChange, onEnter }) {
+  const ref = useRef(null);
+  return (
+    <div onClick={() => ref.current?.focus()} style={{ display: "flex", gap: 8, cursor: "text", justifyContent: "center" }}>
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} style={{ width: 46, height: 56, borderRadius: 14, background: "#161616", display: "flex", alignItems: "center", justifyContent: "center", border: i === code.length ? "1px solid rgba(255,255,255,0.35)" : "1px solid transparent" }}>
+          <span style={{ fontFamily: fd, fontSize: 22, fontWeight: 700, color: code[i] ? "#fff" : "#555" }}>{code[i] ?? "•"}</span>
+        </div>
+      ))}
+      <input ref={ref} value={code} autoFocus inputMode="numeric"
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        onKeyDown={(e) => e.key === "Enter" && code.length === 6 && onEnter?.()}
+        style={{ position: "absolute", opacity: 0, height: 1, width: 1 }} />
+    </div>
+  );
+}
+
+function EmailCodeStep({ onBack, onNext }) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [cooldown, startCooldown] = useCooldown();
+  const startedRef = useRef(false);
+
+  const send = async () => {
+    setError("");
+    try {
+      const d = await verifyPost("/verify/email/start", { email: draft.email });
+      setSent(true);
+      startCooldown(d.cooldownMs || 30_000);
+    } catch (e) {
+      setError(e.message);
+      if (e.cooldownMs) { setSent(true); startCooldown(e.cooldownMs); }
+    }
+  };
+  useEffect(() => { if (!startedRef.current) { startedRef.current = true; send(); } }, []); // eslint-disable-line
+
+  const confirm = async () => {
+    if (busy || code.length !== 6) return;
+    setBusy(true); setError("");
+    try { await verifyPost("/verify/email/confirm", { code }); onNext(); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Frame title="Check your email" subtitle={`We sent a 6-digit code to\n${draft.email}`} cta={busy ? "Checking…" : "Verify email"} ctaEnabled={code.length === 6 && !busy} onCta={confirm} onBack={onBack}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <CodeBoxes code={code} onChange={(c) => { setError(""); setCode(c); }} onEnter={confirm} />
+        {error && <div style={{ ...badge, background: "rgba(255,82,71,0.15)", color: B.red, alignSelf: "center" }}>{error}</div>}
+        <button onClick={() => cooldown === 0 && send()} disabled={cooldown > 0}
+          style={{ background: "none", border: "none", color: cooldown > 0 ? "#555" : "#fff", fontWeight: 600, fontSize: 13, cursor: cooldown > 0 ? "default" : "pointer", fontFamily: fb, padding: "6px 0" }}>
+          {sent ? (cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code") : "Send code"}
+        </button>
+      </div>
+    </Frame>
+  );
+}
+
+function PhoneStep({ onBack, onNext }) {
+  const [phone, setPhone] = useState("");
+  const [phase, setPhase] = useState("enter"); // enter | code
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [cooldown, startCooldown] = useCooldown();
+  const phoneOk = phone.replace(/\D/g, "").length >= 10;
+
+  const send = async () => {
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      const d = await verifyPost("/verify/phone/start", { phone });
+      setPhase("code");
+      startCooldown(d.cooldownMs || 30_000);
+    } catch (e) {
+      setError(e.message);
+      if (e.cooldownMs) { setPhase("code"); startCooldown(e.cooldownMs); }
+    } finally { setBusy(false); }
+  };
+
+  const confirm = async () => {
+    if (busy || code.length !== 6) return;
+    setBusy(true); setError("");
+    try { await verifyPost("/verify/phone/confirm", { phone, code }); onNext(); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return phase === "enter" ? (
+    <Frame title="Verify your phone" subtitle={"One entry per person — we text a code to keep\nthe competition fair. Mobile numbers only."} cta={busy ? "Sending…" : "Send code"} ctaEnabled={phoneOk && !busy} onCta={send} onBack={onBack}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span style={capsLabel}>MOBILE NUMBER</span>
+          <input value={phone} onChange={(e) => { setError(""); setPhone(e.target.value); }} placeholder="+1 (555) 000-0000" type="tel" autoFocus style={fieldInput}
+            onKeyDown={(e) => e.key === "Enter" && phoneOk && send()} />
+        </label>
+        {error && <div style={{ ...badge, background: "rgba(255,82,71,0.15)", color: B.red }}>{error}</div>}
+        <div style={{ fontSize: 12, color: "#666", lineHeight: 1.5 }}>VoIP and landline numbers can't be verified. Standard SMS rates may apply.</div>
+      </div>
+    </Frame>
+  ) : (
+    <Frame title="Enter the SMS code" subtitle={`We texted a 6-digit code to\n${phone}`} cta={busy ? "Checking…" : "Verify phone"} ctaEnabled={code.length === 6 && !busy} onCta={confirm} onBack={() => { setPhase("enter"); setCode(""); setError(""); }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <CodeBoxes code={code} onChange={(c) => { setError(""); setCode(c); }} onEnter={confirm} />
+        {error && <div style={{ ...badge, background: "rgba(255,82,71,0.15)", color: B.red, alignSelf: "center" }}>{error}</div>}
+        <button onClick={() => cooldown === 0 && send()} disabled={cooldown > 0}
+          style={{ background: "none", border: "none", color: cooldown > 0 ? "#555" : "#fff", fontWeight: 600, fontSize: 13, cursor: cooldown > 0 ? "default" : "pointer", fontFamily: fb, padding: "6px 0" }}>
+          {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
+        </button>
+      </div>
+    </Frame>
+  );
+}
+
 
 function ReferralStep({ onBack, onNext, say }) {
   const LEN = 6;

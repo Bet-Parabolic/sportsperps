@@ -4,7 +4,6 @@ import { B, fb, fd, fm } from "../lib/theme.js";
 import { LOGO_WORDMARK, LOGO_MARK } from "../lib/logos.js";
 import { API_URL } from "../lib/constants.js";
 import { getAuth, authToken, currentUserId, logout as doLogout } from "../lib/auth.js";
-import { AuthModal } from "./AuthModal.jsx";
 import { VerifyModal } from "./VerifyModal.jsx";
 import { NavRail } from "./NavRail.jsx";
 import { ActiveBetsPage } from "./ActiveBetsPage.jsx";
@@ -13,6 +12,7 @@ import { ProfilePage } from "./ProfilePage.jsx";
 import { useLiveGames } from "../lib/useLiveGames.js";
 
 const LiveTradingApp = lazy(() => import("../trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
+const OnboardingFlow = lazy(() => import("./onboarding/OnboardingFlow.jsx").then(m => ({ default: m.OnboardingFlow })));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // /worldcup — the World Cup Championship app (siloed event surface).
@@ -177,7 +177,7 @@ export function WorldCupPage() {
   const [joined, setJoined] = useState(null);
   const [wcBalance, setWcBalance] = useState(null);
   const [standing, setStanding] = useState(null);
-  const [showAuth, setShowAuth] = useState(false);
+  const [showOnboard, setShowOnboard] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [joinErr, setJoinErr] = useState("");
@@ -216,7 +216,7 @@ export function WorldCupPage() {
 
   const join = useCallback(async () => {
     setJoinErr("");
-    if (!getAuth()) { setShowAuth(true); return; }
+    if (!getAuth()) { setShowOnboard(true); return; }
     try {
       const res = await fetch(`${API_URL}/event/join`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -225,7 +225,7 @@ export function WorldCupPage() {
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.joined) { setJoined(true); setWcBalance(d.worldCupCash); refresh(); return; }
       if (res.status === 403 && /verify/i.test(d.error || "")) { setShowVerify(true); return; }
-      if (res.status === 401) { setShowAuth(true); return; }
+      if (res.status === 401) { setShowOnboard(true); return; }
       setJoinErr(d.error || "Could not join right now");
     } catch { setJoinErr("Network error — try again"); }
   }, [refresh]);
@@ -257,7 +257,7 @@ export function WorldCupPage() {
           liveGames={wcLive}
           onNavTo={(t) => { setActiveGame(null); setTab(["home", "bets", "news", "leaderboard"].includes(t) ? t : "home"); refresh(); }}
           onTrade={(g) => openGame(g)}
-          onOnboard={() => { setActiveGame(null); setShowAuth(true); }}
+          onOnboard={() => { setActiveGame(null); setShowOnboard(true); }}
         />
       </Suspense>
     );
@@ -364,7 +364,7 @@ export function WorldCupPage() {
                   {!isMobile && <span style={{ fontSize: 13, color: "#aaa", fontFamily: fm }}>{auth.username}</span>}
                   <div onClick={() => setShowProfile(true)} title="My profile" style={{ width: 32, height: 32, borderRadius: "50%", background: "#1a1d22", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14 }}>👤</div>
                 </div>
-              : <button onClick={() => setShowAuth(true)} style={{ padding: "7px 16px", borderRadius: 10, border: "none", background: B.primary, color: "#04130c", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fb }}>Sign in</button>}
+              : <button onClick={() => setShowOnboard(true)} style={{ padding: "7px 16px", borderRadius: 10, border: "none", background: B.primary, color: "#04130c", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fb }}>Sign in</button>}
           </div>
         </div>
 
@@ -396,12 +396,21 @@ export function WorldCupPage() {
           onLoggedOut={() => { setShowProfile(false); }}
         />
       )}
-      {showAuth && (
-        <AuthModal
-          reason="Sign in or create your Parabolic account — it works here and on the main app."
-          onClose={() => setShowAuth(false)}
-          onAuth={(data) => { setAuth(data); setShowAuth(false); refresh(); }}
-        />
+      {showOnboard && (
+        <Suspense fallback={<div style={{ position: "fixed", inset: 0, zIndex: 800, background: "#050505" }} />}>
+          <OnboardingFlow
+            worldcup
+            onGuest={() => setShowOnboard(false)}
+            onDone={() => {
+              setShowOnboard(false);
+              const a = getAuth();
+              setAuth(a);
+              // Fresh signups arrive fully verified — grant World Cup Cash immediately.
+              if (a) setTimeout(() => join(), 250);
+              refresh();
+            }}
+          />
+        </Suspense>
       )}
       {showVerify && auth && (
         <VerifyModal
