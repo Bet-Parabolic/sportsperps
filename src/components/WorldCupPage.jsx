@@ -255,7 +255,7 @@ export function WorldCupPage() {
           game={activeGame}
           onBack={() => { setActiveGame(null); refresh(); }}
           liveGames={wcLive}
-          onNavTo={(t) => { setActiveGame(null); if (["home", "bets", "news", "bookmarks", "leaderboard"].includes(t)) setTab(t); refresh(); }}
+          onNavTo={(t) => { setActiveGame(null); setTab(["home", "bets", "news", "leaderboard"].includes(t) ? t : "home"); refresh(); }}
           onTrade={(g) => openGame(g)}
           onOnboard={() => { setActiveGame(null); setShowAuth(true); }}
         />
