@@ -1029,6 +1029,78 @@ function WaitlistTab({ data }) {
   );
 }
 
+// ─── Alerts tab — live conditions + persisted fire→resolve history, click any row for the
+// knowledge-base breakdown (what it is / why it fired / how to fix / how to prevent). ───────────
+function AlertsTab({ data }) {
+  const [openIds, setOpenIds] = useState(() => new Set());
+  if (!data) return <div style={{ color: C.mut, padding: 24 }}>Loading alerts…</div>;
+  const { active = [], history = [] } = data;
+  const toggle = (id) => setOpenIds((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const fmtT = (ts) => ts ? new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  const fmtDur = (s) => s == null ? "—" : s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`;
+  const sevChip = (severity, activeNow) => (
+    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", padding: "2px 8px", borderRadius: 6,
+      color: !activeNow ? C.mut : severity === "crit" ? C.red : C.amber,
+      background: !activeNow ? C.surface : (severity === "crit" ? C.red : C.amber) + "1c",
+      border: `1px solid ${!activeNow ? C.border : (severity === "crit" ? C.red : C.amber) + "55"}` }}>
+      {!activeNow ? "RESOLVED" : severity === "crit" ? "CRIT" : "WARN"}
+    </span>
+  );
+  const Breakdown = ({ ep }) => ep.info ? (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, display: "grid", gap: 10 }}>
+      {[["What this is", ep.info.what], ["Why it triggered", ep.info.why], ["How to fix it", ep.info.fix], ["Preventing it", ep.info.prevent]].map(([h, body]) => (
+        <div key={h}>
+          <div style={{ color: C.text, fontWeight: 700, fontSize: 12, marginBottom: 3 }}>{h}</div>
+          <div style={{ color: C.mut, fontSize: 12.5, lineHeight: 1.65 }}>{body}</div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, color: C.mut, fontSize: 12 }}>
+      No runbook entry for this alert key yet — check the message and the Health/Risk tabs.
+    </div>
+  );
+  const Row = ({ ep, activeNow }) => {
+    const open = openIds.has(ep.id ?? ep.key);
+    return (
+      <div onClick={() => toggle(ep.id ?? ep.key)} style={{ background: C.card, border: `1px solid ${activeNow ? (ep.severity === "crit" ? C.red : C.amber) + "44" : C.border}`, borderRadius: 12, padding: "12px 16px", cursor: "pointer" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {sevChip(ep.severity, activeNow)}
+          <span style={{ color: C.text, fontWeight: 600, fontSize: 13, flex: 1, minWidth: 200 }}>{ep.info?.title || ep.key}</span>
+          <span style={{ color: C.mut, fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
+            {fmtT(ep.firedAt)}{ep.resolvedAt ? ` → ${fmtT(ep.resolvedAt)}` : " → now"} · {fmtDur(ep.durationS)}
+          </span>
+          <span style={{ color: C.mut, fontSize: 12 }}>{open ? "▾" : "▸"}</span>
+        </div>
+        <div style={{ color: C.mut, fontSize: 12, marginTop: 4, fontFamily: "ui-monospace, monospace" }}>{ep.msg}</div>
+        {open && <Breakdown ep={ep} />}
+      </div>
+    );
+  };
+  const activeEpisodes = history.filter((h) => h.active);
+  const resolved = history.filter((h) => !h.active);
+  return (
+    <div style={{ display: "grid", gap: 20 }}>
+      <div>
+        <div style={{ color: C.text, fontWeight: 800, fontSize: 14, marginBottom: 8 }}>Active now {activeEpisodes.length > 0 && <span style={{ color: C.red }}>({activeEpisodes.length})</span>}</div>
+        {activeEpisodes.length === 0
+          ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", color: C.primaryLt, fontSize: 13, fontWeight: 600 }}>✓ All clear — no active alert conditions</div>
+          : <div style={{ display: "grid", gap: 8 }}>{activeEpisodes.map((ep) => <Row key={ep.id} ep={ep} activeNow />)}</div>}
+        {/* live-computed set can briefly differ from persisted episodes between loop ticks */}
+        {active.length !== activeEpisodes.length && (
+          <div style={{ color: C.mut, fontSize: 11, marginTop: 6 }}>({active.length} condition(s) live-computed this refresh — the feed reconciles within one 2-min loop tick)</div>
+        )}
+      </div>
+      <div>
+        <div style={{ color: C.text, fontWeight: 800, fontSize: 14, marginBottom: 8 }}>History <span style={{ color: C.mut, fontWeight: 500, fontSize: 12 }}>· each episode = fired → resolved · click for the runbook</span></div>
+        {resolved.length === 0
+          ? <div style={{ color: C.mut, fontSize: 13, padding: "8px 0" }}>No resolved alert episodes yet — history accumulates from deploy time.</div>
+          : <div style={{ display: "grid", gap: 8 }}>{resolved.map((ep) => <Row key={ep.id} ep={ep} activeNow={false} />)}</div>}
+      </div>
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(TOK));
   const [tab, setTab] = useState("oracle"); // oracle|vault|health|product|economics|execution|risk
@@ -1046,6 +1118,7 @@ export function DashboardPage() {
   const [executionData, setExecutionData] = useState(null);
   const [riskData, setRiskData] = useState(null);
   const [waitlistData, setWaitlistData] = useState(null);
+  const [alertsData, setAlertsData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -1061,7 +1134,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg, wl] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg, wl, alr] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -1076,6 +1149,7 @@ export function DashboardPage() {
         safe(adminFetch("/admin/risk")),
         safe(adminFetch("/vault/hedge")),
         safe(adminFetch("/admin/waitlist?limit=500")),
+        safe(adminFetch("/admin/alerts?limit=300")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -1091,6 +1165,7 @@ export function DashboardPage() {
       if (rsk) setRiskData(rsk);
       if (hdg) setHedgeData(hdg);
       if (wl) setWaitlistData(wl);
+      if (alr) setAlertsData(alr);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -1116,11 +1191,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : tab === "waitlist" ? "Waitlist" : "Oracle accuracy"}</div>
-          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : tab === "execution" ? "Internal dashboard · fills · rejections · slippage · mix" : tab === "risk" ? "Internal dashboard · bad debt · solvency · exposure · drawdown" : "Internal dashboard · all sports · graded forecasts"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : tab === "waitlist" ? "Waitlist" : tab === "alerts" ? "Alerts" : "Oracle accuracy"}</div>
+          <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : tab === "execution" ? "Internal dashboard · fills · rejections · slippage · mix" : tab === "risk" ? "Internal dashboard · bad debt · solvency · exposure · drawdown" : tab === "alerts" ? "Internal dashboard · live conditions · fire/resolve history · runbooks" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"], ["risk", "Risk"], ["waitlist", "Waitlist"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"], ["risk", "Risk"], ["alerts", (alertsData?.active?.length ? `Alerts (${alertsData.active.length})` : "Alerts")], ["waitlist", "Waitlist"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -1131,10 +1206,12 @@ export function DashboardPage() {
 
       {/* Global alert banner — server-computed conditions (feeds down, blind games, bad debt,
           under-collateralized vault). Shown on EVERY tab so nothing hides behind tab choice. */}
-      {(healthData?.alerts || []).length > 0 && (
-        <div style={{ background: C.red + "14", border: `1px solid ${C.red}66`, borderRadius: 12, padding: "11px 16px", marginBottom: 16 }}>
+      {tab !== "alerts" && (healthData?.alerts || []).length > 0 && (
+        <div onClick={() => setTab("alerts")} title="Open the Alerts tab for the breakdown + history"
+          style={{ background: C.red + "14", border: `1px solid ${C.red}66`, borderRadius: 12, padding: "11px 16px", marginBottom: 16, cursor: "pointer" }}>
           <div style={{ color: C.red, fontWeight: 800, fontSize: 13, marginBottom: 4 }}>
             ⚠ {healthData.alerts.length} active alert{healthData.alerts.length > 1 ? "s" : ""}
+            <span style={{ color: C.mut, fontWeight: 500, fontSize: 11, marginLeft: 8 }}>click for breakdown →</span>
           </div>
           {healthData.alerts.map((a) => (
             <div key={a.key} style={{ color: a.severity === "crit" ? C.red : C.amber, fontSize: 12, lineHeight: 1.6 }}>
@@ -1158,6 +1235,8 @@ export function DashboardPage() {
       {tab === "risk" && <RiskTab data={riskData} />}
 
       {tab === "waitlist" && <WaitlistTab data={waitlistData} />}
+
+      {tab === "alerts" && <AlertsTab data={alertsData} />}
 
       {tab === "oracle" && <>
       <Panel title={`Live now — capturing (${live.length})`}>
