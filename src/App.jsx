@@ -10,6 +10,7 @@ const TradingApp = lazy(() => import("./trading/TradingApp.jsx").then(m => ({ de
 const LiveTradingApp = lazy(() => import("./trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
 const DashboardPage = lazy(() => import("./dash/DashboardPage.jsx").then(m => ({ default: m.DashboardPage })));
 const WaitlistPage = lazy(() => import("./components/WaitlistPage.jsx").then(m => ({ default: m.WaitlistPage })));
+const WorldCupPage = lazy(() => import("./components/WorldCupPage.jsx").then(m => ({ default: m.WorldCupPage })));
 const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow.jsx").then(m => ({ default: m.OnboardingFlow })));
 
 const Splash = () => (
@@ -31,6 +32,9 @@ export default function App() {
   const isDash = typeof window !== "undefined" && window.location.pathname.startsWith("/dash");
   // Public waitlist page — /waitlist on any host (parabolic.gg/waitlist).
   const isWaitlist = typeof window !== "undefined" && window.location.pathname.startsWith("/waitlist");
+  // World Cup Championship hub — /worldcup on any host (app.parabolic.gg/worldcup). Siloed event
+  // surface: same backend + same accounts, WC-only leaderboard, inert until EVENT_ENABLED.
+  const isWorldCup = typeof window !== "undefined" && window.location.pathname.startsWith("/worldcup");
 
   const [page, setPage] = useState(isAppDomain ? "trading" : "landing");
   const [liveGame, setLiveGame] = useState(null);
@@ -58,7 +62,7 @@ export default function App() {
   // page_view for the live-game terminal. Tab-level page_views fire inside the terminals.
   useEffect(() => { initTracking(); }, []);
   useEffect(() => {
-    if (isDash || isWaitlist) return; // dashboard + standalone waitlist page aren't landing traffic
+    if (isDash || isWaitlist || isWorldCup) return; // dashboard + standalone waitlist page aren't landing traffic
     if (page === "landing") track("landing_view");
     else if (page === "trading") track("app_open", { terminal: "home" });
     else if (page === "live-trading") track("page_view", { page: "live-trading" });
@@ -89,7 +93,9 @@ export default function App() {
         button:hover:not(:disabled){filter:brightness(1.15);}button:active:not(:disabled){transform:scale(0.98);}
         *{box-sizing:border-box;margin:0;padding:0;}
       `}</style>
-      {isWaitlist
+      {isWorldCup
+        ? <Suspense fallback={<Splash/>}><WorldCupPage/></Suspense>
+        : isWaitlist
         ? <Suspense fallback={<Splash/>}><WaitlistPage/></Suspense>
         : isDash
         ? <Suspense fallback={<Splash/>}><DashboardPage/></Suspense>
