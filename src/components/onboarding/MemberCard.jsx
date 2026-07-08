@@ -97,8 +97,9 @@ export function MemberCard({ width, username, avatar, signature, back = false, r
           <img src={LOGO_WORDMARK} alt="Parabolic" style={{ position: "absolute", top: 13 * k, right: 16 * k, height: 15 * k, width: "auto", objectFit: "contain" }} />
 
           {/* avatar */}
-          <div style={{ position: "absolute", left: 33 * k, top: 42 * k }}>
-            <AvatarCircle avatar={avatar} size={110 * k} />
+          {/* avatar — sized/raised so it clears the username row (191-unit card: 32+96=128 < name top 139) */}
+          <div style={{ position: "absolute", left: 33 * k, top: 32 * k }}>
+            <AvatarCircle avatar={avatar} size={96 * k} />
           </div>
 
           {/* username */}
