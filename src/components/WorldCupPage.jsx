@@ -23,7 +23,7 @@ const LiveTradingApp = lazy(() => import("../trading/LiveTradingApp.jsx").then(m
 // ROI on the $10k grant — no points, no main-app PnL).
 // ═══════════════════════════════════════════════════════════════════════════
 
-const ESPN_WC = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260709-20260721";
+const ESPN_WC = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260704-20260721";
 
 // Parse an ESPN event into a bracket match. Winner flags are only meaningful once state==='post'
 // (pre-game events carry winner:false on both sides).
@@ -51,90 +51,118 @@ function parseMatch(e) {
   };
 }
 
-// Round classification by the 2026 knockout calendar: QF Jul 9–12, SF Jul 14–15, 3rd Jul 18, Final Jul 19.
+// Round classification by the 2026 knockout calendar: R16 Jul 4–7, QF Jul 9–12, SF Jul 14–15,
+// third place Jul 18, final Jul 19.
 function classifyRounds(matches) {
   const sorted = [...matches].sort((a, b) => a.date - b.date);
-  const qf = sorted.filter((m) => m.date < new Date("2026-07-13T00:00:00Z"));
+  const r16 = sorted.filter((m) => m.date < new Date("2026-07-08T00:00:00Z"));
+  const qf = sorted.filter((m) => m.date >= new Date("2026-07-08T00:00:00Z") && m.date < new Date("2026-07-13T00:00:00Z"));
   const sf = sorted.filter((m) => m.date >= new Date("2026-07-13T00:00:00Z") && m.date < new Date("2026-07-17T00:00:00Z"));
   const rest = sorted.filter((m) => m.date >= new Date("2026-07-17T00:00:00Z"));
   const final = rest.length ? rest[rest.length - 1] : null;
   const third = rest.length > 1 ? rest[0] : null;
-  return { qf, sf, third, final };
+  return { r16, qf, sf, third, final };
 }
 
-function MatchCard({ m, onOpen, compact = false, roundTag = null }) {
-  const live = m?.state === "in";
-  const done = m?.state === "post";
+// The two R16 games whose winners meet in a given quarterfinal (matched by team, so the wings
+// wire themselves correctly regardless of listing order).
+function feedersFor(qfMatch, r16) {
+  const inQf = (abbr) => abbr && (qfMatch.home.abbr === abbr || qfMatch.away.abbr === abbr);
+  const winnerAbbr = (m) => (m.home.winner ? m.home.abbr : m.away.winner ? m.away.abbr : null);
+  return r16.filter((m) => inQf(winnerAbbr(m)));
+}
+
+// Compact bracket match card — flag + code + score per row, winner in mint, loser dimmed.
+function MatchCard({ m, onOpen, slim = false, center = false }) {
+  if (!m) return null;
+  const live = m.state === "in";
+  const done = m.state === "post";
   const Row = ({ t }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", opacity: done && t.winner === false ? 0.45 : 1 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-        {t.logo ? <img src={t.logo} alt="" style={{ width: 18, height: 18, flexShrink: 0 }} /> : <span style={{ width: 18 }} />}
-        <span style={{ fontWeight: done && t.winner ? 800 : 600, fontSize: compact ? 12.5 : 13.5, color: done && t.winner ? B.primary : "#eef1f6", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: slim ? "2.5px 0" : "4px 0", opacity: done && t.winner === false ? 0.4 : 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        {t.logo ? <img src={t.logo} alt="" style={{ width: slim ? 15 : 18, height: slim ? 15 : 18, flexShrink: 0 }} /> : <span style={{ width: slim ? 15 : 18 }} />}
+        <span style={{ fontWeight: done && t.winner ? 800 : 600, fontFamily: fm, fontSize: slim ? 11 : 12.5, letterSpacing: "0.02em", color: done && t.winner ? B.primary : "#eef1f6", whiteSpace: "nowrap" }}>{t.abbr}</span>
       </div>
-      <span style={{ fontFamily: fm, fontWeight: 800, fontSize: compact ? 12.5 : 13.5, color: done && t.winner ? B.primary : live ? "#fff" : "#7c8494", marginLeft: 8 }}>
+      <span style={{ fontFamily: fm, fontWeight: 800, fontSize: slim ? 11 : 12.5, color: done && t.winner ? B.primary : live ? "#fff" : "#7c8494", marginLeft: 6 }}>
         {m.state === "pre" ? "" : t.score ?? ""}
       </span>
     </div>
   );
-  if (!m) return null;
   return (
-    <div onClick={() => onOpen?.(m)} style={{
-      background: live ? "#0e1a14" : "#0b0d11", border: `1px solid ${live ? B.primary + "55" : "#181b22"}`,
-      borderRadius: 12, padding: compact ? "10px 12px" : "12px 14px", cursor: "pointer", minWidth: 0,
+    <div onClick={() => onOpen?.(m)} title={`${m.away.name} vs ${m.home.name}${m.note ? " — " + m.note : ""}`} style={{
+      background: live ? "#0e1a14" : "#0d0f13", border: `1px solid ${live ? B.primary + "66" : center ? "#252a33" : "#1a1d24"}`,
+      borderRadius: 10, padding: slim ? "6px 9px" : "8px 11px", cursor: "pointer", minWidth: 0,
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 9.5, fontWeight: 800, fontFamily: fm, letterSpacing: "0.08em", color: live ? "#ff5247" : "#5a6170" }}>
-          {roundTag ? roundTag + " · " : ""}
-          {live ? "● LIVE" : done ? "FINAL" : m.date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-        </span>
-        <span style={{ fontSize: 10, color: B.primary, fontWeight: 700 }}>{live ? "Trade →" : ""}</span>
+      <div style={{ fontSize: 8.5, fontWeight: 800, fontFamily: fm, letterSpacing: "0.07em", color: live ? "#ff5247" : "#4d545f", marginBottom: 3, whiteSpace: "nowrap" }}>
+        {live ? "● LIVE — TRADE →" : done ? "FT" : m.date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric" })}
       </div>
       <Row t={m.home} />
       <Row t={m.away} />
-      {m.note && <div style={{ fontSize: 9.5, color: "#5a6170", marginTop: 5 }}>{m.note}</div>}
     </div>
   );
 }
 
-// The knockout bracket: QFs feed SFs by calendar order (QF1+QF2 → SF1, QF3+QF4 → SF2), SF winners
-// meet in the final, SF losers play the third-place game. ESPN fills in real team names as each
-// round resolves, so wins "advance" automatically.
+// Classic FIFA bracket: two wings converging on the trophy. Left wing = QF1/QF2 (+ their R16
+// feeders) → Semifinal 1; right wing (mirrored) = QF3/QF4 → Semifinal 2; center = FINAL + 🏆 +
+// third place. ESPN fills TBD slots as rounds resolve, so winners advance automatically.
 function Bracket({ matches, onOpen, isMobile }) {
-  const { qf, sf, third, final } = classifyRounds(matches);
-  const label = (t) => <div style={{ fontSize: 10, fontWeight: 800, fontFamily: fm, letterSpacing: "0.12em", color: "#5a6170", textAlign: "center", marginBottom: 10 }}>{t}</div>;
+  const { r16, qf, sf, third, final } = classifyRounds(matches);
+  const label = (t) => <div style={{ fontSize: 9.5, fontWeight: 800, fontFamily: fm, letterSpacing: "0.12em", color: "#5a6170", textAlign: "center" }}>{t}</div>;
 
   if (isMobile) {
     return (
       <div style={{ display: "grid", gap: 18 }}>
-        <div>{label("QUARTERFINALS")}<div style={{ display: "grid", gap: 8 }}>{qf.map((m) => <MatchCard key={m.espnId} m={m} onOpen={onOpen} />)}</div></div>
-        <div>{label("SEMIFINALS")}<div style={{ display: "grid", gap: 8 }}>{sf.map((m) => <MatchCard key={m.espnId} m={m} onOpen={onOpen} />)}</div></div>
-        {third && <div>{label("THIRD PLACE")}<MatchCard m={third} onOpen={onOpen} /></div>}
-        {final && <div>{label("FINAL 🏆")}<MatchCard m={final} onOpen={onOpen} /></div>}
+        <div>{label("QUARTERFINALS")}<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>{qf.map((m) => <MatchCard key={m.espnId} m={m} onOpen={onOpen} />)}</div></div>
+        <div>{label("SEMIFINALS")}<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>{sf.map((m) => <MatchCard key={m.espnId} m={m} onOpen={onOpen} />)}</div></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {final && <div>{label("FINAL 🏆")}<div style={{ marginTop: 8 }}><MatchCard m={final} onOpen={onOpen} center /></div></div>}
+          {third && <div>{label("THIRD PLACE")}<div style={{ marginTop: 8 }}><MatchCard m={third} onOpen={onOpen} /></div></div>}
+        </div>
+        {r16.length > 0 && <div>{label("ROUND OF 16 — RESULTS")}<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>{r16.map((m) => <MatchCard key={m.espnId} m={m} onOpen={onOpen} slim />)}</div></div>}
       </div>
     );
   }
 
+  // Wings: QF1+QF2 left, QF3+QF4 right; each QF's R16 feeders sit outboard of it.
+  const leftQf = qf.slice(0, 2), rightQf = qf.slice(2, 4);
+  const leftR16 = leftQf.flatMap((q) => feedersFor(q, r16));
+  const rightR16 = rightQf.flatMap((q) => feedersFor(q, r16));
+  const cell = (col, row, span, child, key) => (
+    <div key={key} style={{ gridColumn: col, gridRow: `${row} / span ${span}`, alignSelf: "center", minWidth: 0 }}>{child}</div>
+  );
+
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", columnGap: 22, marginBottom: 4 }}>
-        {label("QUARTERFINALS")}{label("SEMIFINALS")}{label("FINAL")}
+    <div style={{ background: "#08090c", border: "1px solid #14161b", borderRadius: 18, padding: "20px 22px" }}>
+      {/* column headers */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.15fr 1fr 1fr 1fr", columnGap: 10, marginBottom: 12 }}>
+        {label("ROUND OF 16")}{label("QUARTERS")}{label("SEMIFINAL 1")}<div style={{ textAlign: "center", fontFamily: fd, fontWeight: 800, fontSize: 15, letterSpacing: "0.14em", color: "#fff" }}>FINAL</div>{label("SEMIFINAL 2")}{label("QUARTERS")}{label("ROUND OF 16")}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gridTemplateRows: "repeat(4, minmax(96px, auto))", columnGap: 22, rowGap: 10 }}>
-        {qf.map((m, i) => (
-          <div key={m.espnId} style={{ gridColumn: 1, gridRow: i + 1, alignSelf: "center" }}><MatchCard m={m} onOpen={onOpen} /></div>
-        ))}
-        {sf[0] && <div style={{ gridColumn: 2, gridRow: "1 / span 2", alignSelf: "center" }}><MatchCard m={sf[0]} onOpen={onOpen} /></div>}
-        {sf[1] && <div style={{ gridColumn: 2, gridRow: "3 / span 2", alignSelf: "center" }}><MatchCard m={sf[1]} onOpen={onOpen} /></div>}
-        <div style={{ gridColumn: 3, gridRow: "1 / span 4", alignSelf: "center", display: "grid", gap: 14 }}>
-          {final && <div>
-            <div style={{ textAlign: "center", fontSize: 18, marginBottom: 6 }}>🏆</div>
-            <MatchCard m={final} onOpen={onOpen} />
-          </div>}
-          {third && <div>
-            <div style={{ fontSize: 9.5, fontWeight: 800, fontFamily: fm, letterSpacing: "0.1em", color: "#5a6170", textAlign: "center", marginBottom: 6 }}>THIRD PLACE · JUL 18</div>
-            <MatchCard m={third} onOpen={onOpen} compact />
-          </div>}
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.15fr 1fr 1fr 1fr", gridTemplateRows: "repeat(4, minmax(74px, auto))", columnGap: 10, rowGap: 8 }}>
+        {/* left wing — R16 feeders (outboard) */}
+        {leftR16.slice(0, 4).map((m, i) => cell(1, i + 1, 1, <MatchCard m={m} onOpen={onOpen} slim />, m.espnId))}
+        {/* left QFs */}
+        {leftQf[0] && cell(2, 1, 2, <MatchCard m={leftQf[0]} onOpen={onOpen} />, "lqf0")}
+        {leftQf[1] && cell(2, 3, 2, <MatchCard m={leftQf[1]} onOpen={onOpen} />, "lqf1")}
+        {/* semifinal 1 */}
+        {sf[0] && cell(3, 1, 4, <MatchCard m={sf[0]} onOpen={onOpen} />, "sf0")}
+        {/* center — final, trophy, third place */}
+        {cell(4, 1, 4, (
+          <div style={{ display: "grid", gap: 10, justifyItems: "stretch" }}>
+            {final && <MatchCard m={final} onOpen={onOpen} center />}
+            <div style={{ textAlign: "center", fontSize: 44, lineHeight: 1, filter: "drop-shadow(0 6px 18px rgba(212,175,55,.35))" }}>🏆</div>
+            {third && <div>
+              <div style={{ fontSize: 8.5, fontWeight: 800, fontFamily: fm, letterSpacing: "0.1em", color: "#5a6170", textAlign: "center", marginBottom: 5 }}>THIRD PLACE</div>
+              <MatchCard m={third} onOpen={onOpen} slim />
+            </div>}
+          </div>
+        ), "center")}
+        {/* semifinal 2 */}
+        {sf[1] && cell(5, 1, 4, <MatchCard m={sf[1]} onOpen={onOpen} />, "sf1")}
+        {/* right QFs */}
+        {rightQf[0] && cell(6, 1, 2, <MatchCard m={rightQf[0]} onOpen={onOpen} />, "rqf0")}
+        {rightQf[1] && cell(6, 3, 2, <MatchCard m={rightQf[1]} onOpen={onOpen} />, "rqf1")}
+        {/* right wing — R16 feeders (outboard) */}
+        {rightR16.slice(0, 4).map((m, i) => cell(7, i + 1, 1, <MatchCard m={m} onOpen={onOpen} slim />, m.espnId))}
       </div>
     </div>
   );
