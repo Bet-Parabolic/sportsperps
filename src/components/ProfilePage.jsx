@@ -33,7 +33,7 @@ function tierOf(points) {
 //     positions, Bets/Badges tabs with All/Wins/Loses filter. (No performance-grade section.)
 //   • Settings view (gear): Account / Security / Preferences / About groups + Log out.
 // Sub-screens (Account details, Payment & deposits, Invite friends, Help) push in with a back arrow.
-export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
+export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup = false }) {
   const userId = userIdProp || currentUserId();
   const [profile, setProfile] = useState(null);
   const [positions, setPositions] = useState([]);
@@ -94,7 +94,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
     const titles = { account: "Account details", transactions: "Payment & deposits", referrals: "Invite your friends", help: "Help & support" };
     return (
       <div style={wrap}><div style={inner}>
-        <TopBar title={titles[view]} onBack={() => setView("settings")} />
+        <TopBar title={titles[view]} onBack={() => setView(worldcup ? "main" : "settings")} />
         {view === "account" && <AccountDetails userId={userId} profile={profile} onSaved={load} />}
         {view === "transactions" && <Transactions profile={profile} onLinkWallet={() => setView("account")} />}
         {view === "referrals" && <Referrals username={username} />}
@@ -155,7 +155,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
         <div style={{ fontFamily: fd, fontSize: 16, fontWeight: 700, color: B.white }}>My profile</div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setShowCard(true)} style={iconBtn} title="My member card">▤</button>
-          <button onClick={() => setView("settings")} style={iconBtn} title="Settings">⚙</button>
+          {!worldcup && <button onClick={() => setView("settings")} style={iconBtn} title="Settings">⚙</button>}
         </div>
       </div>
       {showCard && <CardOverlay onClose={() => setShowCard(false)} />}
@@ -223,6 +223,18 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
               <div style={{ fontFamily: fm, fontWeight: 700, color: p.pnl >= 0 ? B.primary : B.red }}>{p.pnl >= 0 ? "+" : ""}{fmtUsd(p.pnl)}</div>
             </div>
           ))}
+
+        {/* worldcup silo: no settings page — account controls live on the main profile */}
+        {worldcup && (
+          <div style={{ marginTop: 18 }}>
+            <SectionTitle>Account</SectionTitle>
+            <Group>
+              <Row label="Account details" onClick={() => setView("account")} />
+              <PrivacyRow userId={userId} profile={profile} onSaved={load} />
+            </Group>
+            <button onClick={handleLogout} style={logoutBtn}>Log out</button>
+          </div>
+        )}
         </div>
 
         {/* RIGHT column — Bets | Badges */}

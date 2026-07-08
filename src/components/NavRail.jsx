@@ -8,7 +8,7 @@ import { Home, Ticket, Newspaper, Bookmark, Trophy } from "lucide-react";
 
 const RAIL_W = 76;
 
-export function NavRail({ active, onNav }) {
+export function NavRail({ active, onNav, hide = [] }) {
   const items = [
     { key: "home", Icon: Home, label: "Home" },
     { key: "bets", Icon: Ticket, label: "Active bets" },
@@ -19,7 +19,7 @@ export function NavRail({ active, onNav }) {
 
   return (
     <div style={{ width: RAIL_W, flexShrink: 0, borderRight: "1px solid #16181d", background: "#0a0a0a", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0", gap: 6, overflowY: "auto", height: "100%" }} className="mob-nav">
-      {items.map(({ key, Icon, label }) => {
+      {items.filter(({ key }) => !hide.includes(key)).map(({ key, Icon, label }) => {
         const on = active === key;
         return (
           <button key={key} onClick={() => onNav(key)} title={label} style={{

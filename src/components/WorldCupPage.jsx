@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { Home, Ticket, Newspaper, Bookmark, Trophy } from "lucide-react";
+import { Home, Ticket, Newspaper, Trophy } from "lucide-react";
 import { B, fb, fd, fm } from "../lib/theme.js";
 import { LOGO_WORDMARK, LOGO_MARK } from "../lib/logos.js";
 import { API_URL } from "../lib/constants.js";
@@ -9,7 +9,7 @@ import { VerifyModal } from "./VerifyModal.jsx";
 import { NavRail } from "./NavRail.jsx";
 import { ActiveBetsPage } from "./ActiveBetsPage.jsx";
 import { NewsPage } from "./NewsPage.jsx";
-import { BookmarksPage } from "./BookmarksPage.jsx";
+import { ProfilePage } from "./ProfilePage.jsx";
 import { useLiveGames } from "../lib/useLiveGames.js";
 
 const LiveTradingApp = lazy(() => import("../trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
@@ -179,6 +179,7 @@ export function WorldCupPage() {
   const [standing, setStanding] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [joinErr, setJoinErr] = useState("");
   const [activeGame, setActiveGame] = useState(null);
   const [now, setNow] = useState(Date.now());
@@ -265,30 +266,29 @@ export function WorldCupPage() {
   const card = { background: "#0b0d11", border: "1px solid #181b22", borderRadius: 16 };
   const label = { fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", fontFamily: fm, color: "#666" };
 
-  const navItems = [["home", Home], ["bets", Ticket], ["news", Newspaper], ["bookmarks", Bookmark], ["leaderboard", Trophy]];
+  const navItems = [["home", Home], ["bets", Ticket], ["news", Newspaper], ["leaderboard", Trophy]];
 
   const LeaderboardTab = () => (
     <div style={{ maxWidth: 860, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
         <Trophy size={18} color={B.primary} />
-        <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.12em", fontFamily: fm }}>CHAMPIONSHIP LEADERBOARD</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.12em", fontFamily: fm }}>THE WORLD CUP TRADING COMPETITION LEADERBOARD</div>
       </div>
-      <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6, marginBottom: 16 }}>Ranked by equity on the $10,000 World Cup Cash grant. World Cup only — separate from all main-app stats.</p>
+      <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6, marginBottom: 16 }}>Ranked by PnL. Each entrant starts with $10,000 World Cup Cash.</p>
       <div style={{ ...card, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "54px 1fr 120px 90px 70px", padding: "11px 16px", background: "#0e1015", borderBottom: "1px solid #181b22", ...label }}>
-          <div>RANK</div><div>TRADER</div><div style={{ textAlign: "right" }}>WC CASH</div><div style={{ textAlign: "right" }}>ROI</div><div style={{ textAlign: "right" }}>TRADES</div>
+        <div style={{ display: "grid", gridTemplateColumns: "54px 1fr 130px 100px", padding: "11px 16px", background: "#0e1015", borderBottom: "1px solid #181b22", ...label }}>
+          <div>RANK</div><div>TRADER</div><div style={{ textAlign: "right" }}>WC CASH</div><div style={{ textAlign: "right" }}>ROI</div>
         </div>
         {lb.length === 0
           ? <div style={{ padding: "22px 16px", color: "#555", fontSize: 13 }}>{meta?.live ? "No entrants yet — be first on the board." : "The board opens with the championship."}</div>
           : lb.map((e) => {
               const me = e.userId === userId;
               return (
-                <div key={e.userId} style={{ display: "grid", gridTemplateColumns: "54px 1fr 120px 90px 70px", padding: "11px 16px", borderBottom: "1px solid #12141a", fontSize: 13, fontFamily: fm, background: me ? B.primary + "0d" : "transparent", borderLeft: me ? `3px solid ${B.primary}` : "3px solid transparent" }}>
+                <div key={e.userId} style={{ display: "grid", gridTemplateColumns: "54px 1fr 130px 100px", padding: "11px 16px", borderBottom: "1px solid #12141a", fontSize: 13, fontFamily: fm, background: me ? B.primary + "0d" : "transparent", borderLeft: me ? `3px solid ${B.primary}` : "3px solid transparent" }}>
                   <div style={{ fontWeight: 800, color: e.rank <= 3 ? B.primary : "#888" }}>{e.rank}</div>
                   <div style={{ fontWeight: 600, color: me ? B.primary : "#fff", fontFamily: fb }}>{e.username || e.userId.slice(0, 8)}{me ? " (you)" : ""}</div>
                   <div style={{ textAlign: "right", fontWeight: 700 }}>${(e.equity ?? 0).toLocaleString()}</div>
                   <div style={{ textAlign: "right", fontWeight: 700, color: e.roiPct >= 0 ? B.primary : "#ff5247" }}>{e.roiPct >= 0 ? "+" : ""}{e.roiPct}%</div>
-                  <div style={{ textAlign: "right", color: "#888" }}>{e.trades}</div>
                 </div>
               );
             })}
@@ -300,16 +300,11 @@ export function WorldCupPage() {
     <div style={{ maxWidth: 980, margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: 30 }}>
         <div style={{ fontFamily: fd, fontWeight: 800, fontSize: isMobile ? 30 : 44, letterSpacing: "-0.02em", lineHeight: 1.05 }}>
-          The World Cup <span style={{ color: B.primary }}>Championship</span>
+          The World Cup <span style={{ color: B.primary }}>Trading Competition</span>
         </div>
         <p style={{ color: "#8a93a6", fontSize: isMobile ? 13 : 14.5, maxWidth: 560, margin: "12px auto 0", lineHeight: 1.6 }}>
           $10,000 World Cup Cash per entrant · trade live win probability through the bracket · cash prizes <strong style={{ color: B.primary }}>$1,000 · $500 · $250</strong>
         </p>
-        {meta && !meta.live && (
-          <div style={{ marginTop: 14, display: "inline-block", padding: "9px 20px", borderRadius: 12, background: "#101216", border: "1px solid #1c1f24", color: "#8a93a6", fontSize: 13 }}>
-            The championship isn't open yet — check back soon.
-          </div>
-        )}
         {meta?.live && (joined
           ? <div style={{ marginTop: 14, display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
               {standing && [["RANK", `#${standing.rank}`], ["EQUITY", `$${standing.equity.toLocaleString()}`], ["ROI", `${standing.roiPct >= 0 ? "+" : ""}${standing.roiPct}%`]].map(([k, v]) => (
@@ -348,7 +343,7 @@ export function WorldCupPage() {
 
   return (
     <div style={{ height: "100vh", background: "#06070a", fontFamily: fb, color: "#eef1f6", display: "flex", overflow: "hidden" }}>
-      {!isMobile && <NavRail active={tab} onNav={(t) => setTab(t)} />}
+      {!isMobile && <NavRail active={tab} onNav={(t) => setTab(t)} hide={["bookmarks"]} />}
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* top bar — brand + account only (single sport → no category tabs) */}
@@ -367,7 +362,7 @@ export function WorldCupPage() {
             {auth
               ? <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {!isMobile && <span style={{ fontSize: 13, color: "#aaa", fontFamily: fm }}>{auth.username}</span>}
-                  <button onClick={() => { doLogout(); window.location.reload(); }} style={{ padding: "6px 13px", borderRadius: 9, border: "1px solid #22252b", background: "transparent", color: "#888", fontSize: 12, cursor: "pointer", fontFamily: fb }}>Log out</button>
+                  <div onClick={() => setShowProfile(true)} title="My profile" style={{ width: 32, height: 32, borderRadius: "50%", background: "#1a1d22", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14 }}>👤</div>
                 </div>
               : <button onClick={() => setShowAuth(true)} style={{ padding: "7px 16px", borderRadius: 10, border: "none", background: B.primary, color: "#04130c", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: fb }}>Sign in</button>}
           </div>
@@ -378,7 +373,6 @@ export function WorldCupPage() {
           {tab === "home" && <HomeTab />}
           {tab === "bets" && <ActiveBetsPage eventOnly liveGames={wcLive} onTrade={openGame} />}
           {tab === "news" && <NewsPage />}
-          {tab === "bookmarks" && <BookmarksPage liveGames={wcLive} onTrade={openGame} />}
           {tab === "leaderboard" && <LeaderboardTab />}
         </div>
       </div>
@@ -394,6 +388,14 @@ export function WorldCupPage() {
         </div>
       )}
 
+      {showProfile && (
+        <ProfilePage
+          worldcup
+          userId={auth?.userId}
+          onClose={() => { setShowProfile(false); refresh(); }}
+          onLoggedOut={() => { setShowProfile(false); }}
+        />
+      )}
       {showAuth && (
         <AuthModal
           reason="Sign in or create your Parabolic account — it works here and on the main app."
