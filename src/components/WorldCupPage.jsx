@@ -116,6 +116,11 @@ export function WorldCupPage() {
           <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 14, letterSpacing: "0.06em", color: B.primary }}>🏆 WORLD CUP</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* TEMP (remove before launch): direct terminal access for internal testing */}
+          <button onClick={() => games.length && openGame(games[0])}
+            style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid #22252b", background: "transparent", color: "#8a93a6", fontSize: 12, cursor: "pointer", fontFamily: fb, fontWeight: 600 }}>
+            Continue to terminal →
+          </button>
           {joined && wcBalance != null && (
             <div style={{ padding: "6px 14px", borderRadius: 10, background: B.primary + "14", border: `1px solid ${B.primary}44`, textAlign: "right" }}>
               <div style={{ ...label, color: B.primary }}>WORLD CUP CASH</div>
