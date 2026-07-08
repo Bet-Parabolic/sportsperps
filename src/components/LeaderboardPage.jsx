@@ -3,15 +3,21 @@ import { Trophy } from "lucide-react";
 import { B, fd, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { fmtUsd } from "../lib/helpers.js";
+import { fetchEventMeta } from "../lib/event.js";
 
 export function LeaderboardPage({ userId }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState("points"); // 'points' | 'pnl'
+  const [mode, setMode] = useState("points"); // 'points' | 'pnl' | 'worldcup'
+  const [evLive, setEvLive] = useState(false); // World Cup toggle only appears while the event is open
+
+  useEffect(() => { fetchEventMeta().then((m) => setEvLive(!!m?.live)); }, []);
 
   useEffect(() => {
-    const sort = mode === "points" ? "points" : "return";
-    const fetchLb = () => fetch(`${API_URL}/leaderboard?limit=50&sort=${sort}`)
+    const url = mode === "worldcup"
+      ? `${API_URL}/event/leaderboard?limit=50`
+      : `${API_URL}/leaderboard?limit=50&sort=${mode === "points" ? "points" : "return"}`;
+    const fetchLb = () => fetch(url)
       .then(r => r.json()).then(d => { setData(d.leaderboard || []); setLoading(false); })
       .catch(() => setLoading(false));
     setLoading(true);
@@ -20,12 +26,12 @@ export function LeaderboardPage({ userId }) {
     return () => clearInterval(iv);
   }, [mode]);
 
-  const pts = mode === "points";
-  const cols = pts ? "50px 1fr 110px 90px 80px" : "50px 1fr 100px 100px 80px 100px";
+  const pts = mode === "points", wc = mode === "worldcup";
+  const cols = wc ? "50px 1fr 120px 100px 80px" : pts ? "50px 1fr 110px 90px 80px" : "50px 1fr 100px 100px 80px 100px";
 
   const Toggle = () => (
     <div style={{ display: "inline-flex", background: "#111", border: "1px solid #1f1f1f", borderRadius: 10, padding: 3, gap: 3 }}>
-      {[["points", "Points"], ["pnl", "PnL"]].map(([k, label]) => (
+      {[["points", "Points"], ["pnl", "PnL"], ...(evLive ? [["worldcup", "🏆 World Cup"]] : [])].map(([k, label]) => (
         <button key={k} onClick={() => setMode(k)} style={{
           padding: "7px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: fd, fontWeight: 700, fontSize: 13,
           background: mode === k ? B.primary : "transparent", color: mode === k ? "#04130c" : "#888",
@@ -43,7 +49,8 @@ export function LeaderboardPage({ userId }) {
         </div>
         <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 8 }}>Top Traders</h2>
         <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6, marginBottom: 16 }}>
-          {pts ? "Ranked by points earned — wager volume + daily streaks." : "Ranked by return % on the initial $10,000 balance."}
+          {wc ? "World Cup Championship — ranked by equity on the $10,000 World Cup Cash grant."
+            : pts ? "Ranked by points earned — wager volume + daily streaks." : "Ranked by return % on the initial $10,000 balance."}
         </p>
         <Toggle />
         {/* How points work — mirrors the backend rules in src/points.js (keep in sync) */}
@@ -79,7 +86,9 @@ export function LeaderboardPage({ userId }) {
         <div style={{ borderRadius: 16, border: "1px solid #1f1f1f", overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: cols, padding: "12px 16px", background: "#111", borderBottom: "1px solid #1a1a1a", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: fm, letterSpacing: "0.06em" }}>
             <div>RANK</div><div>TRADER</div>
-            {pts
+            {wc
+              ? <><div style={{ textAlign: "right" }}>WC CASH EQUITY</div><div style={{ textAlign: "right" }}>ROI</div><div style={{ textAlign: "right" }}>TRADES</div></>
+              : pts
               ? <><div style={{ textAlign: "right" }}>POINTS</div><div style={{ textAlign: "right" }}>STREAK</div><div style={{ textAlign: "right" }}>TRADES</div></>
               : <><div style={{ textAlign: "right" }}>RETURN</div><div style={{ textAlign: "right" }}>PNL</div><div style={{ textAlign: "right" }}>TRADES</div><div style={{ textAlign: "right" }}>VOLUME</div></>}
           </div>
@@ -90,7 +99,13 @@ export function LeaderboardPage({ userId }) {
                 background: isMe ? B.primary + "10" : "transparent", borderLeft: isMe ? "3px solid " + B.primary : "3px solid transparent" }}>
                 <div style={{ fontWeight: 800, color: i < 3 ? "#fff" : "#888" }}>{entry.rank || i + 1}</div>
                 <div style={{ fontWeight: 600, color: isMe ? B.primary : "#fff" }}>{entry.username || entry.userId.slice(0, 8) + "..."}{isMe && " (you)"}</div>
-                {pts
+                {wc
+                  ? <>
+                      <div style={{ textAlign: "right", fontWeight: 800, color: B.primaryLight }}>{fmtUsd(entry.equity)}</div>
+                      <div style={{ textAlign: "right", fontWeight: 700, color: entry.roiPct >= 0 ? B.green : B.red }}>{entry.roiPct >= 0 ? "+" : ""}{entry.roiPct}%</div>
+                      <div style={{ textAlign: "right", color: "#888" }}>{entry.trades}</div>
+                    </>
+                  : pts
                   ? <>
                       <div style={{ textAlign: "right", fontWeight: 800, color: B.primaryLight }}>{(entry.points || 0).toLocaleString()}</div>
                       <div style={{ textAlign: "right", color: entry.streak > 0 ? "#ff9f1c" : "#555" }}>{entry.streak > 0 ? "🔥 " + entry.streak : "—"}</div>

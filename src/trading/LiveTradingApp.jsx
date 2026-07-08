@@ -5,6 +5,7 @@ import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, 
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
 import { subscribeLive, setLiveUser } from "../lib/liveSocket.js";
+import { fetchEventMeta, isEventEligible } from "../lib/event.js";
 import { TvChart } from "../components/TvChart.jsx";
 import { ProfilePage } from "../components/ProfilePage.jsx";
 import { AuthModal } from "../components/AuthModal.jsx";
@@ -187,6 +188,24 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const mR   = useRef(oMark);    mR.current   = oMark;
   const mlR  = useRef(10);       // effective (side-aware) max leverage — mirrors `ml` each render so
                                  // placeOrder submits the SAME cap the slider shows (A7 finding #1)
+
+  // ── World Cup Cash event (plan 010) — fully inert until the backend flips EVENT_ENABLED ──
+  // Eligible games trade on the segregated EVENT ledger: balance/positions come from /event/*,
+  // the header shows World Cup Cash, and non-participants get a Join button instead of Buy.
+  const [evMeta, setEvMeta] = useState(null);     // GET /api/event — { live, league, grant, ... }
+  const [wcJoined, setWcJoined] = useState(null); // null=unknown · false=not a participant · true=in
+  const [wcBalance, setWcBalance] = useState(null);
+  const isEventGame = isEventEligible(evMeta, g);
+  const evGameR = useRef(false);  evGameR.current = isEventGame;
+  const wcJoinedR = useRef(null); wcJoinedR.current = wcJoined;
+  const wcBalR = useRef(null);    wcBalR.current = wcBalance;
+  useEffect(() => {
+    let on = true;
+    const tick = () => fetchEventMeta().then((m) => { if (on) setEvMeta(m); });
+    tick();
+    const iv = setInterval(tick, 60_000);
+    return () => { on = false; clearInterval(iv); };
+  }, []);
   const posR = useRef(positions); posR.current = positions;
   const limR = useRef(limitOrders); limR.current = limitOrders;
   const pollRef = useRef(null);  // latest poll() — lets WS events trigger reconciliation early
@@ -478,6 +497,36 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           }
         } catch(e) { /* backend unavailable, keep local state */ }
 
+        // World Cup Cash: an eligible game trades on the EVENT ledger, so this game's balance and
+        // positions come from /event/* (the main poll above legitimately sees nothing for it).
+        // 404 on /event/balance = not a participant yet → the Buy button becomes Join.
+        if (evGameR.current) {
+          try {
+            const [ebRes, epRes] = await Promise.all([
+              fetch(`${API_URL}/event/balance/${userId}`),
+              fetch(`${API_URL}/event/positions/${userId}`),
+            ]);
+            if (ebRes.status === 404) { setWcJoined(false); setWcBalance(null); }
+            else if (ebRes.ok) {
+              const eb = await ebRes.json();
+              setWcJoined(true);
+              setWcBalance(eb.balance);
+            }
+            if (epRes.ok) {
+              const ep = await epRes.json();
+              if (Array.isArray(ep.positions)) {
+                const mappedE = ep.positions.filter(p => p.gameId === g.id).map(p => ({
+                  id: p.id, gameId: p.gameId, side: p.side, size: p.size, margin: p.margin,
+                  leverage: p.leverage, exposure: p.size * p.entryPx, entry: p.entryPx,
+                  liq: p.liqPrice, tp: p.tp, sl: p.sl, pnl: p.pnl, roe: p.roe, openedAt: p.openedAt,
+                  event: true, // rendered with the World Cup Cash context
+                }));
+                setPositions(prev => [...prev.filter(p => p.gameId !== g.id), ...mappedE]);
+              }
+            }
+          } catch (e) { /* event endpoints unavailable — keep local state */ }
+        }
+
         // Reconcile resting limit orders with the backend — a filled or cancelled order drops
         // off here, which clears its green dotted line on the chart + its Pending entry.
         try {
@@ -556,15 +605,40 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     return unsub;
   }, [g.id, userId, initGame._espnKey, notify]);
 
+  // ── World Cup Cash: join the championship (idempotent $10k grant on the event ledger) ──
+  const joinEvent = useCallback(async () => {
+    if (!isLoggedIn()) { onOnboard ? onOnboard() : setShowAuth(true); return; }
+    try {
+      const res = await fetch(`${API_URL}/event/join`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, token: authToken() }),
+      });
+      if (res.status === 401) { handleUnauthorized(); return; }
+      const d = await res.json();
+      if (res.ok && d.joined) {
+        setWcJoined(true);
+        setWcBalance(d.worldCupCash);
+        notify(`🏆 You're in — $${Math.round(d.worldCupCash || 10000).toLocaleString()} World Cup Cash granted`, 'green');
+        pollRef.current?.();
+      } else {
+        notify(d.error || 'Could not join the championship', 'red');
+      }
+    } catch (e) { notify('Join failed: ' + e.message, 'red'); }
+  }, [userId, notify, onOnboard]);
+
   // ── placeOrder (backend CLOB) ────────────────────────────────────────────
   const placeOrder = useCallback(async () => {
     if (!isLoggedIn()) { onOnboard ? onOnboard() : setShowAuth(true); return; }  // gate: signup runs the full onboarding flow (falls back to the bare modal)
     if (settled) return;
+    // World Cup Cash: eligible games are event-only — the first click joins (grant), then trades.
+    if (evGameR.current && wcJoinedR.current === false) { await joinEvent(); return; }
     const op = oR.current;
     // Clamp to BOTH the price-tier cap and the live side-aware cap the slider shows (mlR) — the
     // backend enforces the tighter gap-aware cap, so submitting above it just guarantees a reject.
     const ml2 = maxLev(op), lev = Math.max(1, Math.min(orderLev, ml2, mlR.current || ml2));
-    const margin = Math.min(orderMargin, balance);
+    // Margin is capped by the ledger that will actually fund the order: World Cup Cash on an
+    // eligible game, the main paper balance everywhere else.
+    const margin = Math.min(orderMargin, evGameR.current ? (wcBalR.current ?? 0) : balance);
     if (margin < 10) { notify('Insufficient margin', 'red'); return; }
     if (reduceOnly && !posR.current.some(p => p.gameId===g.id && p.side===orderSide)) { notify('No position to reduce', 'red'); return; }
     const tp = tpCents!==''&&+tpCents>0 ? +tpCents/100 : null;
@@ -644,7 +718,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     } catch(e) {
       notify('Order failed: '+e.message, 'red');
     }
-  }, [oPrice, orderSide, orderMargin, orderLev, balance, settled, orderType, limitCents, tpCents, slCents, reduceOnly, chartData, HOME, AWAY, notify, addMark, userId, g.id]);
+  }, [oPrice, orderSide, orderMargin, orderLev, balance, settled, orderType, limitCents, tpCents, slCents, reduceOnly, chartData, HOME, AWAY, notify, addMark, userId, g.id, joinEvent]);
 
   // Cancel a resting limit order on the backend (DELETE), then drop it locally so its green
   // dotted chart line + Pending entry clear immediately (the poll reconcile confirms it).
@@ -739,7 +813,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const sideCap = marketMaxLevBySide ? marketMaxLevBySide[orderSide] : marketMaxLev;
   const ml  = sideCap != null ? Math.min(maxLev(oPrice), sideCap) : maxLev(oPrice);
   mlR.current = ml; // keep the submit path on the same cap the slider displays
-  const eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
+  // The funding ledger for THIS game: World Cup Cash on an eligible event game, else main balance.
+  const ledgerBal = isEventGame ? (wcBalance ?? 0) : balance;
+  // On an eligible game before joining, the Buy button IS the Join CTA — it must stay clickable
+  // even though the (not-yet-granted) WC balance is 0.
+  const joinNeeded = isEventGame && wcJoined === false;
+  const eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,ledgerBal);
   // If the cap drops below the chosen leverage (late-game tightening, side switch), pull the REAL
   // state down too — otherwise the stepper reads the clamped display (e.g. "1x", − disabled) while
   // the stale higher value keeps getting submitted and rejected, hard-sticking the user.
@@ -968,9 +1047,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
             LIVE
           </span>}
-          <div style={{padding:isMobile?'6px 10px':'6px 14px',borderRadius:10,background:'#111',border:'1px solid #1f1f1f',textAlign:'right'}}>
-            {!isMobile && <div style={{fontSize:8.5,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,lineHeight:1.2}}>BALANCE</div>}
-            <div style={{fontSize:isMobile?12:13,fontWeight:800,color:'#fff',fontFamily:fm,lineHeight:1.2}}>${balance.toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2})}</div>
+          <div style={{padding:isMobile?'6px 10px':'6px 14px',borderRadius:10,background:isEventGame?B.primary+'14':'#111',border:`1px solid ${isEventGame?B.primary+'44':'#1f1f1f'}`,textAlign:'right'}}>
+            {!isMobile && <div style={{fontSize:8.5,color:isEventGame?B.primary:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,lineHeight:1.2}}>{isEventGame?'🏆 WORLD CUP CASH':'BALANCE'}</div>}
+            <div style={{fontSize:isMobile?12:13,fontWeight:800,color:'#fff',fontFamily:fm,lineHeight:1.2}}>
+              {isEventGame
+                ? (wcJoined ? '$'+(wcBalance ?? 0).toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2}) : (isMobile?'🏆 Join':'Join to get $10,000'))
+                : '$'+balance.toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2})}
+            </div>
           </div>
           <button onClick={()=>setShowDeposit(true)} style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
           <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14,overflow:'hidden'}}>
@@ -1502,12 +1585,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             </div>
             {/* Submit */}
-            <button onClick={placeOrder} disabled={settled||eM<10} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
+            <button onClick={placeOrder} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
               border:settled?'2px solid #333':'2px solid '+B.green,
               cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
               background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,
               color:'#fff',opacity:settled||eM<10?0.4:1}}>
-              {settled?'Game Settled':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
+              {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
             {/* Account */}
             <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid #1f1f1f',display:'flex',justifyContent:'space-between',fontSize:11}}>
@@ -1679,10 +1762,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                         </div>
                       ))}
                     </div>
-                    <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||eM<10} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
+                    <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
                       border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
                       background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,color:'#fff',opacity:settled||eM<10?0.4:1}}>
-                      {settled?'Game Settled':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
+                      {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>
                       <span>Balance <span style={{color:'#fff',fontFamily:fm,fontWeight:700}}>{fmtUsd(balance)}</span></span>
