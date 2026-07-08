@@ -177,10 +177,10 @@ export function OnboardingFlow({ onDone, onGuest, worldcup = false }) {
   /* ── steps ── */
   return (
     <div style={wrap}>
-      {step === "email" && <EmailStep onBack={() => setStep("welcome")} onNext={() => setStep(worldcup ? "everify" : "referral")} />}
+      {step === "email" && <EmailStep onBack={() => setStep("welcome")} onNext={() => setStep("everify")} />}
       {step === "everify" && <EmailCodeStep onBack={() => setStep("email")} onNext={() => setStep("phone")} />}
-      {step === "phone" && <PhoneStep onBack={() => setStep("everify")} onNext={() => setStep("sport")} />}
-      {step === "referral" && <ReferralStep onBack={() => setStep("email")} onNext={() => setStep("sport")} say={say} />}
+      {step === "phone" && <PhoneStep onBack={() => setStep("everify")} onNext={() => setStep(worldcup ? "sport" : "referral")} />}
+      {step === "referral" && <ReferralStep onBack={() => setStep("phone")} onNext={() => setStep("sport")} say={say} />}
       {step === "sport" && <SportStep onBack={() => setStep(worldcup ? "phone" : "referral")} onNext={() => setStep("username")} />}
       {step === "username" && <UsernameStep onBack={() => setStep("sport")} onNext={() => setStep("image")} />}
       {step === "image" && <ImageStep onBack={() => setStep("username")} onNext={() => setStep("signature")} />}
