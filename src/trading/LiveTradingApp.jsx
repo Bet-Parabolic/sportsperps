@@ -49,6 +49,20 @@ function startsInLabel(startTime) {
  * gap-aware cap), 1x/10x rail labels, and a liquidation card ("Liquidation at ~X% · Only Y pts
  * away"). Pills are clickable; everything clamps to the per-side max.
  */
+// Plain-language copy for backend order-rejection reason codes. Anything unmapped falls back to
+// "Order rejected — <code>" so a new backend reason is never silently ugly (A7 finding #3).
+const REJECT_COPY = {
+  perpMarginRejected: 'Not enough balance for this wager',
+  reduceOnlyRejected: 'No position to reduce',
+  positionLimit: 'Position size limit reached for this game',
+  tooManyOrders: 'Too many open orders on this game',
+  tickRejected: 'Price must be in 0.1¢ increments',
+  invalidInput: 'Invalid order — check your inputs',
+  userNotFound: 'Account not found — try refreshing the page',
+  badAloPxRejected: 'Post-only order would cross the market',
+  joinRequired: 'Join the championship to trade this match',
+};
+
 function LevSlider({ eL, ml, onChange, compact = false, liq = null }) {
   const ABS_MAX = 10;
   const set = (v) => onChange(Math.min(Math.max(1, v), ml));
@@ -171,6 +185,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // refs for closures
   const oR   = useRef(oPrice);   oR.current   = oPrice;
   const mR   = useRef(oMark);    mR.current   = oMark;
+  const mlR  = useRef(10);       // effective (side-aware) max leverage — mirrors `ml` each render so
+                                 // placeOrder submits the SAME cap the slider shows (A7 finding #1)
   const posR = useRef(positions); posR.current = positions;
   const limR = useRef(limitOrders); limR.current = limitOrders;
   const pollRef = useRef(null);  // latest poll() — lets WS events trigger reconciliation early
@@ -193,10 +209,18 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   }), [g.away]);
 
   // ── helpers ─────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState(null);      // most-recent notification, auto-dismisses (mobile surface)
+  const toastTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
   const notify = useCallback((msg, type) => {
     const id = Date.now() + Math.random();
     // Persist in the activity tray (newest first), capped — they don't auto-dismiss.
     setNotifs(p => [{id, msg, type: type||'info', t: Date.now()}, ...p].slice(0, 40));
+    // Mobile: the tray lives in the desktop wager panel, so on a phone a rejection was a silent
+    // no-op (A7 finding #2). Surface every notification as a transient floating toast too.
+    setToast({ id, msg, type: type || 'info' });
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }, []);
   const clearNotifs = useCallback(() => setNotifs([]), []);
 
@@ -537,7 +561,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     if (!isLoggedIn()) { onOnboard ? onOnboard() : setShowAuth(true); return; }  // gate: signup runs the full onboarding flow (falls back to the bare modal)
     if (settled) return;
     const op = oR.current;
-    const ml2 = maxLev(op), lev = Math.min(orderLev, ml2);
+    // Clamp to BOTH the price-tier cap and the live side-aware cap the slider shows (mlR) — the
+    // backend enforces the tighter gap-aware cap, so submitting above it just guarantees a reject.
+    const ml2 = maxLev(op), lev = Math.max(1, Math.min(orderLev, ml2, mlR.current || ml2));
     const margin = Math.min(orderMargin, balance);
     if (margin < 10) { notify('Insufficient margin', 'red'); return; }
     if (reduceOnly && !posR.current.some(p => p.gameId===g.id && p.side===orderSide)) { notify('No position to reduce', 'red'); return; }
@@ -591,7 +617,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           const mkt = Math.round((orderSide==='home'?op:1-op)*100);
           notify(`Limit too far from market — must be within 25¢ of ${mkt}¢ (${Math.max(1,mkt-25)}–${Math.min(99,mkt+25)}¢)`, 'red');
         } else {
-          notify('Rejected: '+(result.reason||'unknown'), 'red');
+          notify(REJECT_COPY[result.reason] || 'Order rejected — '+(result.reason||'unknown'), 'red');
         }
         return;
       }
@@ -712,7 +738,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // Side-aware gap cap: a favorite keeps more leverage than the underdog in the same game.
   const sideCap = marketMaxLevBySide ? marketMaxLevBySide[orderSide] : marketMaxLev;
   const ml  = sideCap != null ? Math.min(maxLev(oPrice), sideCap) : maxLev(oPrice);
+  mlR.current = ml; // keep the submit path on the same cap the slider displays
   const eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,balance);
+  // If the cap drops below the chosen leverage (late-game tightening, side switch), pull the REAL
+  // state down too — otherwise the stepper reads the clamped display (e.g. "1x", − disabled) while
+  // the stale higher value keeps getting submitted and rejected, hard-sticking the user.
+  useEffect(() => { if (orderLev > ml) setOrderLev(ml); }, [ml, orderLev]);
   const team = orderSide==='home' ? HOME : AWAY;
   const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL);
   // Liquidation info for the leverage control's card, in the ORDER'S OWN side scale.
@@ -1704,6 +1735,19 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         />
       )}
       {tradeCard && <TradeCard card={tradeCard} onClose={()=>setTradeCard(null)}/>}
+      {/* Mobile floating toast — the activity tray lives in the desktop wager panel, so phones need
+          their own surface or rejections are invisible (A7 finding #2). Sits above the bottom nav
+          + wager sheet; auto-dismisses in 4s; tap to dismiss early. */}
+      {isMobile && toast && (
+        <div onClick={()=>setToast(null)} style={{position:'fixed',left:12,right:12,bottom:'calc(68px + env(safe-area-inset-bottom))',zIndex:80,
+          padding:'12px 14px',borderRadius:12,fontWeight:600,fontSize:13,lineHeight:1.35,fontFamily:fb,cursor:'pointer',
+          background:toast.type==='green'?'#0d2a1d':toast.type==='red'?'#2a0f0d':'#15181d',
+          border:`1px solid ${toast.type==='green'?B.green+'55':toast.type==='red'?B.red+'55':'#2a2e35'}`,
+          color:toast.type==='green'?B.green:toast.type==='red'?B.red:'#d5d9e0',
+          boxShadow:'0 8px 28px rgba(0,0,0,.55)'}}>
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }
