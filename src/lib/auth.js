@@ -56,7 +56,16 @@ export async function login(username, password) {
   return data;
 }
 
-export function logout() { clearAuth(); }
+// Log out = clear the session AND mint a fresh guest id. setAuth() syncs the guest key to the
+// account's userId at login, so clearing only the session left the app trading/polling AS the
+// logged-out account (balance, positions and name kept rendering — logout looked like a no-op).
+// A fresh guest id returns the browser to a clean anonymous state; logging back in re-claims the
+// account by username/password as normal. (handleUnauthorized below deliberately KEEPS the guest
+// id — an expired session should re-login into the same account seamlessly.)
+export function logout() {
+  clearAuth();
+  localStorage.setItem(GUEST_KEY, crypto.randomUUID());
+}
 
 // ── Session-expired handling ─────────────────────────────────────────────
 // A stored token can stop validating (e.g. AUTH_SECRET rotated, or a future token expiry). Any

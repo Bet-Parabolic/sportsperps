@@ -81,7 +81,9 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut }) {
 
   const filteredTrades = trades.filter((t) => betFilter === "all" ? true : betFilter === "wins" ? t.pnl >= 0 : t.pnl < 0);
 
-  const handleLogout = () => { doLogout(); onLoggedOut?.(); };
+  // Full reload after logout: every mounted component holds the old account's state (balance,
+  // positions, chat identity, WS subscription) — clearing storage alone leaves that on screen.
+  const handleLogout = () => { doLogout(); onLoggedOut?.(); window.location.reload(); };
 
   const wrap = { position: "fixed", inset: 0, zIndex: 900, background: B.bg, overflowY: "auto", fontFamily: fb };
   const inner = { maxWidth: 640, margin: "0 auto", padding: "16px 16px 70px" };
