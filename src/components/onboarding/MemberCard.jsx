@@ -107,10 +107,11 @@ export function MemberCard({ width, username, avatar, signature, back = false, r
             {username}
           </div>
 
-          {/* signature — drawn path scaled into the right half */}
+          {/* signature — fitted to the clear band between the wordmark (bottom ~28) and the
+              barcode block (top ~142) on the right side */}
           {signature?.d ? (
-            <div style={{ position: "absolute", right: -8 * k, top: 28 * k, opacity: 0.95, pointerEvents: "none" }}>
-              <svg width={220 * k} height={150 * k} viewBox={`0 0 ${signature.w} ${signature.h}`} preserveAspectRatio="xMidYMid meet">
+            <div style={{ position: "absolute", right: 12 * k, top: 36 * k, opacity: 0.95, pointerEvents: "none" }}>
+              <svg width={150 * k} height={96 * k} viewBox={`0 0 ${signature.w} ${signature.h}`} preserveAspectRatio="xMidYMid meet">
                 <path d={signature.d} stroke="#fff" strokeWidth={Math.max(3, signature.w / 55)} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
