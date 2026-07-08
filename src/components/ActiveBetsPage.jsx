@@ -10,7 +10,7 @@ import { API_URL } from "../lib/constants.js";
 import { currentUserId } from "../lib/auth.js";
 import { fmtUsd } from "../lib/helpers.js";
 
-export function ActiveBetsPage({ liveGames = [], onTrade }) {
+export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false }) {
   const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
   const [games, setGames] = useState(new Map());
@@ -21,21 +21,25 @@ export function ActiveBetsPage({ liveGames = [], onTrade }) {
     const userId = currentUserId();
     const load = async () => {
       try {
+        // eventOnly (the /worldcup silo): positions come from the EVENT ledger (World Cup Cash);
+        // resting orders share the /orders endpoint, filtered to WC games.
+        const balUrl = eventOnly ? `${API_URL}/event/balance/${userId}` : `${API_URL}/balance/${userId}`;
         const [b, o, g] = await Promise.all([
-          fetch(`${API_URL}/balance/${userId}`).then((r) => (r.ok ? r.json() : null)),
+          fetch(balUrl).then((r) => (r.ok ? r.json() : null)),
           fetch(`${API_URL}/orders/${userId}`).then((r) => (r.ok ? r.json() : null)),
           fetch(`${API_URL}/games`).then((r) => (r.ok ? r.json() : null)),
         ]);
         if (!liveFlag) return;
-        if (b?.openPositions) setPositions(b.openPositions);
-        if (o?.orders) setOrders(o.orders);
+        if (b?.openPositions) setPositions(eventOnly ? b.openPositions.filter((p) => p.gameId.startsWith("wcup_")) : b.openPositions);
+        else if (eventOnly) setPositions([]); // not a participant yet → clean empty state
+        if (o?.orders) setOrders(eventOnly ? o.orders.filter((x) => x.gameId.startsWith("wcup_")) : o.orders);
         if (g?.games) setGames(new Map(g.games.map((x) => [x.id, x])));
       } catch { /* ignore */ } finally { if (liveFlag) setLoading(false); }
     };
     load();
     const iv = setInterval(load, 5000);
     return () => { liveFlag = false; clearInterval(iv); };
-  }, []);
+  }, [eventOnly]);
 
   const gameOf = (gameId) => games.get(gameId) || liveGames.find((g) => g.id === gameId) || null;
   const nameOf = (gameId) => {
