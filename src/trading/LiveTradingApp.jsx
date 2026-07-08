@@ -6,6 +6,7 @@ import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { normalizeEspnToLive } from "../lib/espn.js";
 import { subscribeLive, setLiveUser } from "../lib/liveSocket.js";
 import { fetchEventMeta, isEventEligible } from "../lib/event.js";
+import { VerifyModal } from "../components/VerifyModal.jsx";
 import { TvChart } from "../components/TvChart.jsx";
 import { ProfilePage } from "../components/ProfilePage.jsx";
 import { AuthModal } from "../components/AuthModal.jsx";
@@ -193,6 +194,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // Eligible games trade on the segregated EVENT ledger: balance/positions come from /event/*,
   // the header shows World Cup Cash, and non-participants get a Join button instead of Buy.
   const [evMeta, setEvMeta] = useState(null);     // GET /api/event — { live, league, grant, ... }
+  const [showVerify, setShowVerify] = useState(false); // identity gate (A3) — opened by a verify-403 on join
   const [wcJoined, setWcJoined] = useState(null); // null=unknown · false=not a participant · true=in
   const [wcBalance, setWcBalance] = useState(null);
   const isEventGame = isEventEligible(evMeta, g);
@@ -621,6 +623,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         notify(`🏆 You're in — $${Math.round(d.worldCupCash || 10000).toLocaleString()} World Cup Cash granted`, 'green');
         pollRef.current?.();
       } else {
+        // Identity gate (A3): a verification 403 opens the verify flow instead of a dead-end toast.
+        if (res.status === 403 && /verify/i.test(d.error || '')) { setShowVerify(true); return; }
         notify(d.error || 'Could not join the championship', 'red');
       }
     } catch (e) { notify('Join failed: ' + e.message, 'red'); }
@@ -1809,6 +1813,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           onRequireAuth={()=>setShowAuth(true)} onClose={()=>setShowChatPop(false)}/>
       )}
       {showDeposit && <DepositModal balance={balance} onClose={()=>setShowDeposit(false)}/>}
+      {showVerify && (
+        <VerifyModal
+          userId={userId}
+          onClose={() => setShowVerify(false)}
+          onVerified={() => { setShowVerify(false); joinEvent(); }}
+        />
+      )}
       {showAuth && (
         <AuthModal
           reason={sessionExpired ? "Your session expired — please sign in again." : "Sign in or create an account to place a wager."}
