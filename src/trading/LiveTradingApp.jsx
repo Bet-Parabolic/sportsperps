@@ -110,7 +110,7 @@ function LevSlider({ eL, ml, onChange, compact = false, liq = null }) {
   );
 }
 
-export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade, onOnboard }) {
+export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade, onOnboard, worldcup = false }) {
   // ── normalise team colors from backend ──────────────────────────────────
   const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
 
@@ -1019,8 +1019,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               : <img src={LOGO_WORDMARK} style={{height:30,width:'auto'}} alt="Parabolic"/>}
           </div>
         </div>
-        {/* CENTER — sport tabs */}
-        <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
+        {/* CENTER — sport tabs (hidden on the World Cup surface: single-sport event) */}
+        {worldcup ? <div /> : <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
           {[['home','Home',sportCounts.live],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.soccer],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
               {tab==='home'
@@ -1032,7 +1032,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               {cnt>0&&<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({cnt})</span>}
             </button>
           ))}
-        </div>
+        </div>}
         {/* RIGHT — market actions (chat/bookmark/share) + live indicator + balance + deposit + profile */}
         <div style={{display:'flex',alignItems:'center',gap:10,justifySelf:'end'}}>
           {!isMobile && <div style={{display:'flex',alignItems:'center',gap:4,marginRight:2}}>

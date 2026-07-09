@@ -15,7 +15,7 @@ import stadiumBg from "../assets/worldcup/stadium.jpg";
 import fifa26 from "../assets/worldcup/fifa26.png";
 import laurelImg from "../assets/worldcup/laurel.svg";
 import laurelPodium from "../assets/worldcup/laurel-podium.svg";
-import lanyardImg from "../assets/worldcup/lanyard.png";
+import leaderboardBg from "../assets/worldcup/leaderboard-bg.png";
 
 const LiveTradingApp = lazy(() => import("../trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
 const OnboardingFlow = lazy(() => import("./onboarding/OnboardingFlow.jsx").then(m => ({ default: m.OnboardingFlow })));
@@ -388,6 +388,7 @@ export function WorldCupPage() {
     return (
       <Suspense fallback={<div style={{ minHeight: "100vh", background: "#000" }} />}>
         <LiveTradingApp
+          worldcup
           game={activeGame}
           onBack={() => { setActiveGame(null); refresh(); }}
           liveGames={wcLive}
@@ -405,6 +406,8 @@ export function WorldCupPage() {
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: isMobile ? 520 : 640, overflow: "hidden", pointerEvents: "none" }}>
         <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 76%" }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(4,5,7,0.4) 0%, rgba(4,5,7,0.16) 32%, rgba(4,5,7,0.3) 62%, rgba(6,7,10,0.82) 86%, #06070a 99%)" }} />
+        {/* corner vignette — masks a generation artifact in the photo's top-left */}
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(42% 52% at 0% 0%, rgba(4,5,7,0.96) 0%, rgba(4,5,7,0.75) 45%, rgba(4,5,7,0) 75%)" }} />
       </div>
 
       <div style={{ position: "relative", padding: isMobile ? "60px 16px 60px" : "64px 40px 80px" }}>
@@ -485,30 +488,46 @@ export function WorldCupPage() {
     return (
       <div style={{ position: "relative", minHeight: "100%" }}>
         <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-          <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.32 }} />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(6,7,10,0.25), rgba(6,7,10,0.85) 60%, #06070a)" }} />
+          <img src={leaderboardBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 0%", filter: "grayscale(1)", opacity: 0.5 }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(6,7,10,0.3), rgba(6,7,10,0.78) 55%, #06070a 92%)" }} />
         </div>
         <div style={{ position: "relative", padding: isMobile ? "56px 14px 60px" : "56px 24px 70px" }}>
           <div style={{ fontFamily: fb, fontWeight: 600, fontSize: 14, color: "#fff", padding: "10px 8px 22px" }}>Leaderboard</div>
 
           {me && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: -8 }}>
-              <img src={lanyardImg} alt="" style={{ width: 250, height: 146, objectFit: "contain", marginBottom: -12 }} />
-              <div style={{ width: 339, maxWidth: "92vw", height: 191, borderRadius: 20, position: "relative", background: "#141414", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 24px 60px rgba(0,0,0,0.55)", overflow: "hidden" }}>
-                <div style={{ position: "absolute", inset: 6, borderRadius: 15, border: "1px solid rgba(255,255,255,0.07)" }} />
-                <img src={LOGO_WORDMARK} alt="Parabolic" style={{ position: "absolute", left: 24, top: 24, height: 17 }} />
-                <div style={{ position: "absolute", right: 24, top: 20, padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.1)" }}>
-                  <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 11, color: "#fff", letterSpacing: "0.06em" }}>{me.rank}</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 10 }}>
+              {/* metallic membership card */}
+              <div style={{ width: 339, maxWidth: "92vw", height: 191, borderRadius: 18, position: "relative", overflow: "hidden",
+                background: "linear-gradient(118deg, #34363b 0%, #202226 34%, #2b2d32 52%, #17181c 78%, #202227 100%)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.28)" }}>
+                {/* brushed-metal grain */}
+                <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(92deg, rgba(255,255,255,0.02) 0 1px, rgba(0,0,0,0.02) 1px 3px)" }} />
+                {/* diagonal sheen */}
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(118deg, transparent 28%, rgba(255,255,255,0.13) 42%, rgba(255,255,255,0.04) 50%, transparent 62%)" }} />
+                <div style={{ position: "absolute", inset: 5, borderRadius: 14, border: "1px solid rgba(255,255,255,0.09)" }} />
+                <img src={LOGO_WORDMARK} alt="Parabolic" style={{ position: "absolute", left: 22, top: 22, height: 16 }} />
+                {/* EMV chip */}
+                <div style={{ position: "absolute", left: 22, top: 62, width: 34, height: 25, borderRadius: 6, background: "linear-gradient(135deg, #e8c877, #b98e3e 55%, #dcb861)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.55), inset 0 -1px 2px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.4)" }}>
+                  <div style={{ position: "absolute", left: 0, right: 0, top: "38%", height: 1, background: "rgba(90,60,10,0.5)" }} />
+                  <div style={{ position: "absolute", left: 0, right: 0, top: "64%", height: 1, background: "rgba(90,60,10,0.5)" }} />
+                  <div style={{ position: "absolute", top: 3, bottom: 3, left: "42%", width: 1, background: "rgba(90,60,10,0.5)" }} />
                 </div>
-                <div style={{ position: "absolute", left: 24, bottom: 24, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "#23262c", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ position: "absolute", right: 22, top: 18, padding: "5px 11px", borderRadius: 999, background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.1)" }}>
+                  <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 11, color: "#ffe9b0", letterSpacing: "0.08em" }}>#{me.rank}</span>
+                </div>
+                <div style={{ position: "absolute", left: 22, bottom: 20, display: "flex", alignItems: "center", gap: 11 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "#23262c", border: "1px solid rgba(255,255,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.45)" }}>
                     {memberCard?.avatar ? <AvatarCircle avatar={memberCard.avatar} size={40} /> : <span style={{ fontSize: 18 }}>👤</span>}
                   </div>
-                  <span style={{ fontFamily: fd, fontWeight: 700, fontSize: 19, color: "#fff" }}>{me.username || "you"}</span>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontFamily: fd, fontWeight: 700, fontSize: 18, color: "#fff", letterSpacing: "0.02em", textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}>{me.username || "you"}</span>
+                    <span style={{ fontFamily: fm, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.16em", color: "#8f949c" }}>WORLD CUP 2026</span>
+                  </div>
                 </div>
-                <div style={{ position: "absolute", right: 24, bottom: 26, textAlign: "right" }}>
-                  <div style={{ fontFamily: fb, fontWeight: 700, fontSize: 17, color: me.roiPct >= 0 ? GREEN : "#ff5247" }}>{me.roiPct >= 0 ? "+" : ""}{me.roiPct}%</div>
-                  <div style={{ fontFamily: fb, fontSize: 13, color: "#cfd4dc" }}>{me.trades} trades</div>
+                <div style={{ position: "absolute", right: 22, bottom: 22, textAlign: "right" }}>
+                  <div style={{ fontFamily: fb, fontWeight: 700, fontSize: 17, color: me.roiPct >= 0 ? GREEN : "#ff5247", textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}>{me.roiPct >= 0 ? "+" : ""}{me.roiPct}%</div>
+                  <div style={{ fontFamily: fb, fontSize: 12.5, color: "#c3c8d0" }}>{me.trades} trades</div>
                 </div>
               </div>
             </div>
