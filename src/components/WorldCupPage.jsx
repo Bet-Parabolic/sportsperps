@@ -13,8 +13,8 @@ import { loadCard } from "../lib/onboarding.js";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import stadiumBg from "../assets/worldcup/stadium.jpg";
 import fifa26 from "../assets/worldcup/fifa26.png";
-import laurelImg from "../assets/worldcup/laurel.png";
-import laurelPodium from "../assets/worldcup/laurel-podium.png";
+import laurelImg from "../assets/worldcup/laurel.svg";
+import laurelPodium from "../assets/worldcup/laurel-podium.svg";
 import lanyardImg from "../assets/worldcup/lanyard.png";
 
 const LiveTradingApp = lazy(() => import("../trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
