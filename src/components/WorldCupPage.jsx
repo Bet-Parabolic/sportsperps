@@ -74,18 +74,36 @@ const fmtWhen = (d) => {
   return today ? `Today, ${time}` : tomorrow ? `Tomorrow, ${time}` : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
 
-/* ── team chip: real logo when known, laurel "?" placeholder for unresolved slots ── */
+/* ── circular flag: ESPN country pngs carry transparent padding, so scale the image up inside
+   an overflow-hidden circle — no black letterbox (Figma glossy flag badges) ── */
+function FlagCircle({ src, size, dim = false, border = true }) {
+  return (
+    <div style={{ position: "relative", width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "#1c1d21", border: border ? "1px solid rgba(255,255,255,0.14)" : "none", boxShadow: "inset 0 2px 3px rgba(255,255,255,0.18), inset 0 -2px 4px rgba(0,0,0,0.4)", opacity: dim ? 0.38 : 1 }}>
+      {src && <img src={src} alt="" style={{ position: "absolute", left: "-24%", top: "-24%", width: "148%", height: "148%", objectFit: "cover" }} />}
+      <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,0.22), rgba(255,255,255,0) 45%)" }} />
+    </div>
+  );
+}
+
+/* ── team chip: circular flag when known, clean dark "?" for unresolved slots ── */
 function TeamSlot({ t, size = 32, dim = false }) {
   if (t?.tbd || !t?.logo) {
     return (
-      <div style={{ position: "relative", width: size, height: size, borderRadius: "50%", background: "linear-gradient(180deg,#828282,#373737)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <img src={laurelImg} alt="" style={{ position: "absolute", inset: "3%", width: "94%", height: "94%", objectFit: "contain", opacity: 0.9 }} />
-        <span style={{ fontFamily: fb, fontWeight: 700, fontSize: size * 0.34, color: "#cfcfcf" }}>?</span>
+      <div style={{ position: "relative", width: size, height: size, borderRadius: "50%", background: "#232323", border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.06)" }}>
+        <img src={laurelImg} alt="" style={{ position: "absolute", inset: "10%", width: "80%", height: "80%", objectFit: "contain", opacity: 0.22 }} />
+        <span style={{ fontFamily: fb, fontWeight: 600, fontSize: size * 0.36, color: "#9a9a9a", position: "relative" }}>?</span>
       </div>
     );
   }
-  return <img src={t.logo} alt={t.abbr} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, opacity: dim ? 0.38 : 1, background: "#111" }} />;
+  return <FlagCircle src={t.logo} size={size} dim={dim} />;
 }
+
+/* win-% chip under a team once the oracle prices the matchup */
+const Pct = ({ p, home }) => p == null ? null : (
+  <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 10, color: home ? B.primary : "#ff5247" }}>
+    {Math.round((home ? p : 1 - p) * 100)}%
+  </span>
+);
 
 /* ── round chip label (FINAL / SEMI-FINAL 1 / 3RD PLACE) ── */
 const RoundChip = ({ children, gold = false }) => (
@@ -95,9 +113,10 @@ const RoundChip = ({ children, gold = false }) => (
 );
 
 /* ── center-column round cards (FINAL gold glass / semis / 3rd place) — Figma 142-18797 ── */
-function RoundCard({ m, label, onOpen, gold = false }) {
+function RoundCard({ m, label, onOpen, gold = false, prob = null }) {
   const live = m?.state === "in";
   const done = m?.state === "post";
+  const showProb = prob != null && !done && m && !m.home.tbd && !m.away.tbd;
   return (
     <div onClick={() => m && onOpen?.(m)} style={{
       borderRadius: 20, padding: "14px 12px", cursor: m ? "pointer" : "default", textAlign: "center",
@@ -111,11 +130,13 @@ function RoundCard({ m, label, onOpen, gold = false }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           <TeamSlot t={m?.home} size={gold ? 48 : 32} dim={done && m?.home.winner === false} />
           {m?.home && !m.home.tbd && <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 11, color: done && m.home.winner === false ? "#666" : done && m.home.winner ? GREEN : "#fff" }}>{m.home.abbr}{m.state !== "pre" && m.home.score != null ? ` ${m.home.score}` : ""}</span>}
+          {showProb && <Pct p={prob} home />}
         </div>
         {gold && <img src={fifa26} alt="" style={{ width: 36, height: 36, objectFit: "contain" }} />}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           <TeamSlot t={m?.away} size={gold ? 48 : 32} dim={done && m?.away.winner === false} />
           {m?.away && !m.away.tbd && <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 11, color: done && m.away.winner === false ? "#666" : done && m.away.winner ? GREEN : "#fff" }}>{m.away.abbr}{m.state !== "pre" && m.away.score != null ? ` ${m.away.score}` : ""}</span>}
+          {showProb && <Pct p={prob} />}
         </div>
       </div>
       <span style={{ fontFamily: fb, fontWeight: 600, fontSize: 13, color: "rgba(255,255,255,0.8)" }}>
@@ -143,25 +164,27 @@ function WingPair({ m, onOpen }) {
 }
 
 /* QF card in the wings: two flags side by side + date */
-function QfCard({ m, onOpen }) {
+function QfCard({ m, onOpen, prob = null }) {
   const live = m?.state === "in";
   const done = m?.state === "post";
-  const Col = ({ t }) => (
+  const showProb = prob != null && !done && !m.home.tbd && !m.away.tbd;
+  const Col = ({ t, home }) => (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, opacity: done && t.winner === false ? 0.4 : 1 }}>
       <TeamSlot t={t} size={30} />
       <span style={{ fontFamily: fm, fontWeight: 800, fontSize: 11, color: done && t.winner ? GREEN : "#fff" }}>{t.abbr}{t.score != null && m.state !== "pre" ? ` ${t.score}` : ""}</span>
+      {showProb && <Pct p={prob} home={home} />}
     </div>
   );
   return (
     <div onClick={() => onOpen?.(m)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 10px", borderRadius: 18, background: "rgba(30,31,36,0.9)", border: `1px solid ${live ? B.primary + "66" : "rgba(255,255,255,0.06)"}`, cursor: "pointer", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.05)" }}>
-      <div style={{ display: "flex", gap: 18 }}><Col t={m.home} /><Col t={m.away} /></div>
+      <div style={{ display: "flex", gap: 18 }}><Col t={m.home} home /><Col t={m.away} /></div>
       <span style={{ fontFamily: fb, fontSize: 11, color: live ? "#ff5247" : "#8a93a6", fontWeight: 600 }}>{live ? "● LIVE — Trade" : done ? "Full time" : fmtWhen(m.date).split(",")[0]}</span>
     </div>
   );
 }
 
 /* Bracket — symmetric wings converging on the gold FINAL card (Figma home layout) */
-function Bracket({ matches, onOpen, isMobile }) {
+function Bracket({ matches, onOpen, isMobile, probs = {} }) {
   const { r16, qf, sf, third, final } = classifyRounds(matches);
   const leftQf = qf.slice(0, 2), rightQf = qf.slice(2, 4);
   const leftR16 = leftQf.flatMap((q) => feedersFor(q, r16));
@@ -170,14 +193,14 @@ function Bracket({ matches, onOpen, isMobile }) {
   if (isMobile) {
     return (
       <div style={{ display: "grid", gap: 16 }}>
-        {final && <RoundCard m={final} label="FINAL" gold onOpen={onOpen} />}
+        {final && <RoundCard m={final} label="FINAL" gold onOpen={onOpen} prob={probs[final.backendId]} />}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {sf[0] && <RoundCard m={sf[0]} label="SEMI-FINAL 1" onOpen={onOpen} />}
-          {sf[1] && <RoundCard m={sf[1]} label="SEMI-FINAL 2" onOpen={onOpen} />}
+          {sf[0] && <RoundCard m={sf[0]} label="SEMI-FINAL 1" onOpen={onOpen} prob={probs[sf[0].backendId]} />}
+          {sf[1] && <RoundCard m={sf[1]} label="SEMI-FINAL 2" onOpen={onOpen} prob={probs[sf[1].backendId]} />}
         </div>
-        {third && <RoundCard m={third} label="3RD PLACE" onOpen={onOpen} />}
+        {third && <RoundCard m={third} label="3RD PLACE" onOpen={onOpen} prob={probs[third.backendId]} />}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {qf.map((m) => <QfCard key={m.espnId} m={m} onOpen={onOpen} />)}
+          {qf.map((m) => <QfCard key={m.espnId} m={m} onOpen={onOpen} prob={probs[m.backendId]} />)}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
           {r16.map((m) => <WingPair key={m.espnId} m={m} onOpen={onOpen} />)}
@@ -192,18 +215,18 @@ function Bracket({ matches, onOpen, isMobile }) {
         {leftR16.slice(0, 4).map((m) => <WingPair key={m.espnId} m={m} onOpen={onOpen} />)}
       </div>
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-around", gap: 12 }}>
-        {leftQf.map((m) => <QfCard key={m.espnId} m={m} onOpen={onOpen} />)}
+        {leftQf.map((m) => <QfCard key={m.espnId} m={m} onOpen={onOpen} prob={probs[m.backendId]} />)}
       </div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: "0 8px" }}>
-        <div style={{ width: "min(346px, 100%)" }}>{final && <RoundCard m={final} label="FINAL" gold onOpen={onOpen} />}</div>
+        <div style={{ width: "min(346px, 100%)" }}>{final && <RoundCard m={final} label="FINAL" gold onOpen={onOpen} prob={probs[final.backendId]} />}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, width: "100%", maxWidth: 430 }}>
-          {sf[0] ? <RoundCard m={sf[0]} label="SEMI-FINAL 1" onOpen={onOpen} /> : <div />}
-          {sf[1] ? <RoundCard m={sf[1]} label="SEMI-FINAL 2" onOpen={onOpen} /> : <div />}
+          {sf[0] ? <RoundCard m={sf[0]} label="SEMI-FINAL 1" onOpen={onOpen} prob={probs[sf[0].backendId]} /> : <div />}
+          {sf[1] ? <RoundCard m={sf[1]} label="SEMI-FINAL 2" onOpen={onOpen} prob={probs[sf[1].backendId]} /> : <div />}
         </div>
-        <div style={{ width: "min(240px, 100%)" }}>{third && <RoundCard m={third} label="3RD PLACE" onOpen={onOpen} />}</div>
+        <div style={{ width: "min(240px, 100%)" }}>{third && <RoundCard m={third} label="3RD PLACE" onOpen={onOpen} prob={probs[third.backendId]} />}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-around", gap: 12 }}>
-        {rightQf.map((m) => <QfCard key={m.espnId} m={m} onOpen={onOpen} />)}
+        {rightQf.map((m) => <QfCard key={m.espnId} m={m} onOpen={onOpen} prob={probs[m.backendId]} />)}
       </div>
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-around", gap: 12 }}>
         {rightR16.slice(0, 4).map((m) => <WingPair key={m.espnId} m={m} onOpen={onOpen} />)}
@@ -240,7 +263,7 @@ function WCRail({ tab, onTab, liveWc, onOpenLive, authed, onProfile, avatar }) {
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 {liveWc.slice(0, 3).flatMap((g) => [g.home?.logo, g.away?.logo]).filter(Boolean).slice(0, 3).map((logo, i) => (
-                  <img key={i} src={logo} alt="" style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover", marginTop: i ? -5 : 0, border: "1px solid #222", background: "#111" }} />
+                  <div key={i} style={{ marginTop: i ? -5 : 0 }}><FlagCircle src={logo} size={18} /></div>
                 ))}
               </div>
             </div>
@@ -263,26 +286,22 @@ function CountdownRing({ nextMatch, cdStr }) {
   if (!nextMatch) return null;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
-      <div style={{ position: "relative", width: 252, height: 252 }}>
-        <svg width="252" height="252" viewBox="0 0 252 252" style={{ position: "absolute", inset: 0 }}>
-          <circle cx="126" cy="126" r="106" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
-          <defs><path id="wc-arc" d="M 34 126 A 92 92 0 0 1 218 126" fill="none" /></defs>
-          <text style={{ fontFamily: fm, fontWeight: 700, fontSize: 15, letterSpacing: "0.3em", fill: "#fff" }}>
+      <div style={{ position: "relative", width: 208, height: 208, marginBottom: -66 }}>
+        <svg width="208" height="208" viewBox="0 0 208 208" style={{ position: "absolute", inset: 0 }}>
+          <circle cx="104" cy="104" r="88" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+          <defs><path id="wc-arc" d="M 28 104 A 76 76 0 0 1 180 104" fill="none" /></defs>
+          <text style={{ fontFamily: fm, fontWeight: 700, fontSize: 12.5, letterSpacing: "0.3em", fill: "#fff" }}>
             <textPath href="#wc-arc" startOffset="50%" textAnchor="middle">{nextMatch.away.abbr} VS {nextMatch.home.abbr}</textPath>
           </text>
         </svg>
-        <img src={fifa26} alt="FIFA World Cup 26" style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: 92, objectFit: "contain" }} />
-        <div style={{ position: "absolute", left: -8, top: 105, width: 42, height: 42, borderRadius: "50%", overflow: "hidden", border: "1px solid rgba(255,255,255,0.15)", background: "#111" }}>
-          {nextMatch.away.logo && <img src={nextMatch.away.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-        </div>
-        <div style={{ position: "absolute", right: -8, top: 105, width: 42, height: 42, borderRadius: "50%", overflow: "hidden", border: "1px solid rgba(255,255,255,0.15)", background: "#111" }}>
-          {nextMatch.home.logo && <img src={nextMatch.home.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-        </div>
+        <img src={fifa26} alt="FIFA World Cup 26" style={{ position: "absolute", left: "50%", top: 96, transform: "translate(-50%,-50%)", width: 74, objectFit: "contain" }} />
+        <div style={{ position: "absolute", left: -4, top: 86 }}><FlagCircle src={nextMatch.away.logo} size={36} /></div>
+        <div style={{ position: "absolute", right: -4, top: 86 }}><FlagCircle src={nextMatch.home.logo} size={36} /></div>
       </div>
-      <div style={{ marginTop: -46, display: "flex", flexDirection: "column", gap: 13, alignItems: "center", width: 217, zIndex: 1 }}>
-        <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 20, letterSpacing: "0.05em", color: "#fff" }}>NEXT MATCH</span>
-        <div style={{ background: GOLD, padding: 10, width: "100%", textAlign: "center" }}>
-          <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 26, letterSpacing: "0.05em", color: "#000", whiteSpace: "nowrap", textTransform: "uppercase" }}>{cdStr}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", zIndex: 1 }}>
+        <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 17, letterSpacing: "0.05em", color: "#fff" }}>NEXT MATCH</span>
+        <div style={{ background: GOLD, padding: "8px 18px", display: "inline-block" }}>
+          <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 21, letterSpacing: "0.04em", color: "#000", whiteSpace: "nowrap", textTransform: "uppercase" }}>{cdStr}</span>
         </div>
       </div>
     </div>
@@ -293,6 +312,7 @@ export function WorldCupPage() {
   const [tab, setTab] = useState("home");
   const [meta, setMeta] = useState(null);
   const [bracket, setBracket] = useState([]);
+  const [probs, setProbs] = useState({});
   const [lb, setLb] = useState([]);
   const [auth, setAuth] = useState(getAuth);
   const [joined, setJoined] = useState(null);
@@ -312,13 +332,20 @@ export function WorldCupPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [m, l, e] = await Promise.all([
+      const [m, l, e, g] = await Promise.all([
         fetch(`${API_URL}/event`).then(r => r.json()),
         fetch(`${API_URL}/event/leaderboard?limit=50`).then(r => r.json()),
         fetch(ESPN_WC).then(r => r.json()).catch(() => null),
+        fetch(`${API_URL}/games`).then(r => r.json()).catch(() => null),
       ]);
       setMeta(m); setLb(l.leaderboard || []);
       if (e?.events) setBracket(e.events.map(parseMatch));
+      const games = g?.games || (Array.isArray(g) ? g : []);
+      const p = {};
+      for (const gm of games) {
+        if (gm?.id?.startsWith?.("wcup_") && gm.oracle?.indexPrice != null && gm.oracle.confidence > 0) p[gm.id] = gm.oracle.indexPrice;
+      }
+      setProbs(p);
       if (auth?.userId) {
         const eb = await fetch(`${API_URL}/event/balance/${auth.userId}`);
         if (eb.status === 404) { setJoined(false); setWcBalance(null); setStanding(null); }
@@ -389,46 +416,45 @@ export function WorldCupPage() {
   /* ── HOME (Figma 142-18663) ── */
   const HomeTab = () => (
     <div style={{ position: "relative" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: isMobile ? 660 : 860, overflow: "hidden", pointerEvents: "none" }}>
-        <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.55 }} />
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(90% 60% at 50% 0%, rgba(11,11,11,0) 0%, rgba(6,7,10,0.55) 70%, #06070a 100%)" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(6,7,10,0.25) 0%, rgba(6,7,10,0.1) 35%, #06070a 96%)" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: isMobile ? 560 : 700, overflow: "hidden", pointerEvents: "none" }}>
+        <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 32%" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(4,5,7,0.42) 0%, rgba(4,5,7,0.28) 30%, rgba(4,5,7,0.62) 62%, #06070a 97%)" }} />
       </div>
 
-      <div style={{ position: "relative", padding: isMobile ? "26px 16px 60px" : "44px 40px 80px" }}>
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: isMobile ? 26 : 40 }}>
+      <div style={{ position: "relative", padding: isMobile ? "8px 16px 60px" : "6px 40px 80px" }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: isMobile ? 18 : 24 }}>
           <CountdownRing nextMatch={liveMatch || nextMatch} cdStr={liveMatch ? "LIVE NOW" : cdStr || "—"} />
         </div>
 
         <div style={{ textAlign: "center", maxWidth: 1253, margin: "0 auto" }}>
-          <h1 style={{ fontFamily: fd, fontWeight: 800, textTransform: "uppercase", color: "#fff", fontSize: isMobile ? 44 : "min(7.2vw, 96px)", lineHeight: 1.04, letterSpacing: "-0.01em", margin: 0 }}>
+          <h1 style={{ fontFamily: fd, fontWeight: 800, textTransform: "uppercase", color: "#fff", fontSize: isMobile ? 40 : "min(5.4vw, 74px)", lineHeight: 1.05, letterSpacing: "-0.01em", margin: 0, textShadow: "0 4px 30px rgba(0,0,0,0.55)" }}>
             The World Cup<br />Trading Competition
           </h1>
-          <p style={{ fontFamily: fb, color: "rgba(255,255,255,0.85)", fontSize: isMobile ? 13.5 : 16, lineHeight: 1.5, maxWidth: 640, margin: "22px auto 0" }}>
+          <p style={{ fontFamily: fb, color: "rgba(255,255,255,0.88)", fontSize: isMobile ? 13.5 : 15, lineHeight: 1.5, maxWidth: 640, margin: "16px auto 0", textShadow: "0 2px 14px rgba(0,0,0,0.6)" }}>
             $10,000 World Cup Cash per entrant, trade live win probability through the bracket.<br />
             Cash prizes $1,000 · $500 · $250
           </p>
 
           {meta?.live && (joined
-            ? <div style={{ marginTop: 28, display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+            ? <div style={{ marginTop: 20, display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
                 {standing && [["RANK", `#${standing.rank}`], ["WC CASH", `$${Math.round(wcBalance ?? standing.equity).toLocaleString()}`], ["ROI", `${standing.roiPct >= 0 ? "+" : ""}${standing.roiPct}%`]].map(([k, v]) => (
-                  <div key={k} style={{ padding: "12px 22px", borderRadius: 14, background: "rgba(20,21,25,0.85)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div key={k} style={{ padding: "10px 20px", borderRadius: 14, background: "rgba(20,21,25,0.85)", border: "1px solid rgba(255,255,255,0.08)" }}>
                     <div style={{ fontFamily: fm, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", color: "#8a93a6" }}>{k}</div>
                     <div style={{ fontFamily: fd, fontWeight: 800, fontSize: 20, color: k === "ROI" ? (standing.roiPct >= 0 ? GREEN : "#ff5247") : "#fff" }}>{v}</div>
                   </div>
                 ))}
               </div>
-            : <div style={{ marginTop: 28 }}>
-                <button onClick={join} style={{ padding: "14px 22px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: fb, fontWeight: 700, fontSize: 15, background: "#fff", color: "#0a0a0a", boxShadow: "0 10px 34px rgba(255,255,255,0.15)" }}>
+            : <div style={{ marginTop: 20 }}>
+                <button onClick={join} style={{ padding: "13px 22px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: fb, fontWeight: 700, fontSize: 15, background: "#fff", color: "#0a0a0a", boxShadow: "0 10px 34px rgba(255,255,255,0.15)" }}>
                   Join Championship &amp; Get $10,000
                 </button>
                 {joinErr && <div style={{ color: "#ff5247", fontSize: 13, marginTop: 12 }}>{joinErr}</div>}
-                <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 12.5, marginTop: 16 }}>One entry per person — email + phone verification keeps the prizes fair.</div>
+                <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12.5, marginTop: 12, textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>One entry per person — email + phone verification keeps the prizes fair.</div>
               </div>)}
         </div>
 
-        <div style={{ marginTop: isMobile ? 48 : 90 }}>
-          {bracket.length > 0 && <Bracket matches={bracket} onOpen={openMatch} isMobile={isMobile} />}
+        <div style={{ marginTop: isMobile ? 40 : 56 }}>
+          {bracket.length > 0 && <Bracket matches={bracket} onOpen={openMatch} isMobile={isMobile} probs={probs} />}
         </div>
 
         <p style={{ textAlign: "center", color: "#4a4f58", fontSize: 11.5, lineHeight: 1.8, maxWidth: 780, margin: "70px auto 0" }}>
