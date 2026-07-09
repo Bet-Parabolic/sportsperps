@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { Home, Ticket, Newspaper, Trophy, ArrowRight } from "lucide-react";
+import { Home, Ticket, Newspaper, Trophy } from "lucide-react";
 import { B, fb, fd, fm } from "../lib/theme.js";
-import { LOGO_MARK, LOGO_WORDMARK } from "../lib/logos.js";
+import { LOGO_WORDMARK } from "../lib/logos.js";
 import { API_URL } from "../lib/constants.js";
 import { getAuth, authToken, currentUserId } from "../lib/auth.js";
 import { VerifyModal } from "./VerifyModal.jsx";
@@ -235,48 +235,34 @@ function Bracket({ matches, onOpen, isMobile, probs = {} }) {
   );
 }
 
-/* ── left nav rail (Figma 142-17611): logo, icons, live capsule, avatar ── */
-function WCRail({ tab, onTab, liveWc, onOpenLive, authed, onProfile, avatar }) {
+/* ── left nav rail (Figma 142-17611): icons + live capsule ── */
+function WCRail({ tab, onTab, liveWc, onOpenLive }) {
   const items = [["home", Home], ["bets", Ticket], ["news", Newspaper], ["leaderboard", Trophy]];
   return (
-    <div style={{ width: 64, flexShrink: 0, background: "#050505", borderRight: "1px solid #131313", display: "flex", flexDirection: "column", alignItems: "center", height: "100%", padding: "0 12px" }}>
-      <div style={{ padding: "20px 0 8px" }}>
-        <img src={LOGO_MARK} alt="Parabolic" style={{ width: 22, height: 22, cursor: "pointer" }} onClick={() => onTab("home")} />
+    <div style={{ width: 64, flexShrink: 0, background: "#050505", borderRight: "1px solid #131313", display: "flex", flexDirection: "column", alignItems: "center", height: "100%", padding: "22px 12px 20px", gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
+        {items.map(([key, Icon]) => (
+          <button key={key} onClick={() => onTab(key)} title={key} style={{ width: 36, height: 36, borderRadius: 12, border: "none", cursor: "pointer", background: tab === key ? "rgba(255,255,255,0.08)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon size={20} color={tab === key ? "#fff" : "#63676e"} strokeWidth={2} />
+          </button>
+        ))}
       </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", paddingBottom: 20, paddingTop: 8, width: "100%" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-            {items.map(([key, Icon]) => (
-              <button key={key} onClick={() => onTab(key)} title={key} style={{ width: 36, height: 36, borderRadius: 12, border: "none", cursor: "pointer", background: tab === key ? "rgba(255,255,255,0.08)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon size={20} color={tab === key ? "#fff" : "#63676e"} strokeWidth={2} />
-              </button>
+      {liveWc.length > 0 && (
+        <div onClick={() => onOpenLive(liveWc[0])} title={`${liveWc.length} live match${liveWc.length > 1 ? "es" : ""} — trade now`}
+          style={{ width: 36, borderRadius: 9999, padding: "10px 3px 8px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 6, alignItems: "center",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)), rgba(34,34,34,0.95)",
+            boxShadow: "inset 0 1px 1px rgba(255,255,255,0.04), inset 0 0 0 0.5px rgba(255,255,255,0.05)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
+            <div style={{ width: 6, height: 6, borderRadius: 24, background: "#46dc63", boxShadow: "0 0 2px 0.5px rgba(143,250,163,0.15), 0 0 5px 1px rgba(70,220,99,0.25), 0 0 11px 2px rgba(70,220,99,0.45)" }} />
+            <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 12, color: "#fff" }}>{liveWc.length}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+            {liveWc.slice(0, 3).flatMap((g) => [g.home?.logo, g.away?.logo]).filter(Boolean).slice(0, 3).map((logo, i) => (
+              <div key={i} style={{ marginTop: i ? -5 : 0 }}><FlagCircle src={logo} size={18} /></div>
             ))}
           </div>
-          {liveWc.length > 0 && (
-            <div onClick={() => onOpenLive(liveWc[0])} title={`${liveWc.length} live match${liveWc.length > 1 ? "es" : ""} — trade now`}
-              style={{ width: 36, borderRadius: 9999, padding: "10px 3px 8px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 6, alignItems: "center",
-                background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)), rgba(34,34,34,0.95)",
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.04), inset 0 0 0 0.5px rgba(255,255,255,0.05)" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
-                <div style={{ width: 6, height: 6, borderRadius: 24, background: "#46dc63", boxShadow: "0 0 2px 0.5px rgba(143,250,163,0.15), 0 0 5px 1px rgba(70,220,99,0.25), 0 0 11px 2px rgba(70,220,99,0.45)" }} />
-                <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 12, color: "#fff" }}>{liveWc.length}</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                {liveWc.slice(0, 3).flatMap((g) => [g.home?.logo, g.away?.logo]).filter(Boolean).slice(0, 3).map((logo, i) => (
-                  <div key={i} style={{ marginTop: i ? -5 : 0 }}><FlagCircle src={logo} size={18} /></div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-        {authed && (
-          <button onClick={onProfile} title="My profile" style={{ width: 40, height: 40, borderRadius: 64, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
-            <div style={{ width: 28, height: 28, borderRadius: "50%", border: "3px solid #131313", overflow: "hidden", background: "#1a1d22", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {avatar ? <AvatarCircle avatar={avatar} size={28} /> : <span style={{ fontSize: 13 }}>👤</span>}
-            </div>
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -416,13 +402,13 @@ export function WorldCupPage() {
   /* ── HOME (Figma 142-18663) ── */
   const HomeTab = () => (
     <div style={{ position: "relative" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: isMobile ? 560 : 700, overflow: "hidden", pointerEvents: "none" }}>
-        <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 32%" }} />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(4,5,7,0.42) 0%, rgba(4,5,7,0.28) 30%, rgba(4,5,7,0.62) 62%, #06070a 97%)" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: isMobile ? 520 : 640, overflow: "hidden", pointerEvents: "none" }}>
+        <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 76%" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(4,5,7,0.4) 0%, rgba(4,5,7,0.16) 32%, rgba(4,5,7,0.3) 62%, rgba(6,7,10,0.82) 86%, #06070a 99%)" }} />
       </div>
 
-      <div style={{ position: "relative", padding: isMobile ? "8px 16px 60px" : "6px 40px 80px" }}>
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: isMobile ? 18 : 24 }}>
+      <div style={{ position: "relative", padding: isMobile ? "60px 16px 60px" : "64px 40px 80px" }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: isMobile ? 14 : 18 }}>
           <CountdownRing nextMatch={liveMatch || nextMatch} cdStr={liveMatch ? "LIVE NOW" : cdStr || "—"} />
         </div>
 
@@ -502,8 +488,8 @@ export function WorldCupPage() {
           <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.32 }} />
           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(6,7,10,0.25), rgba(6,7,10,0.85) 60%, #06070a)" }} />
         </div>
-        <div style={{ position: "relative", padding: isMobile ? "0 14px 60px" : "0 24px 70px" }}>
-          <div style={{ fontFamily: fb, fontWeight: 600, fontSize: 14, color: "#fff", padding: "22px 8px" }}>Leaderboard</div>
+        <div style={{ position: "relative", padding: isMobile ? "56px 14px 60px" : "56px 24px 70px" }}>
+          <div style={{ fontFamily: fb, fontWeight: 600, fontSize: 14, color: "#fff", padding: "10px 8px 22px" }}>Leaderboard</div>
 
           {me && (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: -8 }}>
@@ -571,58 +557,33 @@ export function WorldCupPage() {
   return (
     <div style={{ height: "100vh", background: "#06070a", fontFamily: fb, color: "#eef1f6", display: "flex", overflow: "hidden" }}>
       {!isMobile && (
-        <WCRail tab={tab} onTab={setTab} liveWc={wcLive} onOpenLive={openGame}
-          authed={!!auth} onProfile={() => setShowProfile(true)} avatar={memberCard?.avatar} />
+        <WCRail tab={tab} onTab={setTab} liveWc={wcLive} onOpenLive={openGame} />
       )}
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* announcement strip (Figma 142-18913) */}
-        <div style={{ height: 40, flexShrink: 0, background: "#000", borderBottom: "1px solid #101114", display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "0 12px", overflow: "hidden", whiteSpace: "nowrap" }}>
-          <span style={{ fontFamily: fb, fontWeight: 600, fontSize: 12.5, color: "#fff" }}>World Cup predictions are live</span>
-          {liveMatch && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <span style={{ background: "#ff3628", borderRadius: 999, padding: "2px 8px", fontFamily: fm, fontWeight: 800, fontSize: 9, color: "#fff", letterSpacing: "0.06em" }}>LIVE{liveMatch.minute ? ` • ${liveMatch.minute}` : ""}</span>
-              <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 12, color: "#fff" }}>
-                {liveMatch.away.abbr} {liveMatch.away.score ?? 0} - {liveMatch.home.score ?? 0} {liveMatch.home.abbr}
-              </span>
-            </span>
-          )}
-          {!isMobile && <span style={{ width: 1, height: 10, background: "#2a2d33" }} />}
-          <button onClick={() => (liveMatch || nextMatch) && openMatch(liveMatch || nextMatch)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", fontFamily: fb, fontWeight: 600, fontSize: 12.5, color: "#fff" }}>
-            Trade World Cup <ArrowRight size={12} color="#fff" />
-          </button>
-        </div>
-
-        {/* header: wordmark + auth pills (Figma) */}
-        <div style={{ height: 64, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "0 16px" : "0 40px" }}>
-          <img src={LOGO_WORDMARK} alt="Parabolic" style={{ height: 22 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {joined && wcBalance != null && (
-              <div style={{ padding: "6px 14px", borderRadius: 999, background: "rgba(94,216,126,0.1)", border: `1px solid ${GREEN}44` }}>
-                <span style={{ fontFamily: fm, fontWeight: 800, fontSize: 13, color: "#fff" }}>${wcBalance.toLocaleString(undefined, { minimumFractionDigits: isMobile ? 0 : 2 })}</span>
-              </div>
-            )}
-            {auth
-              ? <>
-                  {!isMobile && <span style={{ fontFamily: fm, fontSize: 13, color: "#aaa" }}>{auth.username}</span>}
-                  {isMobile && (
-                    <div onClick={() => setShowProfile(true)} style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", background: "#1a1d22", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                      {memberCard?.avatar ? <AvatarCircle avatar={memberCard.avatar} size={30} /> : <span style={{ fontSize: 13 }}>👤</span>}
-                    </div>
-                  )}
-                </>
-              : <>
-                  <button onClick={() => setShowOnboard(true)} style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: fb, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Login</button>
-                  <button onClick={() => setShowOnboard(true)} style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "#fff", color: "#0a0a0a", fontFamily: fb, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Create account</button>
-                </>}
+        <div style={{ flex: 1, overflowY: "auto", paddingBottom: isMobile ? 68 : 0, position: "relative" }}>
+          {/* header overlays the tab content (Figma: wordmark + auth pills float on the stadium hero) */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 64, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "0 16px" : "0 40px" }}>
+            <img src={LOGO_WORDMARK} alt="Parabolic" style={{ height: 22 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {joined && wcBalance != null && (
+                <div style={{ padding: "6px 14px", borderRadius: 999, background: "rgba(94,216,126,0.1)", border: `1px solid ${GREEN}44`, backdropFilter: "blur(6px)" }}>
+                  <span style={{ fontFamily: fm, fontWeight: 800, fontSize: 13, color: "#fff" }}>${wcBalance.toLocaleString(undefined, { minimumFractionDigits: isMobile ? 0 : 2 })}</span>
+                </div>
+              )}
+              {auth
+                ? <button onClick={() => setShowProfile(true)} title="My profile" style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.18)", overflow: "hidden", background: "#1a1d22", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}>
+                    {memberCard?.avatar ? <AvatarCircle avatar={memberCard.avatar} size={34} /> : <span style={{ fontSize: 14 }}>👤</span>}
+                  </button>
+                : <>
+                    <button onClick={() => setShowOnboard(true)} style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", fontFamily: fb, fontWeight: 600, fontSize: 13, cursor: "pointer", backdropFilter: "blur(6px)" }}>Login</button>
+                    <button onClick={() => setShowOnboard(true)} style={{ padding: "8px 16px", borderRadius: 999, border: "none", background: "#fff", color: "#0a0a0a", fontFamily: fb, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Create account</button>
+                  </>}
+            </div>
           </div>
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto", paddingBottom: isMobile ? 68 : 0 }}>
           {tab === "home" && <HomeTab />}
-          {tab === "bets" && <div style={{ padding: isMobile ? "10px 4px" : "10px 16px" }}><ActiveBetsPage eventOnly liveGames={wcLive} onTrade={openGame} /></div>}
-          {tab === "news" && <NewsPage />}
+          {tab === "bets" && <div style={{ padding: isMobile ? "64px 4px 10px" : "64px 16px 10px" }}><ActiveBetsPage eventOnly liveGames={wcLive} onTrade={openGame} /></div>}
+          {tab === "news" && <div style={{ paddingTop: 56 }}><NewsPage /></div>}
           {tab === "leaderboard" && <LeaderboardTab />}
         </div>
       </div>
