@@ -9,8 +9,9 @@ import { ProfilePage } from "./ProfilePage.jsx";
 import { ActiveBetsPage } from "./ActiveBetsPage.jsx";
 import { NewsPage } from "./NewsPage.jsx";
 import { useLiveGames } from "../lib/useLiveGames.js";
-import { loadCard } from "../lib/onboarding.js";
+import { loadCard, parseAvatar, syncAvatarToBackend } from "../lib/onboarding.js";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
+import { PublicProfilePage } from "./PublicProfilePage.jsx";
 import stadiumBg from "../assets/worldcup/stadium.jpg";
 import fifa26 from "../assets/worldcup/fifa26.png";
 import laurelImg from "../assets/worldcup/laurel.svg";
@@ -308,6 +309,7 @@ export function WorldCupPage() {
   const [showVerify, setShowVerify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
+  const [viewUser, setViewUser] = useState(null); // public-profile target
   const [joinErr, setJoinErr] = useState("");
   const [activeGame, setActiveGame] = useState(null);
   const [now, setNow] = useState(Date.now());
@@ -349,6 +351,8 @@ export function WorldCupPage() {
   useEffect(() => { refresh(); const iv = setInterval(refresh, 30_000); return () => clearInterval(iv); }, [refresh]);
   useEffect(() => { const iv = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(iv); }, []);
   useEffect(() => { document.title = "Parabolic · World Cup Trading Competition"; }, []);
+  // One-shot: push the device-local avatar to the account so leaderboards/feeds can show it.
+  useEffect(() => { if (auth?.userId) syncAvatarToBackend({ apiUrl: API_URL, userId: auth.userId, token: authToken() }); }, [auth?.userId]);
 
   const join = useCallback(async () => {
     setJoinErr("");
@@ -464,16 +468,22 @@ export function WorldCupPage() {
     const medal = (rank) => rank === 1
       ? "linear-gradient(180deg,#cf7b0e,#9f5a00)" : rank === 2
       ? "linear-gradient(180deg,#9aa0a8,#5c6167)" : "linear-gradient(180deg,#a06a3c,#6d4426)";
+    const openUser = (e) => {
+      if (e.userId === userId) { setShowProfile(true); return; }
+      if (e.profilePublic !== false) setViewUser(e.userId);
+    };
+    const lbAvatar = (e) => (e.userId === userId && memberCard?.avatar) ? memberCard.avatar : parseAvatar(e.avatar);
     const Podium = ({ e, big = false }) => {
       if (!e) return <div style={{ width: 130 }} />;
       const wreathW = big ? 100 : 82, wreathH = big ? 90 : 74, av = big ? 64 : 52;
+      const pav = lbAvatar(e);
       return (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, width: 130, marginTop: big ? 0 : 26 }}>
+        <div onClick={() => openUser(e)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, width: 130, marginTop: big ? 0 : 26, cursor: e.profilePublic !== false || e.userId === userId ? "pointer" : "default" }}>
           <div style={{ position: "relative", width: wreathW, height: wreathH + 10 }}>
             <img src={laurelPodium} alt="" style={{ position: "absolute", left: 0, top: 0, width: wreathW, height: wreathH, objectFit: "contain", filter: e.rank === 1 ? "none" : "grayscale(0.75) brightness(1.08)" }} />
             <div style={{ position: "absolute", left: "50%", top: (wreathH - av) / 2 - 2, transform: "translateX(-50%)", width: av, height: av, borderRadius: "50%", background: "#23262c", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-              {e.userId === userId && memberCard?.avatar
-                ? <AvatarCircle avatar={memberCard.avatar} size={av} />
+              {pav
+                ? <AvatarCircle avatar={pav} size={av} />
                 : <span style={{ fontFamily: fd, fontWeight: 800, fontSize: av * 0.38, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
             </div>
             <div style={{ position: "absolute", left: "50%", bottom: 0, transform: "translateX(-50%)", background: "#0a0a0b", borderRadius: 40, padding: 3 }}>
@@ -525,11 +535,12 @@ export function WorldCupPage() {
             <div style={{ maxWidth: 560, margin: "38px auto 0" }}>
               {rest.map((e) => {
                 const isMe = e.userId === userId;
+                const rav = lbAvatar(e);
                 return (
-                  <div key={e.userId} style={{ display: "flex", alignItems: "center", gap: 14, height: 62, borderBottom: "1px solid rgba(255,255,255,0.06)", background: isMe ? "rgba(94,216,126,0.05)" : "transparent", borderRadius: isMe ? 10 : 0, padding: "0 10px" }}>
+                  <div key={e.userId} onClick={() => openUser(e)} style={{ display: "flex", alignItems: "center", gap: 14, height: 62, borderBottom: "1px solid rgba(255,255,255,0.06)", background: isMe ? "rgba(94,216,126,0.05)" : "transparent", borderRadius: isMe ? 10 : 0, padding: "0 10px", cursor: e.profilePublic !== false || isMe ? "pointer" : "default" }}>
                     <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 14, color: "#8a93a6", width: 22 }}>{e.rank}</span>
                     <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#23262c", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                      {isMe && memberCard?.avatar ? <AvatarCircle avatar={memberCard.avatar} size={28} /> : <span style={{ fontFamily: fd, fontWeight: 700, fontSize: 12, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
+                      {rav ? <AvatarCircle avatar={rav} size={28} /> : <span style={{ fontFamily: fd, fontWeight: 700, fontSize: 12, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
                     </div>
                     <span style={{ fontFamily: fb, fontWeight: 600, fontSize: 14.5, color: isMe ? GREEN : "#fff", flex: 1 }}>{e.username || e.userId.slice(0, 8)}{isMe ? " (you)" : ""}</span>
                     <div style={{ textAlign: "right" }}>
@@ -592,6 +603,7 @@ export function WorldCupPage() {
         </div>
       )}
 
+      {viewUser && <PublicProfilePage targetId={viewUser} onClose={() => setViewUser(null)} />}
       {showShareCard && (() => {
         const meLb = lb.find((e) => e.userId === userId);
         return (

@@ -5,7 +5,7 @@ import { API_URL } from "../lib/constants.js";
 import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "../lib/auth.js";
 import { CardShareModal } from "./CardShareModal.jsx";
 import { MemberCard, AvatarCircle } from "./onboarding/MemberCard.jsx";
-import { loadCard, referralCodeFor } from "../lib/onboarding.js";
+import { loadCard, referralCodeFor, syncAvatarToBackend } from "../lib/onboarding.js";
 
 // League metadata for bet cards + the favorite-discipline card (league comes from gameId prefix).
 const LEAGUE_META = {
@@ -59,6 +59,8 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
+  // One-shot: push the device-local avatar to the account so leaderboards/feeds can show it.
+  useEffect(() => { syncAvatarToBackend({ apiUrl: API_URL, userId, token: authToken() }); }, [userId]);
 
   const username = profile?.username || "trader";
   const joined = profile?.createdAt

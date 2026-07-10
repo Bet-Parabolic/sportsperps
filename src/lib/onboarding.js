@@ -70,3 +70,67 @@ export function referralCodeFor(userId) {
 
 /** Exact bar widths of the card's barcode, lifted from the Figma node tree. */
 export const BARCODE_WIDTHS = [3, 2, 4, 1, 2, 3, 1, 1, 3, 3, 2, 2, 4, 1, 1, 4, 1, 1];
+
+/* ── avatar ↔ backend sync ─────────────────────────────────────────────────
+   The backend stores one TEXT field: a data-URI for photos, or a JSON emoji
+   descriptor. These helpers translate to/from the local {kind,...} shape. */
+
+export function serializeAvatar(avatar) {
+  if (!avatar) return null;
+  if (avatar.kind === 'photo') return avatar.uri;
+  if (avatar.kind === 'emoji') return JSON.stringify({ kind: 'emoji', emoji: avatar.emoji, bg: avatar.bg });
+  return null;
+}
+
+export function parseAvatar(s) {
+  if (!s || typeof s !== 'string') return null;
+  if (s.startsWith('data:')) return { kind: 'photo', uri: s };
+  if (s.startsWith('{')) { try { const o = JSON.parse(s); if (o?.kind) return o; } catch { /* ignore */ } }
+  return null;
+}
+
+/** Downscale an uploaded image to a small square JPEG data-URI (leaderboard/feed friendly). */
+export function resizeAvatar(dataUrl, px = 128) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = px; c.height = px;
+        const ctx = c.getContext('2d');
+        const s = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, px, px);
+        resolve(c.toDataURL('image/jpeg', 0.82));
+      } catch { resolve(dataUrl); }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/** Best-effort one-shot upload of the device-local avatar to the account (so leaderboards can
+    show it). Safe to call on every mount — a localStorage flag stops repeats per avatar. */
+export async function syncAvatarToBackend({ apiUrl, userId, token }) {
+  try {
+    if (!userId) return;
+    const card = loadCard();
+    const ser = serializeAvatar(card.avatar);
+    if (!ser) return;
+    const KEY = 'parabolic_avatar_synced';
+    const sig = `${userId}:${ser.length}:${ser.slice(0, 40)}`;
+    if (localStorage.getItem(KEY) === sig) return;
+    // photos saved before resizing existed can be huge — shrink before upload
+    let payload = ser;
+    if (ser.startsWith('data:') && ser.length > 80_000) {
+      payload = await resizeAvatar(ser);
+      if (payload.length > 80_000) return; // still too big — skip, never block
+      card.avatar = { kind: 'photo', uri: payload };
+      try { localStorage.setItem('parabolic_card', JSON.stringify(card)); } catch { /* ignore */ }
+    }
+    const res = await fetch(`${apiUrl}/profile/${userId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar: payload, token }),
+    });
+    if (res.ok) localStorage.setItem(KEY, sig);
+  } catch { /* offline — retry next visit */ }
+}

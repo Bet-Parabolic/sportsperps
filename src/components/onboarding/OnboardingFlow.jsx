@@ -17,7 +17,7 @@ import { API_URL } from "../../lib/constants.js";
 import { register, authToken, currentUserId, getAuth, setAuth as setAuthState } from "../../lib/auth.js";
 import { AuthModal } from "../AuthModal.jsx";
 import { track } from "../../lib/track.js";
-import { draft, resetDraft, persistCard } from "../../lib/onboarding.js";
+import { draft, resetDraft, persistCard, resizeAvatar, serializeAvatar } from "../../lib/onboarding.js";
 import { MemberCard } from "./MemberCard.jsx";
 import { SignaturePad } from "./SignaturePad.jsx";
 import heroImg from "../../assets/onboard-hero.jpg";
@@ -174,7 +174,8 @@ function ProfileStep({ username, setUsername, onBack, onNext }) {
     const f = e.target.files?.[0];
     if (!f) return;
     const reader = new FileReader();
-    reader.onload = () => setAvatar({ kind: "photo", uri: reader.result });
+    // downscale to a small square so the avatar can sync to the account (leaderboards/feed)
+    reader.onload = () => resizeAvatar(reader.result).then((uri) => setAvatar({ kind: "photo", uri }));
     reader.readAsDataURL(f);
   };
 
@@ -240,10 +241,14 @@ function SignatureStep({ username, onBack, onNext }) {
     draft.signature = d ? { d, w: padW, h: padH } : null;
     try {
       await register(username, draft.password); // claims the guest UUID → paper balance carries over
-      if (draft.email) {
-        // Attach the email for 2FA/recovery; never block onboarding if it fails.
+      // Attach email (2FA/recovery) + avatar (leaderboards/feed); never block onboarding on either.
+      const extras = {};
+      if (draft.email) extras.email = draft.email;
+      const av = serializeAvatar(draft.avatar);
+      if (av) extras.avatar = av;
+      if (Object.keys(extras).length) {
         try {
-          await fetch(`${API_URL}/profile/${currentUserId()}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: draft.email, token: authToken() }) });
+          await fetch(`${API_URL}/profile/${currentUserId()}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...extras, token: authToken() }) });
         } catch { /* ignore */ }
       }
       onNext();
