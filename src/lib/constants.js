@@ -1,5 +1,10 @@
 /* ─── Backend API ─── */
 export const API_URL = "https://perpdictions-backend-production.up.railway.app/api";
+
+/* ─── Google OAuth client id (GIS). Set VITE_GOOGLE_CLIENT_ID in Vercel env; empty = the
+   Sign-up-with-Google button falls back to a coming-soon toast. Must match the backend's
+   GOOGLE_CLIENT_ID (Railway) — the ID token audience is verified server-side. ─── */
+export const GOOGLE_CLIENT_ID = import.meta.env?.VITE_GOOGLE_CLIENT_ID || "";
 /* WebSocket — derived from API_URL: https→wss, /api→/ws */
 export const WS_URL = API_URL.replace(/^http/, "ws").replace(/\/api$/, "/ws");
 
