@@ -1,13 +1,15 @@
 /**
- * Account onboarding flow — web port of the mobile app's welcome + onboarding screens
- * (Figma 82:18508 → 82:19663). Behavior parity with mobile:
- *   welcome (WIN hero, Explore as guest, Create account, Log in)
- *   → account sheet (Apple/Google/Wallet = coming soon; Email = real path)
- *   → email+password (held in memory) → referral (skippable) → sport (lanyard color)
- *   → username (creates the REAL account: register claims the guest UUID, then attaches email)
- *   → profile image (upload or emoji templates, skippable) → signature (canvas, skippable)
- *   → congrats (card on lanyard) → persist card locally → terminal.
- * Card data is device-local; referral codes are deterministic from the userId (no server bonus).
+ * Account onboarding — 4-screen split modal (Figma Parabolic 157:19134 welcome,
+ * 157:18780 username+pfp, 157:19501 signature, 157:19843 done). Replaces the old
+ * 9-step full-page flow (email code / phone 2FA / referral / sport steps removed —
+ * identity verification now happens at WC join time via VerifyModal).
+ *   welcome (email+password, Apple/Google/Wallet coming-soons, Log in)
+ *   → profile (username w/ live availability + optional picture)
+ *   → signature (draw on the card) → Create account (register claims the guest UUID)
+ *   → done (card issued, Start trading).
+ * Card data stays device-local (persistCard). Deviation from the frames: a password
+ * field on screen 1 — accounts are username/password and the design has no other
+ * place to set one.
  */
 import { useEffect, useRef, useState } from "react";
 import { B, fd, fb, fm } from "../../lib/theme.js";
@@ -15,76 +17,56 @@ import { API_URL } from "../../lib/constants.js";
 import { register, authToken, currentUserId, getAuth, setAuth as setAuthState } from "../../lib/auth.js";
 import { AuthModal } from "../AuthModal.jsx";
 import { track } from "../../lib/track.js";
-import { SPORTS, AVATAR_TEMPLATES, draft, resetDraft, persistCard, referralCodeFor } from "../../lib/onboarding.js";
-import { MemberCard, AvatarCircle } from "./MemberCard.jsx";
-import { Lanyard } from "./Lanyard.jsx";
+import { draft, resetDraft, persistCard } from "../../lib/onboarding.js";
+import { MemberCard } from "./MemberCard.jsx";
 import { SignaturePad } from "./SignaturePad.jsx";
-import { LOGO_WORDMARK } from "../../lib/logos.js";
-import winNeon from "../../assets/winNeon.png";
-import heroPlayer from "../../assets/heroPlayer.png";
+import heroImg from "../../assets/onboard-hero.jpg";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
-const COL_W = 400; // centered column width on desktop
 
-/* ── shared chrome ────────────────────────────────────────────────────────── */
+/* ── shared styles ── */
+const whitePill = { background: "#fff", border: "none", borderRadius: 999, height: 42, width: "100%", color: "#0a0a0a", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: fb };
+const darkPill = { background: "rgba(255,255,255,0.07)", border: "none", borderRadius: 999, height: 42, width: "100%", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fb, display: "flex", alignItems: "center", justifyContent: "center", gap: 9 };
+const fieldInput = { background: "#161616", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "11px 15px", color: "#fff", fontSize: 14, fontFamily: fb, outline: "none", width: "100%", boxSizing: "border-box" };
+const circleBtn = { width: 32, height: 32, borderRadius: 16, background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
 
-function Frame({ title, subtitle, children, cta = "Continue", ctaEnabled = true, onCta, onSkip, onBack }) {
+function Toast({ msg }) {
+  if (!msg) return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", maxWidth: COL_W, margin: "0 auto", padding: "0 16px", width: "100%" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
-        {onBack ? (
-          <button onClick={onBack} style={circleBtn}>←</button>
-        ) : <div style={{ width: 40 }} />}
-        {onSkip ? (
-          <button onClick={onSkip} style={{ background: "none", border: "none", color: "#fff", fontWeight: 600, fontSize: 15, cursor: "pointer", fontFamily: fb }}>Skip</button>
-        ) : <div style={{ width: 40 }} />}
-      </div>
-      {(title || subtitle) && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4, paddingBottom: 18, textAlign: "center" }}>
-          {title && <div style={{ fontFamily: fd, fontSize: 24, lineHeight: "30px", fontWeight: 700, color: "#fff" }}>{title}</div>}
-          {subtitle && <div style={{ fontSize: 14, color: "#8a8f98", lineHeight: 1.5, whiteSpace: "pre-line", padding: "0 24px" }}>{subtitle}</div>}
+    <div style={{ position: "fixed", bottom: 60, left: "50%", transform: "translateX(-50%)", zIndex: 900, background: "#1c1c1c", border: "1px solid #333", color: "#eee", borderRadius: 12, padding: "12px 18px", fontSize: 13, maxWidth: 340, textAlign: "center", fontFamily: fb }}>{msg}</div>
+  );
+}
+
+const AppleIcon = () => <svg width="16" height="16" viewBox="0 0 384 512" fill="#fff"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>;
+const GoogleIcon = () => <svg width="16" height="16" viewBox="0 0 488 512"><path fill="#4285F4" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"/></svg>;
+const WalletIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/></svg>;
+
+/* ── modal shell: form panel left, lanyard-card hero right (hidden on mobile) ── */
+function Shell({ children, corner, onClose }) {
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 900;
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 800, fontFamily: fb, color: "#fff" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(10px)" }} />
+      <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: isMobile ? "100%" : "min(986px, 94vw)", height: isMobile ? "100%" : "min(600px, 92vh)", borderRadius: isMobile ? 0 : 20, overflow: "hidden", display: "flex", background: "#101010", boxShadow: "0 40px 120px rgba(0,0,0,0.6)" }}>
+        <div style={{ flex: 1, minWidth: 0, position: "relative", display: "flex", flexDirection: "column", padding: isMobile ? "18px 20px 24px" : "16px 48px 40px", overflowY: "auto" }}>
+          <div style={{ height: 40, display: "flex", alignItems: "center", marginLeft: isMobile ? 0 : -36 }}>{corner}</div>
+          {children}
         </div>
-      )}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>{children}</div>
-      <div style={{ padding: "8px 0 24px" }}>
-        <button onClick={() => ctaEnabled && onCta()} style={{ ...ctaBtn, ...(ctaEnabled ? {} : { background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.45)", cursor: "default" }) }}>{cta}</button>
+        {!isMobile && (
+          <div style={{ width: 494, flexShrink: 0 }}>
+            <img src={heroImg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function Toast({ msg }) {
-  if (!msg) return null;
-  return (
-    <div style={{ position: "fixed", bottom: 90, left: "50%", transform: "translateX(-50%)", zIndex: 60, background: "#1c1c1c", border: "1px solid #333", color: "#eee", borderRadius: 12, padding: "12px 18px", fontSize: 13, maxWidth: 340, textAlign: "center", fontFamily: fb, animation: "fadeIn .2s ease-out" }}>{msg}</div>
-  );
-}
-
-function SheetRow({ icon, label, onClick, trailing }) {
-  return (
-    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.07)", border: "none", borderRadius: 14, padding: "0 16px", height: 52, cursor: "pointer", width: "100%", fontFamily: fb }}>
-      <span style={{ width: 24, textAlign: "center", fontSize: 17 }}>{icon}</span>
-      <span style={{ color: "#fff", fontSize: 15, fontWeight: 600, flex: 1, textAlign: "left" }}>{label}</span>
-      {trailing}
-    </button>
-  );
-}
-
-const WALLETS = [
-  { name: "MetaMask", emoji: "🦊" },
-  { name: "Coinbase", emoji: "🔵" },
-  { name: "Phantom", emoji: "👻" },
-  { name: "WalletConnect", emoji: "🔗" },
-];
-
-/* ── main flow ────────────────────────────────────────────────────────────── */
-
+/* ── main flow ── */
 export function OnboardingFlow({ onDone, onGuest, worldcup = false }) {
-  const [step, setStep] = useState("welcome"); // welcome|email|referral|sport|username|image|signature|done
-  const [sheet, setSheet] = useState("none");  // none|account|wallet
+  const [step, setStep] = useState("welcome"); // welcome | profile | signature | done
   const [showLogin, setShowLogin] = useState(false);
-  const onLogin = () => { setSheet("none"); setShowLogin(true); };
   const [toast, setToast] = useState("");
   const toastTimer = useRef(null);
   const say = (msg) => {
@@ -93,375 +75,100 @@ export function OnboardingFlow({ onDone, onGuest, worldcup = false }) {
     toastTimer.current = setTimeout(() => setToast(""), 2600);
   };
 
-  useEffect(() => { resetDraft(); }, []);
+  // draft fields reused from the old flow; sport defaults to soccer (lanyard color — no sport step)
+  const [username, setUsername] = useState("");
+  useEffect(() => { resetDraft(); draft.sport = "soccer"; }, []);
   useEffect(() => { track("page_view", { page: "onboarding", step }); }, [step]);
 
-  const wrap = { position: "fixed", inset: 0, zIndex: 800, background: "#050505", overflowY: "auto", fontFamily: fb, color: "#fff" };
+  const close = () => onGuest?.();
 
-  /* ── welcome ── */
-  if (step === "welcome") {
-    return (
-      <div style={wrap}>
-        <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh", maxWidth: 480, margin: "0 auto", padding: 16, gap: 16 }}>
-          {/* hero card */}
-          <div style={{ flex: 1, position: "relative", background: "#101208", borderRadius: 28, overflow: "hidden", padding: 20, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 480 }}>
-            {/* tiled WIN backdrop */}
-            <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-              {Array.from({ length: 8 }, (_, r) => Array.from({ length: 4 }, (_, c) => (
-                <span key={`${r}-${c}`} style={{ position: "absolute", left: c * 180 - (r % 2 ? 90 : 0), top: r * 100, fontFamily: fd, fontSize: 68, fontWeight: 800, letterSpacing: 2, color: "rgba(255,255,255,0.05)" }}>WIN</span>
-              )))}
-            </div>
-            <img src={winNeon} alt="" style={{ position: "absolute", top: "24%", left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 460, objectFit: "contain", pointerEvents: "none" }} />
-            <img src={heroPlayer} alt="" style={{ position: "absolute", bottom: "10%", left: "50%", transform: "translateX(-50%)", width: "94%", maxWidth: 440, objectFit: "contain", pointerEvents: "none" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
-              <img src={LOGO_WORDMARK} alt="Parabolic" style={{ height: 19, width: "auto" }} />
-              <button onClick={onGuest} style={{ background: "rgba(255,255,255,0.14)", border: "none", borderRadius: 999, padding: "8px 16px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: fb }}>Explore as guest</button>
-            </div>
-            <div style={{ textAlign: "center", paddingBottom: 24, position: "relative" }}>
-              <div style={{ fontSize: 28, lineHeight: "38px", fontWeight: 700 }}>
-                Trade <span style={{ background: B.red, borderRadius: 999, padding: "2px 10px", fontSize: 16, fontWeight: 800, verticalAlign: "middle" }}>• LIVE</span> on every<br />game as it happens
-              </div>
-            </div>
-          </div>
-          {/* CTAs */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <button onClick={() => worldcup ? setStep("email") : setSheet("account")} style={ctaBtn}>Create account</button>
-            <button onClick={onLogin} style={{ ...ctaBtn, background: "rgba(255,255,255,0.08)", color: "#fff" }}>Log in</button>
-          </div>
-        </div>
-
-        {/* account / wallet sheets */}
-        {sheet !== "none" && (
-          <>
-            <div onClick={() => setSheet("none")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 55 }} />
-            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 56, background: "#131313", borderRadius: "24px 24px 0 0", padding: "10px 20px 36px", maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 10, animation: "slideUp .25s ease-out" }}>
-              <div style={{ alignSelf: "center", width: 44, height: 4, borderRadius: 2, background: "#333", marginBottom: 6 }} />
-              {sheet === "account" ? (
-                <>
-                  <div style={{ color: "#fff", fontSize: 16, fontWeight: 700, textAlign: "center", marginBottom: 8 }}>Create your account</div>
-                  <SheetRow icon="" label="Sign up with Apple" onClick={() => say("Apple sign-up is coming soon — use Email for now; your paper balance and card carry over.")} />
-                  <SheetRow icon="🇬" label="Sign up with Google" onClick={() => say("Google sign-up is coming soon — use Email for now; your paper balance and card carry over.")} />
-                  <SheetRow icon="✉️" label="Sign up with Email" onClick={() => { setSheet("none"); setStep("email"); }} />
-                  <SheetRow icon="👛" label="Sign up with Wallet" onClick={() => setSheet("wallet")} trailing={
-                    <span style={{ display: "flex" }}>
-                      {WALLETS.slice(0, 3).map((w, i) => (
-                        <span key={w.name} style={{ width: 20, height: 20, borderRadius: 10, background: "#2a2a2a", border: "1px solid #131313", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, marginLeft: i ? -8 : 0 }}>{w.emoji}</span>
-                      ))}
-                    </span>
-                  } />
-                  <button onClick={onLogin} style={{ background: "none", border: "none", color: "#888", fontSize: 13, cursor: "pointer", padding: "10px 0", fontFamily: fb }}>
-                    Already have an account? <span style={{ color: "#fff", fontWeight: 700, textDecoration: "underline" }}>Log in</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-                    <button onClick={() => setSheet("account")} style={circleBtn}>←</button>
-                    <div style={{ color: "#fff", fontSize: 16, fontWeight: 700, textAlign: "center", flex: 1 }}>Connect a wallet</div>
-                    <div style={{ width: 36 }} />
-                  </div>
-                  {WALLETS.map((w) => (
-                    <SheetRow key={w.name} icon={w.emoji} label={w.name} onClick={() => say("Wallet linking is coming soon — wallet sign-in arrives with on-chain deposits. Use Email for now.")} />
-                  ))}
-                </>
-              )}
-            </div>
-          </>
-        )}
-        {showLogin && <AuthModal defaultMode="login" onClose={() => setShowLogin(false)} onAuth={(data) => { setAuthState(data); onDone(); }} />}
-        <Toast msg={toast} />
-      </div>
-    );
-  }
-
-  /* ── steps ── */
   return (
-    <div style={wrap}>
-      {step === "email" && <EmailStep onBack={() => setStep("welcome")} onNext={() => setStep("everify")} />}
-      {step === "everify" && <EmailCodeStep onBack={() => setStep("email")} onNext={() => setStep("phone")} />}
-      {step === "phone" && <PhoneStep onBack={() => setStep("everify")} onNext={() => setStep(worldcup ? "sport" : "referral")} />}
-      {step === "referral" && <ReferralStep onBack={() => setStep("phone")} onNext={() => setStep("sport")} say={say} />}
-      {step === "sport" && <SportStep onBack={() => setStep(worldcup ? "phone" : "referral")} onNext={() => setStep("username")} />}
-      {step === "username" && <UsernameStep onBack={() => setStep("sport")} onNext={() => setStep("image")} />}
-      {step === "image" && <ImageStep onBack={() => setStep("username")} onNext={() => setStep("signature")} />}
-      {step === "signature" && <SignatureStep onBack={() => setStep("image")} onNext={() => setStep("done")} />}
-      {step === "done" && <DoneStep onFinish={() => { persistCard(); track("signup_onboarded", { sport: draft.sport }); onDone(); }} />}
+    <>
+      {step === "welcome" && (
+        <WelcomeStep onClose={close} say={say}
+          onLogin={() => setShowLogin(true)}
+          onNext={() => setStep("profile")} />
+      )}
+      {step === "profile" && (
+        <ProfileStep username={username} setUsername={setUsername}
+          onBack={() => setStep("welcome")}
+          onNext={() => setStep("signature")} />
+      )}
+      {step === "signature" && (
+        <SignatureStep username={username}
+          onBack={() => setStep("profile")}
+          onNext={() => setStep("done")} />
+      )}
+      {step === "done" && (
+        <DoneStep worldcup={worldcup}
+          onFinish={() => { persistCard(); track("signup_onboarded", { sport: draft.sport }); onDone(); }} />
+      )}
+      {showLogin && <AuthModal defaultMode="login" onClose={() => setShowLogin(false)} onAuth={(data) => { setAuthState(data); onDone(); }} />}
       <Toast msg={toast} />
-    </div>
+    </>
   );
 }
 
-/* ── individual steps ─────────────────────────────────────────────────────── */
-
-function EmailStep({ onBack, onNext }) {
+/* ── screen 1: welcome (157:19134) ── */
+function WelcomeStep({ onClose, onLogin, onNext, say }) {
   const [email, setEmail] = useState(draft.email);
   const [password, setPassword] = useState(draft.password);
   const [touched, setTouched] = useState(false);
   const emailOk = EMAIL_RE.test(email.trim());
   const passOk = password.length >= 6;
+  const ready = emailOk && passOk;
+  const go = () => { if (!ready) return; draft.email = email.trim(); draft.password = password; onNext(); };
+  const soon = (what) => say(`${what} sign-up is coming soon — use Email for now.`);
+
   return (
-    <Frame title="Sign up with Email" subtitle="You'll pick a username for the leaderboard in a moment." ctaEnabled={emailOk && passOk} onCta={() => { draft.email = email.trim(); draft.password = password; onNext(); }} onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={capsLabel}>EMAIL</span>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" type="email" autoFocus style={fieldInput} />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={capsLabel}>PASSWORD</span>
-          <input value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => setTouched(true)} placeholder="At least 6 characters" type="password" style={fieldInput} />
+    <Shell onClose={onClose} corner={<button onClick={onClose} style={circleBtn}>✕</button>}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 345, width: "100%", margin: "0 auto", gap: 0 }}>
+        <div style={{ fontFamily: fd, fontSize: 20, fontWeight: 700, textAlign: "center", marginBottom: 28 }}>Welcome to Parabolic</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email address" type="email" autoFocus style={fieldInput}
+            onKeyDown={(e) => e.key === "Enter" && go()} />
+          <input value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => setTouched(true)} placeholder="Create a password (6+ characters)" type="password" style={fieldInput}
+            onKeyDown={(e) => e.key === "Enter" && go()} />
           {touched && password.length > 0 && !passOk && <span style={{ fontSize: 12, color: B.red }}>Password must be at least 6 characters.</span>}
-        </label>
-      </div>
-    </Frame>
-  );
-}
-
-/* ── WC identity steps (worldcup onboarding) — real email + phone verification, bound to the
-      guest UUID; the username step's register CLAIMS that UUID so the flags carry over. ── */
-
-function useCooldown() {
-  const [cooldown, setCooldown] = useState(0);
-  const timer = useRef(null);
-  useEffect(() => () => clearInterval(timer.current), []);
-  const start = (ms) => {
-    setCooldown(Math.ceil(ms / 1000));
-    clearInterval(timer.current);
-    timer.current = setInterval(() => setCooldown((c) => { if (c <= 1) { clearInterval(timer.current); return 0; } return c - 1; }), 1000);
-  };
-  return [cooldown, start];
-}
-
-async function verifyPost(path, body) {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId: currentUserId(), token: authToken(), ...body }),
-  });
-  const d = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(d.error || "Something went wrong"), { cooldownMs: d.cooldownMs });
-  return d;
-}
-
-function CodeBoxes({ code, onChange, onEnter }) {
-  const ref = useRef(null);
-  return (
-    <div onClick={() => ref.current?.focus()} style={{ display: "flex", gap: 8, cursor: "text", justifyContent: "center" }}>
-      {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} style={{ width: 46, height: 56, borderRadius: 14, background: "#161616", display: "flex", alignItems: "center", justifyContent: "center", border: i === code.length ? "1px solid rgba(255,255,255,0.35)" : "1px solid transparent" }}>
-          <span style={{ fontFamily: fd, fontSize: 22, fontWeight: 700, color: code[i] ? "#fff" : "#555" }}>{code[i] ?? "•"}</span>
+          <button onClick={go} style={{ ...whitePill, ...(ready ? {} : { opacity: 0.45, cursor: "default" }) }}>Continue with Email</button>
         </div>
-      ))}
-      <input ref={ref} value={code} autoFocus inputMode="numeric"
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
-        onKeyDown={(e) => e.key === "Enter" && code.length === 6 && onEnter?.()}
-        style={{ position: "absolute", opacity: 0, height: 1, width: 1 }} />
-    </div>
-  );
-}
-
-function EmailCodeStep({ onBack, onNext }) {
-  const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [cooldown, startCooldown] = useCooldown();
-  const startedRef = useRef(false);
-
-  const send = async () => {
-    setError("");
-    try {
-      const d = await verifyPost("/verify/email/start", { email: draft.email });
-      setSent(true);
-      startCooldown(d.cooldownMs || 30_000);
-    } catch (e) {
-      setError(e.message);
-      if (e.cooldownMs) { setSent(true); startCooldown(e.cooldownMs); }
-    }
-  };
-  useEffect(() => { if (!startedRef.current) { startedRef.current = true; send(); } }, []); // eslint-disable-line
-
-  const confirm = async () => {
-    if (busy || code.length !== 6) return;
-    setBusy(true); setError("");
-    try { await verifyPost("/verify/email/confirm", { code }); onNext(); }
-    catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  };
-
-  return (
-    <Frame title="Check your email" subtitle={`We sent a 6-digit code to\n${draft.email}`} cta={busy ? "Checking…" : "Verify email"} ctaEnabled={code.length === 6 && !busy} onCta={confirm} onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <CodeBoxes code={code} onChange={(c) => { setError(""); setCode(c); }} onEnter={confirm} />
-        {error && <div style={{ ...badge, background: "rgba(255,82,71,0.15)", color: B.red, alignSelf: "center" }}>{error}</div>}
-        <button onClick={() => cooldown === 0 && send()} disabled={cooldown > 0}
-          style={{ background: "none", border: "none", color: cooldown > 0 ? "#555" : "#fff", fontWeight: 600, fontSize: 13, cursor: cooldown > 0 ? "default" : "pointer", fontFamily: fb, padding: "6px 0" }}>
-          {sent ? (cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code") : "Send code"}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "22px 0" }}>
+          <div style={{ flex: 1, borderTop: "1px dashed rgba(255,255,255,0.18)" }} />
+          <span style={{ fontSize: 12, color: "#8a8f98" }}>or</span>
+          <div style={{ flex: 1, borderTop: "1px dashed rgba(255,255,255,0.18)" }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button onClick={() => soon("Apple")} style={darkPill}><AppleIcon /> Sign up with Apple</button>
+          <button onClick={() => soon("Google")} style={darkPill}><GoogleIcon /> Sign up with Google</button>
+          <button onClick={() => soon("Wallet")} style={darkPill}><WalletIcon /> Sign up with Wallet</button>
+        </div>
+        <button onClick={onLogin} style={{ background: "none", border: "none", color: "#8a8f98", fontSize: 13, cursor: "pointer", padding: "18px 0 0", fontFamily: fb }}>
+          Already have an account? <span style={{ color: "#fff", fontWeight: 700 }}>Log in</span>
         </button>
       </div>
-    </Frame>
+    </Shell>
   );
 }
 
-function PhoneStep({ onBack, onNext }) {
-  const [phone, setPhone] = useState("");
-  const [phase, setPhase] = useState("enter"); // enter | code
-  const [code, setCode] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [cooldown, startCooldown] = useCooldown();
-  const phoneOk = phone.replace(/\D/g, "").length >= 10;
-
-  const send = async () => {
-    if (busy) return;
-    setBusy(true); setError("");
-    try {
-      const d = await verifyPost("/verify/phone/start", { phone });
-      setPhase("code");
-      startCooldown(d.cooldownMs || 30_000);
-    } catch (e) {
-      setError(e.message);
-      if (e.cooldownMs) { setPhase("code"); startCooldown(e.cooldownMs); }
-    } finally { setBusy(false); }
-  };
-
-  const confirm = async () => {
-    if (busy || code.length !== 6) return;
-    setBusy(true); setError("");
-    try { await verifyPost("/verify/phone/confirm", { phone, code }); onNext(); }
-    catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  };
-
-  return phase === "enter" ? (
-    <Frame title="Verify your phone" subtitle={"One entry per person — we text a code to keep\nthe competition fair. Mobile numbers only."} cta={busy ? "Sending…" : "Send code"} ctaEnabled={phoneOk && !busy} onCta={send} onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={capsLabel}>MOBILE NUMBER</span>
-          <input value={phone} onChange={(e) => { setError(""); setPhone(e.target.value); }} placeholder="+1 (555) 000-0000" type="tel" autoFocus style={fieldInput}
-            onKeyDown={(e) => e.key === "Enter" && phoneOk && send()} />
-        </label>
-        {error && <div style={{ ...badge, background: "rgba(255,82,71,0.15)", color: B.red }}>{error}</div>}
-        <div style={{ fontSize: 12, color: "#666", lineHeight: 1.5 }}>VoIP and landline numbers can't be verified. Standard SMS rates may apply.</div>
-      </div>
-    </Frame>
-  ) : (
-    <Frame title="Enter the SMS code" subtitle={`We texted a 6-digit code to\n${phone}`} cta={busy ? "Checking…" : "Verify phone"} ctaEnabled={code.length === 6 && !busy} onCta={confirm} onBack={() => { setPhase("enter"); setCode(""); setError(""); }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <CodeBoxes code={code} onChange={(c) => { setError(""); setCode(c); }} onEnter={confirm} />
-        {error && <div style={{ ...badge, background: "rgba(255,82,71,0.15)", color: B.red, alignSelf: "center" }}>{error}</div>}
-        <button onClick={() => cooldown === 0 && send()} disabled={cooldown > 0}
-          style={{ background: "none", border: "none", color: cooldown > 0 ? "#555" : "#fff", fontWeight: 600, fontSize: 13, cursor: cooldown > 0 ? "default" : "pointer", fontFamily: fb, padding: "6px 0" }}>
-          {cooldown > 0 ? `Resend code in ${cooldown}s` : "Resend code"}
-        </button>
-      </div>
-    </Frame>
-  );
-}
-
-
-function ReferralStep({ onBack, onNext, say }) {
-  const LEN = 6;
-  const [code, setCode] = useState(draft.referral);
-  const inputRef = useRef(null);
-  return (
-    <Frame title="Got a referral code?" subtitle={"Enter a friend's code or scan their QR.\nYou'll both get a bonus"} ctaEnabled={code.length === LEN} onCta={() => { draft.referral = code; onNext(); }} onSkip={() => { draft.referral = ""; onNext(); }} onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontWeight: 600, fontSize: 15 }}>Enter referral code</div>
-        <div onClick={() => inputRef.current?.focus()} style={{ display: "flex", gap: 8, cursor: "text" }}>
-          {Array.from({ length: LEN }, (_, i) => (
-            <div key={i} style={{ flex: 1, aspectRatio: "0.86", borderRadius: 999, background: "#161616", display: "flex", alignItems: "center", justifyContent: "center", border: i === code.length ? "1px solid rgba(255,255,255,0.35)" : "1px solid transparent" }}>
-              <span style={{ fontFamily: fd, fontSize: 20, fontWeight: 700, color: code[i] ? "#fff" : "#555" }}>{code[i] ?? "✱"}</span>
-            </div>
-          ))}
-        </div>
-        <input ref={inputRef} value={code} onChange={(e) => setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, "").slice(0, LEN).toUpperCase())} maxLength={LEN} autoFocus
-          style={{ position: "absolute", opacity: 0, height: 1, width: 1, pointerEvents: "none" }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "4px 0" }}>
-          <div style={hairline} /><span style={{ fontSize: 12, color: "#666" }}>or</span><div style={hairline} />
-        </div>
-        <button onClick={() => say("QR scanning is coming soon — enter your friend's code manually for now.")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#161616", border: "none", borderRadius: 999, padding: "15px 0", color: "#fff", fontWeight: 600, fontSize: 15, cursor: "pointer", fontFamily: fb }}>
-          ⌗ Scan a friend's QR
-        </button>
-      </div>
-    </Frame>
-  );
-}
-
-function SportStep({ onBack, onNext }) {
-  const [sport, setSport] = useState(draft.sport);
-  return (
-    <Frame title="" ctaEnabled={sport != null} onCta={() => { draft.sport = sport; onNext(); }} onBack={onBack}>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 18 }}>
-        <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 4 }}>
-          <Lanyard sport={sport} width={54} height={230} />
-        </div>
-        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 8, paddingBottom: 4 }}>
-          <div style={{ fontFamily: fd, fontSize: 24, fontWeight: 700 }}>Pick your favorite sport</div>
-          <div style={{ fontSize: 14, color: "#8a8f98" }}>We'll print it on your member card lanyard</div>
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8, paddingBottom: 8 }}>
-          {SPORTS.map((s) => {
-            const on = sport === s.key;
-            return (
-              <button key={s.key} onClick={() => setSport(s.key)} style={{ display: "flex", alignItems: "center", gap: 7, borderRadius: 999, border: on ? "1px solid rgba(255,255,255,0.3)" : "1px solid rgba(255,255,255,0.14)", background: on ? "rgba(255,255,255,0.14)" : "transparent", padding: "11px 16px", cursor: "pointer", fontFamily: fb }}>
-                <span style={{ fontSize: 16 }}>{s.emoji}</span>
-                <span style={{ color: "#fff", fontSize: 14, fontWeight: on ? 700 : 500 }}>{s.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </Frame>
-  );
-}
-
-function UsernameStep({ onBack, onNext }) {
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const inputRef = useRef(null);
-  const valid = NAME_RE.test(name);
-
-  const submit = async () => {
-    if (!valid || busy) return;
-    setBusy(true); setError(null);
-    try {
-      await register(name, draft.password); // claims the guest UUID → paper balance carries over
-      if (draft.email) {
-        // Attach the email for 2FA/recovery; never block onboarding if it fails.
-        try {
-          await fetch(`${API_URL}/profile/${currentUserId()}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: draft.email, token: authToken() }) });
-        } catch { /* ignore */ }
-      }
-      onNext();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Something went wrong";
-      setError(/taken|exists/i.test(msg) ? `${name} is already taken` : msg);
-    } finally { setBusy(false); }
-  };
-
-  return (
-    <Frame title="Choose a username" subtitle={"This is how you'll show up on the leaderboard.\nYou can change this any time"} cta={busy ? "Creating account…" : "Continue"} ctaEnabled={valid && !busy} onCta={submit} onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div onClick={() => inputRef.current?.focus()} style={{ cursor: "text" }}>
-          <MemberCard width={Math.min(COL_W - 32, 368)} username={name || "Username"} placeholder={!name} avatar={draft.avatar} signature={null} />
-        </div>
-        {error ? (
-          <div style={{ ...badge, background: "rgba(255,82,71,0.15)", color: B.red }}>{error}</div>
-        ) : name.length > 0 && !valid ? (
-          <div style={badge}>3–20 characters — letters, numbers, underscores</div>
-        ) : null}
-        <input ref={inputRef} value={name} autoFocus onChange={(e) => { setError(null); setName(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20)); }}
-          style={{ position: "absolute", opacity: 0, height: 1, width: 1 }} />
-      </div>
-    </Frame>
-  );
-}
-
-function ImageStep({ onBack, onNext }) {
+/* ── screen 2: username + profile picture (157:18780) ── */
+function ProfileStep({ username, setUsername, onBack, onNext }) {
   const [avatar, setAvatar] = useState(draft.avatar);
-  const [showTemplates, setShowTemplates] = useState(false);
+  const [avail, setAvail] = useState(null); // null unknown | true | false
   const fileRef = useRef(null);
-  const username = getAuth()?.username ?? "Username";
+  const valid = NAME_RE.test(username);
+
+  // live availability — debounce against GET /auth/available (unknown on network failure)
+  useEffect(() => {
+    setAvail(null);
+    if (!valid) return;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`${API_URL}/auth/available?username=${encodeURIComponent(username)}`);
+        if (r.ok) { const d = await r.json(); setAvail(!!d.available); }
+      } catch { /* offline / old backend — resolve at Create account */ }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [username, valid]);
 
   const onFile = (e) => {
     const f = e.target.files?.[0];
@@ -471,99 +178,129 @@ function ImageStep({ onBack, onNext }) {
     reader.readAsDataURL(f);
   };
 
+  const ready = valid && avail !== false;
+  const go = () => { if (!ready) return; draft.avatar = avatar; onNext(); };
+
   return (
-    <Frame title="Add a profile image" subtitle="You can change this any time" ctaEnabled={avatar != null} onCta={() => { draft.avatar = avatar; onNext(); }} onSkip={() => { draft.avatar = avatar; onNext(); }} onBack={onBack}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 20 }}>
-        <MemberCard width={Math.min(COL_W - 32, 368)} username={username} avatar={avatar} signature={null} />
-        {avatar && (
-          <button onClick={() => setShowTemplates(true)} style={{ background: "none", border: "none", color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontFamily: fb }}>✏️ Change profile image</button>
-        )}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <OptionRow icon="📷" label="Upload a photo" onClick={() => fileRef.current?.click()} />
-          <OptionRow icon="😊" label="Use from templates" onClick={() => setShowTemplates((v) => !v)} trailing={
-            <span style={{ display: "flex" }}>
-              {AVATAR_TEMPLATES.slice(0, 3).map((t, i) => (
-                <span key={i} style={{ width: 20, height: 20, borderRadius: 10, background: t.bg, border: "1px solid #141414", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, marginLeft: i ? -8 : 0 }}>{t.emoji}</span>
-              ))}
-            </span>
-          } />
+    <Shell onClose={null} corner={<button onClick={onBack} style={circleBtn}>‹</button>}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", maxWidth: 392, width: "100%", margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginTop: 26, marginBottom: 34 }}>
+          <div style={{ fontFamily: fd, fontSize: 20, fontWeight: 700 }}>Choose username and profile picture</div>
+          <div style={{ fontSize: 13.5, color: "#8a8f98", lineHeight: 1.5, marginTop: 9 }}>
+            Choose username and profile picture, this goes on your<br />member card. You can change it any time
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 30 }}>
+          <div onClick={() => fileRef.current?.click()} style={{ width: 84, height: 84, borderRadius: "50%", background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", flexShrink: 0 }}>
+            {avatar?.kind === "photo"
+              ? <img src={avatar.uri} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" strokeWidth="1.6"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5-9 9"/></svg>}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Profile picture <span style={{ color: "#8a8f98", fontWeight: 400 }}>(optional)</span></div>
+            <button onClick={() => fileRef.current?.click()} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 999, padding: "8px 16px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: fb, alignSelf: "flex-start" }}>Upload image</button>
+          </div>
           <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
         </div>
-        {showTemplates && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
-            {AVATAR_TEMPLATES.map((t, i) => (
-              <button key={i} onClick={() => setAvatar(t)} style={{ width: 56, height: 56, borderRadius: 28, background: t.bg, border: avatar?.kind === "emoji" && avatar.emoji === t.emoji ? "2px solid #fff" : "none", cursor: "pointer", fontSize: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>{t.emoji}</button>
-            ))}
-          </div>
-        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Username</span>
+          <input value={username} autoFocus onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20))} placeholder="Enter username" style={fieldInput}
+            onKeyDown={(e) => e.key === "Enter" && go()} />
+          {valid && avail === true && (
+            <span style={{ alignSelf: "flex-start", background: "rgba(94,216,126,0.14)", color: "#5ed87e", borderRadius: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 600 }}>{username} is available</span>
+          )}
+          {valid && avail === false && (
+            <span style={{ alignSelf: "flex-start", background: "rgba(255,82,71,0.14)", color: B.red, borderRadius: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 600 }}>{username} is already taken</span>
+          )}
+          {username.length > 0 && !valid && (
+            <span style={{ alignSelf: "flex-start", background: "rgba(255,255,255,0.08)", color: "#8a8f98", borderRadius: 8, padding: "5px 10px", fontSize: 12.5 }}>3–20 characters — letters, numbers, underscores</span>
+          )}
+        </div>
+
+        <div style={{ flex: 1 }} />
+        <button onClick={go} style={{ ...whitePill, ...(ready ? {} : { opacity: 0.45, cursor: "default" }) }}>Continue</button>
       </div>
-    </Frame>
+    </Shell>
   );
 }
 
-function OptionRow({ icon, label, onClick, trailing }) {
-  return (
-    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, background: "#141414", border: "none", borderRadius: 999, padding: "0 18px", height: 54, cursor: "pointer", width: "100%", fontFamily: fb }}>
-      <span style={{ fontSize: 18 }}>{icon}</span>
-      <span style={{ color: "#fff", fontSize: 15, fontWeight: 600, flex: 1, textAlign: "left" }}>{label}</span>
-      {trailing}
-    </button>
-  );
-}
-
-function SignatureStep({ onBack, onNext }) {
+/* ── screen 3: signature → Create account (157:19501) ── */
+function SignatureStep({ username, onBack, onNext }) {
   const [d, setD] = useState(draft.signature?.d ?? null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const padRef = useRef(null);
-  const padW = Math.min(COL_W - 52, 348);
-  const padH = 260;
-  const username = getAuth()?.username ?? "Username";
-  const save = () => { draft.signature = d ? { d, w: padW, h: padH } : null; };
+  const padW = 380, padH = 240;
+
+  const create = async () => {
+    if (busy) return;
+    setBusy(true); setError("");
+    draft.signature = d ? { d, w: padW, h: padH } : null;
+    try {
+      await register(username, draft.password); // claims the guest UUID → paper balance carries over
+      if (draft.email) {
+        // Attach the email for 2FA/recovery; never block onboarding if it fails.
+        try {
+          await fetch(`${API_URL}/profile/${currentUserId()}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: draft.email, token: authToken() }) });
+        } catch { /* ignore */ }
+      }
+      onNext();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Something went wrong";
+      setError(/taken|exists/i.test(msg) ? `${username} is already taken — go back to change it` : msg);
+    } finally { setBusy(false); }
+  };
+
   return (
-    <Frame title="Sign your card" subtitle="Make it yours — your signature goes on the card." ctaEnabled={!!d} onCta={() => { save(); onNext(); }} onSkip={() => { draft.signature = null; onNext(); }} onBack={onBack}>
-      <div style={{ flex: 1, border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 20, padding: 10, display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-        <MemberCard width={Math.min(COL_W - 52, 348)} username={username} avatar={draft.avatar} signature={d ? { d, w: padW, h: padH } : null} />
-        <div style={{ width: padW, height: padH, position: "relative" }}>
+    <Shell onClose={null} corner={<button onClick={onBack} style={circleBtn}>‹</button>}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", maxWidth: 396, width: "100%", margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginTop: 14, marginBottom: 24 }}>
+          <div style={{ fontFamily: fd, fontSize: 20, fontWeight: 700 }}>Sign your member card</div>
+          <div style={{ fontSize: 13.5, color: "#8a8f98", marginTop: 9 }}>Your signature is printed on the card. Draw it below.</div>
+        </div>
+
+        <div style={{ flex: 1, border: "1px dashed rgba(255,255,255,0.22)", borderRadius: 16, position: "relative", minHeight: padH, display: "flex", alignItems: "center", justifyContent: "center" }}>
           {!d && (
-            <div style={{ position: "absolute", top: "45%", left: 0, right: 0, textAlign: "center", pointerEvents: "none", color: "#8a8f98", fontWeight: 600, fontSize: 14, zIndex: 1 }}>
-              ✍️ Sign your card here
+            <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", pointerEvents: "none", color: "#8a8f98", fontWeight: 600, fontSize: 14, zIndex: 1 }}>
+              ✍️ <span style={{ color: "#c8ccd2" }}>Sign your card</span> here
             </div>
           )}
           <SignaturePad ref={padRef} width={padW} height={padH} onChange={setD} />
           {d && (
-            <button onClick={() => padRef.current?.clear()} style={{ position: "absolute", right: 6, bottom: 10, display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.14)", border: "none", borderRadius: 999, padding: "7px 12px", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: fb }}>✕ Clear</button>
+            <button onClick={() => { padRef.current?.clear(); setD(null); }} style={{ position: "absolute", right: 10, bottom: 10, background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 999, padding: "7px 12px", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: fb }}>✕ Clear</button>
           )}
         </div>
+
+        {error && <div style={{ color: B.red, fontSize: 13, textAlign: "center", marginTop: 12 }}>{error}</div>}
+        <button onClick={create} disabled={busy} style={{ ...whitePill, marginTop: 20, ...(busy ? { opacity: 0.6, cursor: "default" } : {}) }}>
+          {busy ? "Creating account…" : "Create account"}
+        </button>
       </div>
-    </Frame>
+    </Shell>
   );
 }
 
-function DoneStep({ onFinish }) {
+/* ── screen 4: card issued (157:19843) ── */
+function DoneStep({ worldcup, onFinish }) {
   const username = getAuth()?.username ?? "trader";
   return (
-    <Frame title="" cta="Start trading" onCta={onFinish}>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ transform: "rotate(-9deg)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <Lanyard sport={draft.sport} width={44} height={150} />
-            <div style={{ marginTop: -6 }}>
-              <MemberCard width={Math.min(COL_W - 40, 360)} username={username} avatar={draft.avatar} signature={draft.signature} referralCode={referralCodeFor(currentUserId())} />
-            </div>
-          </div>
+    <Shell onClose={null} corner={null}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", maxWidth: 396, width: "100%", margin: "0 auto", textAlign: "center" }}>
+        <div style={{ marginBottom: 22 }}>
+          <MemberCard width={190} username={username} avatar={draft.avatar} signature={draft.signature} />
         </div>
-        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 8, paddingBottom: 10 }}>
-          <div style={{ fontFamily: fd, fontSize: 24, fontWeight: 700 }}>Congrats, {username}</div>
-          <div style={{ fontSize: 14, color: "#8a8f98", lineHeight: 1.5 }}>Your member card is ready.<br />Now it's time for first bet</div>
+        <span style={{ background: "rgba(94,216,126,0.14)", color: "#5ed87e", borderRadius: 999, padding: "5px 12px", fontSize: 12.5, fontWeight: 700 }}>Card issued</span>
+        <div style={{ fontFamily: fd, fontSize: 21, fontWeight: 700, marginTop: 16 }}>Welcome, {username}</div>
+        <div style={{ fontSize: 13.5, color: "#8a8f98", lineHeight: 1.55, marginTop: 10 }}>
+          {worldcup
+            ? <>Your member card is live.<br />Time to trade the knockouts.</>
+            : <>Your member card is live.<br />Time to make your first trade.</>}
         </div>
+        <div style={{ flex: 0.5 }} />
+        <button onClick={onFinish} style={{ ...whitePill, marginTop: 34 }}>Start trading</button>
       </div>
-    </Frame>
+    </Shell>
   );
 }
-
-/* ── shared styles ────────────────────────────────────────────────────────── */
-const ctaBtn = { background: B.primary, border: "none", borderRadius: 999, padding: "16px 0", width: "100%", color: "#04130c", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: fb };
-const circleBtn = { width: 40, height: 40, borderRadius: 20, background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
-const fieldInput = { background: "#141414", border: "none", borderRadius: 16, padding: "14px 16px", color: "#fff", fontSize: 15, fontFamily: fb, outline: "none" };
-const capsLabel = { fontSize: 11, letterSpacing: "0.08em", color: "#949494", fontWeight: 700, fontFamily: fm };
-const hairline = { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" };
-const badge = { alignSelf: "flex-start", background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "5px 10px", fontSize: 12, color: "#8a8f98" };
