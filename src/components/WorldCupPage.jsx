@@ -15,7 +15,7 @@ import stadiumBg from "../assets/worldcup/stadium.jpg";
 import fifa26 from "../assets/worldcup/fifa26.png";
 import laurelImg from "../assets/worldcup/laurel.svg";
 import laurelPodium from "../assets/worldcup/laurel-podium.svg";
-import leaderboardBg from "../assets/worldcup/leaderboard-bg.png";
+import { CardShareModal, LanyardStrap, StatCard } from "./CardShareModal.jsx";
 
 const LiveTradingApp = lazy(() => import("../trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
 const OnboardingFlow = lazy(() => import("./onboarding/OnboardingFlow.jsx").then(m => ({ default: m.OnboardingFlow })));
@@ -307,6 +307,7 @@ export function WorldCupPage() {
   const [showOnboard, setShowOnboard] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showShareCard, setShowShareCard] = useState(false);
   const [joinErr, setJoinErr] = useState("");
   const [activeGame, setActiveGame] = useState(null);
   const [now, setNow] = useState(Date.now());
@@ -454,87 +455,61 @@ export function WorldCupPage() {
     </div>
   );
 
-  /* ── LEADERBOARD (Figma 142-17156) ── */
+  /* ── LEADERBOARD (Figma 157-23575: black bg, lanyard card + Share card, laurel podium, rows) ── */
   const LeaderboardTab = () => {
     const me = lb.find((e) => e.userId === userId);
     const top3 = lb.slice(0, 3);
-    const rest = lb.slice(3, 12);
+    const rest = lb.slice(3, 15);
+    const roi = (v) => `${v >= 0 ? "+" : ""}${Number(v ?? 0).toFixed(2)}%`;
     const medal = (rank) => rank === 1
       ? "linear-gradient(180deg,#cf7b0e,#9f5a00)" : rank === 2
       ? "linear-gradient(180deg,#9aa0a8,#5c6167)" : "linear-gradient(180deg,#a06a3c,#6d4426)";
-    const Podium = ({ e, big = false }) => e ? (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: 120, marginTop: big ? 0 : 24 }}>
-        <div style={{ position: "relative", width: 84, height: 92 }}>
-          <img src={laurelPodium} alt="" style={{ position: "absolute", left: 0, top: 0, width: 84, height: 76, objectFit: "contain", filter: e.rank === 1 ? "none" : "grayscale(0.7) brightness(1.05)" }} />
-          <div style={{ position: "absolute", left: 10, top: 5, width: 64, height: 64, borderRadius: "50%", border: "3px solid #131313", background: "#23262c", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-            {e.userId === userId && memberCard?.avatar
-              ? <AvatarCircle avatar={memberCard.avatar} size={58} />
-              : <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 24, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
-          </div>
-          <div style={{ position: "absolute", left: "50%", bottom: 0, transform: "translateX(-50%)", background: "#131313", borderRadius: 40, padding: 4 }}>
-            <div style={{ width: 18, height: 18, borderRadius: "50%", background: medal(e.rank), display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.17)" }}>
-              <span style={{ fontFamily: fb, fontWeight: 700, fontSize: 11, color: "#281a03" }}>{e.rank}</span>
+    const Podium = ({ e, big = false }) => {
+      if (!e) return <div style={{ width: 130 }} />;
+      const wreathW = big ? 100 : 82, wreathH = big ? 90 : 74, av = big ? 64 : 52;
+      return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, width: 130, marginTop: big ? 0 : 26 }}>
+          <div style={{ position: "relative", width: wreathW, height: wreathH + 10 }}>
+            <img src={laurelPodium} alt="" style={{ position: "absolute", left: 0, top: 0, width: wreathW, height: wreathH, objectFit: "contain", filter: e.rank === 1 ? "none" : "grayscale(0.75) brightness(1.08)" }} />
+            <div style={{ position: "absolute", left: "50%", top: (wreathH - av) / 2 - 2, transform: "translateX(-50%)", width: av, height: av, borderRadius: "50%", background: "#23262c", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              {e.userId === userId && memberCard?.avatar
+                ? <AvatarCircle avatar={memberCard.avatar} size={av} />
+                : <span style={{ fontFamily: fd, fontWeight: 800, fontSize: av * 0.38, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
+            </div>
+            <div style={{ position: "absolute", left: "50%", bottom: 0, transform: "translateX(-50%)", background: "#0a0a0b", borderRadius: 40, padding: 3 }}>
+              <div style={{ width: 19, height: 19, borderRadius: "50%", background: medal(e.rank), display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.17)" }}>
+                <span style={{ fontFamily: fb, fontWeight: 700, fontSize: 11, color: "#281a03" }}>{e.rank}</span>
+              </div>
             </div>
           </div>
+          <span style={{ fontFamily: fb, fontWeight: 600, fontSize: 15, color: "#fff" }}>{e.username || e.userId.slice(0, 8)}</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+            <span style={{ fontFamily: fb, fontWeight: 700, fontSize: big ? 16 : 15, color: e.roiPct >= 0 ? GREEN : "#ff5247" }}>{roi(e.roiPct)}</span>
+            <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 12, color: "#9aa0a8" }}>{e.trades} trades</span>
+          </div>
         </div>
-        <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 15, color: "#fff" }}>{e.username || e.userId.slice(0, 8)}</span>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
-          <span style={{ fontFamily: fb, fontWeight: 600, fontSize: 16, color: e.roiPct >= 0 ? GREEN : "#ff5247" }}>{e.roiPct >= 0 ? "+" : ""}{e.roiPct}%</span>
-          <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 12, color: "#b6b6b6" }}>{e.trades} trades</span>
-        </div>
-      </div>
-    ) : <div style={{ width: 120 }} />;
+      );
+    };
 
     return (
-      <div style={{ position: "relative", minHeight: "100%" }}>
-        <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-          <img src={leaderboardBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 0%", filter: "grayscale(1)", opacity: 0.5 }} />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(6,7,10,0.3), rgba(6,7,10,0.78) 55%, #06070a 92%)" }} />
-        </div>
-        <div style={{ position: "relative", padding: isMobile ? "56px 14px 60px" : "56px 24px 70px" }}>
-          <div style={{ fontFamily: fb, fontWeight: 600, fontSize: 14, color: "#fff", padding: "10px 8px 22px" }}>Leaderboard</div>
-
+      <div style={{ position: "relative", minHeight: "100%", background: "#050506" }}>
+        <div style={{ position: "relative", padding: isMobile ? "0 14px 60px" : "0 24px 70px" }}>
           {me && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 10 }}>
-              {/* metallic membership card */}
-              <div style={{ width: 339, maxWidth: "92vw", height: 191, borderRadius: 18, position: "relative", overflow: "hidden",
-                background: "linear-gradient(118deg, #34363b 0%, #202226 34%, #2b2d32 52%, #17181c 78%, #202227 100%)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                boxShadow: "0 24px 60px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.28)" }}>
-                {/* brushed-metal grain */}
-                <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(92deg, rgba(255,255,255,0.02) 0 1px, rgba(0,0,0,0.02) 1px 3px)" }} />
-                {/* diagonal sheen */}
-                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(118deg, transparent 28%, rgba(255,255,255,0.13) 42%, rgba(255,255,255,0.04) 50%, transparent 62%)" }} />
-                <div style={{ position: "absolute", inset: 5, borderRadius: 14, border: "1px solid rgba(255,255,255,0.09)" }} />
-                <img src={LOGO_WORDMARK} alt="Parabolic" style={{ position: "absolute", left: 22, top: 22, height: 16 }} />
-                {/* EMV chip */}
-                <div style={{ position: "absolute", left: 22, top: 62, width: 34, height: 25, borderRadius: 6, background: "linear-gradient(135deg, #e8c877, #b98e3e 55%, #dcb861)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.55), inset 0 -1px 2px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.4)" }}>
-                  <div style={{ position: "absolute", left: 0, right: 0, top: "38%", height: 1, background: "rgba(90,60,10,0.5)" }} />
-                  <div style={{ position: "absolute", left: 0, right: 0, top: "64%", height: 1, background: "rgba(90,60,10,0.5)" }} />
-                  <div style={{ position: "absolute", top: 3, bottom: 3, left: "42%", width: 1, background: "rgba(90,60,10,0.5)" }} />
-                </div>
-                <div style={{ position: "absolute", right: 22, top: 18, padding: "5px 11px", borderRadius: 999, background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.18)", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.1)" }}>
-                  <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 11, color: "#ffe9b0", letterSpacing: "0.08em" }}>#{me.rank}</span>
-                </div>
-                <div style={{ position: "absolute", left: 22, bottom: 20, display: "flex", alignItems: "center", gap: 11 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "#23262c", border: "1px solid rgba(255,255,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.45)" }}>
-                    {memberCard?.avatar ? <AvatarCircle avatar={memberCard.avatar} size={40} /> : <span style={{ fontSize: 18 }}>👤</span>}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontFamily: fd, fontWeight: 700, fontSize: 18, color: "#fff", letterSpacing: "0.02em", textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}>{me.username || "you"}</span>
-                    <span style={{ fontFamily: fm, fontSize: 8.5, fontWeight: 700, letterSpacing: "0.16em", color: "#8f949c" }}>WORLD CUP 2026</span>
-                  </div>
-                </div>
-                <div style={{ position: "absolute", right: 22, bottom: 22, textAlign: "right" }}>
-                  <div style={{ fontFamily: fb, fontWeight: 700, fontSize: 17, color: me.roiPct >= 0 ? GREEN : "#ff5247", textShadow: "0 1px 2px rgba(0,0,0,0.5)" }}>{me.roiPct >= 0 ? "+" : ""}{me.roiPct}%</div>
-                  <div style={{ fontFamily: fb, fontSize: 12.5, color: "#c3c8d0" }}>{me.trades} trades</div>
-                </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              {/* your card on its lanyard, hanging from the top of the page */}
+              <LanyardStrap strapH={isMobile ? 66 : 92} width={32} />
+              <div onClick={() => setShowShareCard(true)} style={{ cursor: "pointer", marginTop: -7 }} title="Share my card">
+                <StatCard width={336} username={me.username || "you"} avatar={memberCard?.avatar} rank={me.rank} roiPct={me.roiPct} trades={me.trades} />
               </div>
+              <button onClick={() => setShowShareCard(true)} style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 18, background: "#1b1b1e", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 999, padding: "9px 16px", color: "#fff", fontFamily: fb, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16"/></svg>
+                Share card
+              </button>
             </div>
           )}
 
           {top3.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? 14 : 60, marginTop: me ? 56 : 30 }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? 10 : 50, marginTop: me ? 60 : 90 }}>
               <Podium e={top3[1]} />
               <Podium e={top3[0]} big />
               <Podium e={top3[2]} />
@@ -558,7 +533,7 @@ export function WorldCupPage() {
                     </div>
                     <span style={{ fontFamily: fb, fontWeight: 600, fontSize: 14.5, color: isMe ? GREEN : "#fff", flex: 1 }}>{e.username || e.userId.slice(0, 8)}{isMe ? " (you)" : ""}</span>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontFamily: fb, fontWeight: 600, fontSize: 14.5, color: e.roiPct >= 0 ? GREEN : "#ff5247" }}>{e.roiPct >= 0 ? "+" : ""}{e.roiPct}%</div>
+                      <div style={{ fontFamily: fb, fontWeight: 600, fontSize: 14.5, color: e.roiPct >= 0 ? GREEN : "#ff5247" }}>{roi(e.roiPct)}</div>
                       <div style={{ fontFamily: fb, fontSize: 12, color: "#8a93a6" }}>{e.trades} trades</div>
                     </div>
                   </div>
@@ -617,6 +592,14 @@ export function WorldCupPage() {
         </div>
       )}
 
+      {showShareCard && (() => {
+        const meLb = lb.find((e) => e.userId === userId);
+        return (
+          <CardShareModal userId={userId} username={meLb?.username || auth?.username || "you"} avatar={memberCard?.avatar}
+            rank={meLb?.rank} roiPct={meLb?.roiPct} trades={meLb?.trades}
+            onClose={() => setShowShareCard(false)} />
+        );
+      })()}
       {showProfile && (
         <ProfilePage worldcup userId={auth?.userId}
           onClose={() => { setShowProfile(false); refresh(); }}

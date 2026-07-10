@@ -3,7 +3,7 @@ import { B, fd, fb, fm } from "../lib/theme.js";
 import { fmtUsd, fmtPct } from "../lib/helpers.js";
 import { API_URL } from "../lib/constants.js";
 import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "../lib/auth.js";
-import { CardOverlay } from "./onboarding/CardOverlay.jsx";
+import { CardShareModal } from "./CardShareModal.jsx";
 import { MemberCard, AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { loadCard, referralCodeFor } from "../lib/onboarding.js";
 
@@ -158,7 +158,11 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
           {!worldcup && <button onClick={() => setView("settings")} style={iconBtn} title="Settings">⚙</button>}
         </div>
       </div>
-      {showCard && <CardOverlay onClose={() => setShowCard(false)} />}
+      {showCard && (
+        <CardShareModal userId={userId} username={username} avatar={memberCard.avatar}
+          roiPct={returnPct} trades={trades.length}
+          onClose={() => setShowCard(false)} />
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: isWide ? "380px 1fr" : "1fr", gap: 24, alignItems: "start" }}>
         {/* LEFT column — identity, discipline, stats, open positions */}
@@ -182,7 +186,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
           {/* Member card — always visible; click for the full overlay (flip/QR/share) */}
           <div onClick={() => setShowCard(true)} style={{ cursor: "pointer", marginBottom: 12 }} title="Open my card">
             <MemberCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={memberCard.avatar} signature={memberCard.signature} referralCode={referralCodeFor(userId)} />
-            <div style={{ fontSize: 11, color: B.dim, marginTop: 6, textAlign: "center" }}>Tap the card to flip &amp; share</div>
+            <div style={{ fontSize: 11, color: B.dim, marginTop: 6, textAlign: "center" }}>Tap the card to share</div>
           </div>
 
           {/* Favorite discipline */}
