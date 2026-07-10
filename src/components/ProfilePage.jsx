@@ -169,19 +169,16 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
       <div style={{ display: "grid", gridTemplateColumns: isWide ? "380px 1fr" : "1fr", gap: 24, alignItems: "start" }}>
         {/* LEFT column — identity, discipline, stats, open positions */}
         <div>
-          {/* Identity — pfp mirrors the member-card avatar when one was chosen */}
+          {/* Identity — no standalone pfp; the member card below carries the avatar */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
-              {memberCard.avatar ? <AvatarCircle avatar={memberCard.avatar} size={76} /> : <div style={avatar}>{username.charAt(0).toUpperCase()}</div>}
-              <div>
-                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ddd", background: "#1a1d22", padding: "3px 9px", borderRadius: 999 }}>★ {points.toLocaleString()}</span>
-                  <span style={{ fontSize: 10, fontWeight: 800, fontFamily: fm, letterSpacing: "0.08em", color: tier.color, background: tier.color + "1c", padding: "3px 9px", borderRadius: 6 }}>{tier.name}</span>
-                  {profile?.streak > 0 && <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ff9f1c", background: "#ff9f1c18", padding: "3px 9px", borderRadius: 999 }}>🔥 {profile.streak}</span>}
-                </div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: B.white, fontFamily: fd, letterSpacing: "-0.02em" }}>{username}</div>
-                <div style={{ fontSize: 12, color: B.dim }}>Joined {joined}</div>
-              </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ddd", background: "#1a1d22", padding: "3px 9px", borderRadius: 999 }}>★ {points.toLocaleString()}</span>
+              <span style={{ fontSize: 10, fontWeight: 800, fontFamily: fm, letterSpacing: "0.08em", color: tier.color, background: tier.color + "1c", padding: "3px 9px", borderRadius: 6 }}>{tier.name}</span>
+              {profile?.streak > 0 && <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ff9f1c", background: "#ff9f1c18", padding: "3px 9px", borderRadius: 999 }}>🔥 {profile.streak}</span>}
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: B.white, fontFamily: fd, letterSpacing: "-0.02em" }}>{username}</div>
+            <div style={{ fontSize: 12, color: B.dim, marginTop: 2 }}>
+              Joined {joined} · <span style={{ color: "#c8ccd2", fontWeight: 600 }}>{profile?.followers ?? 0}</span> follower{(profile?.followers ?? 0) === 1 ? "" : "s"} · <span style={{ color: "#c8ccd2", fontWeight: 600 }}>{profile?.following ?? 0}</span> following
             </div>
           </div>
 
@@ -432,7 +429,7 @@ const iconBtn = { width: 34, height: 34, borderRadius: "50%", background: B.surf
 const avatar = { width: 76, height: 76, borderRadius: "50%", background: `linear-gradient(140deg, ${B.primary}, ${B.cyan})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, fontWeight: 800, color: "#04130c", fontFamily: fd };
 const editBtn = { marginTop: 4, padding: "7px 22px", borderRadius: 999, background: B.surface, border: `1px solid ${B.border2}`, color: B.white, fontFamily: fd, fontWeight: 600, fontSize: 13, cursor: "pointer" };
 const logoutBtn = { width: "100%", marginTop: 18, padding: "13px", borderRadius: 12, background: "transparent", border: `1px solid ${B.border2}`, color: B.red, fontFamily: fd, fontWeight: 600, fontSize: 14, cursor: "pointer" };
-const input = { width: "100%", boxSizing: "border-box", padding: "11px 12px", marginTop: 8, background: B.bg, border: `1px solid ${B.border2}`, borderRadius: 10, color: B.white, fontSize: 14, fontFamily: fb, outline: "none" };
+const input = { width: "100%", boxSizing: "border-box", padding: "11px 12px", marginTop: 8, background: B.bg, border: `1px solid ${B.border2}`, borderRadius: 10, color: B.white, fontSize: 16, fontFamily: fb, outline: "none" }; // ≥16px: sub-16 inputs make iOS Safari zoom on focus
 const saveBtn = { padding: "11px 16px", borderRadius: 10, border: "none", background: B.primary, color: "#04130c", fontFamily: fd, fontWeight: 700, fontSize: 14, cursor: "pointer", whiteSpace: "nowrap" };
 const fieldLabel = { fontSize: 11, color: B.dim, fontFamily: fm, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 2 };
 
