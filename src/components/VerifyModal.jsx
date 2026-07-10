@@ -80,7 +80,7 @@ export function VerifyModal({ userId, onClose, onVerified }) {
   const inputStyle = {
     width: "100%", boxSizing: "border-box", padding: "13px 14px", marginTop: 6,
     background: B.bg, border: `1px solid ${B.border2}`, borderRadius: 12,
-    color: B.white, fontSize: 15, fontFamily: fb, outline: "none",
+    color: B.white, fontSize: 16, fontFamily: fb, outline: "none", // ≥16px: sub-16 inputs make iOS Safari zoom on focus
   };
   const label = { fontSize: 12, color: B.dim, fontFamily: fm, letterSpacing: 0.3, textTransform: "uppercase" };
   const btn = (primary) => ({
@@ -134,6 +134,8 @@ export function VerifyModal({ userId, onClose, onVerified }) {
             <input
               style={inputStyle}
               type={isEmail ? "email" : "tel"}
+              autoComplete={isEmail ? "email" : "tel"}
+              inputMode={isEmail ? "email" : "tel"}
               placeholder={isEmail ? "you@example.com" : "+1 (555) 000-0000"}
               value={contact}
               disabled={codeSent}
@@ -148,7 +150,7 @@ export function VerifyModal({ userId, onClose, onVerified }) {
                 <div style={{ ...label, marginTop: 14 }}>6-digit code</div>
                 <input
                   style={{ ...inputStyle, letterSpacing: "0.4em", textAlign: "center", fontFamily: fm, fontSize: 20 }}
-                  inputMode="numeric" maxLength={6} placeholder="••••••"
+                  inputMode="numeric" maxLength={6} placeholder="••••••" autoComplete="one-time-code"
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                   onKeyDown={(e) => e.key === "Enter" && code.length === 6 && confirmCode()}

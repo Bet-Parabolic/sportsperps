@@ -6,12 +6,29 @@ import { useLiveGames } from "./lib/useLiveGames.js";
 import { track, initTracking, withVisitorId } from "./lib/track.js";
 
 import { LandingPage } from "./components/LandingPage.jsx";
-const TradingApp = lazy(() => import("./trading/TradingApp.jsx").then(m => ({ default: m.TradingApp })));
-const LiveTradingApp = lazy(() => import("./trading/LiveTradingApp.jsx").then(m => ({ default: m.LiveTradingApp })));
-const DashboardPage = lazy(() => import("./dash/DashboardPage.jsx").then(m => ({ default: m.DashboardPage })));
-const WaitlistPage = lazy(() => import("./components/WaitlistPage.jsx").then(m => ({ default: m.WaitlistPage })));
-const WorldCupPage = lazy(() => import("./components/WorldCupPage.jsx").then(m => ({ default: m.WorldCupPage })));
-const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow.jsx").then(m => ({ default: m.OnboardingFlow })));
+
+// Stale-chunk guard: a deploy replaces the hashed chunk files, so a tab that loaded index.html
+// BEFORE the deploy 404s when it lazy-loads a page after it (common on phones — tabs live for
+// days). On chunk-load failure, reload once to fetch the fresh index.html; a sessionStorage
+// latch stops a reload loop if the failure is real (offline, adblock). Cleared on success.
+const RELOAD_KEY = "parabolic_chunk_reloaded";
+const lazyPage = (importer, pick) => lazy(() =>
+  importer().then((m) => {
+    try { sessionStorage.removeItem(RELOAD_KEY); } catch { /* storage blocked */ }
+    return { default: pick(m) };
+  }).catch((err) => {
+    let latched = true;
+    try { latched = !!sessionStorage.getItem(RELOAD_KEY); if (!latched) sessionStorage.setItem(RELOAD_KEY, "1"); } catch { /* storage blocked */ }
+    if (!latched) { window.location.reload(); return new Promise(() => {}); } // reload takes over
+    throw err; // second failure → surface to the ErrorBoundary
+  })
+);
+const TradingApp = lazyPage(() => import("./trading/TradingApp.jsx"), m => m.TradingApp);
+const LiveTradingApp = lazyPage(() => import("./trading/LiveTradingApp.jsx"), m => m.LiveTradingApp);
+const DashboardPage = lazyPage(() => import("./dash/DashboardPage.jsx"), m => m.DashboardPage);
+const WaitlistPage = lazyPage(() => import("./components/WaitlistPage.jsx"), m => m.WaitlistPage);
+const WorldCupPage = lazyPage(() => import("./components/WorldCupPage.jsx"), m => m.WorldCupPage);
+const OnboardingFlow = lazyPage(() => import("./components/onboarding/OnboardingFlow.jsx"), m => m.OnboardingFlow);
 
 const Splash = () => (
   <div style={{minHeight:"100vh",background:"#000",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -62,7 +79,8 @@ export default function App() {
   // page_view for the live-game terminal. Tab-level page_views fire inside the terminals.
   useEffect(() => { initTracking(); }, []);
   useEffect(() => {
-    if (isDash || isWaitlist || isWorldCup) return; // dashboard + standalone waitlist page aren't landing traffic
+    if (isDash || isWaitlist) return; // dashboard + standalone waitlist page aren't landing traffic
+    if (isWorldCup) { track("page_view", { page: "worldcup" }); return; } // the WC event hub IS the funnel — count it
     if (page === "landing") track("landing_view");
     else if (page === "trading") track("app_open", { terminal: "home" });
     else if (page === "live-trading") track("page_view", { page: "live-trading" });

@@ -69,7 +69,7 @@ export function ChatPanel({ gameId, userId, homeShort = "Home", awayShort = "Awa
             <input
               value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()}
               placeholder="Message…" maxLength={280}
-              style={{ flex: 1, minWidth: 0, padding: "10px 12px", background: "#0a0a0a", border: "1px solid #1f2329", borderRadius: 10, color: "#fff", fontSize: 13, fontFamily: fb, outline: "none" }}
+              style={{ flex: 1, minWidth: 0, padding: "10px 12px", background: "#0a0a0a", border: "1px solid #1f2329", borderRadius: 10, color: "#fff", fontSize: 16 /* ≥16px avoids iOS zoom-on-focus */, fontFamily: fb, outline: "none" }}
             />
             <button onClick={send} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: B.primary, color: "#04130c", fontFamily: fb, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Send</button>
           </>

@@ -145,6 +145,10 @@ export const TvChart = forwardRef(function TvChart(
       crosshair: { mode: CrosshairMode.Normal,
         vertLine: { color: "#ffffff2a", width: 1, style: LineStyle.Solid, labelBackgroundColor: "#1f2733" },
         horzLine: { color: "#ffffff2a", labelBackgroundColor: "#1f2733" } },
+      // Mobile: a vertical swipe starting on the chart must scroll the PAGE, not pan the chart —
+      // otherwise the 240px chart band makes the whole page feel stuck. Horizontal drag still
+      // pans the time axis and pinch still zooms.
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
     });
 
     // Both series show only their last-value axis label (home green %, away red %) — no

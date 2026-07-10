@@ -4,6 +4,7 @@ import { B, fb, fd, fm } from "../lib/theme.js";
 import { LOGO_WORDMARK } from "../lib/logos.js";
 import { API_URL } from "../lib/constants.js";
 import { getAuth, authToken, currentUserId } from "../lib/auth.js";
+import { track } from "../lib/track.js";
 import { VerifyModal } from "./VerifyModal.jsx";
 import { ProfilePage } from "./ProfilePage.jsx";
 import { ActiveBetsPage } from "./ActiveBetsPage.jsx";
@@ -12,7 +13,7 @@ import { useLiveGames } from "../lib/useLiveGames.js";
 import { loadCard, parseAvatar, syncAvatarToBackend } from "../lib/onboarding.js";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { PublicProfilePage } from "./PublicProfilePage.jsx";
-import stadiumBg from "../assets/worldcup/stadium.jpg";
+import stadiumBg from "../assets/worldcup/stadium.webp"; // 218KB webp (was a 418KB jpg) — first paint of the WC funnel
 import fifa26 from "../assets/worldcup/fifa26.png";
 import laurelImg from "../assets/worldcup/laurel.svg";
 import laurelPodium from "../assets/worldcup/laurel-podium.svg";
@@ -269,8 +270,20 @@ function WCRail({ tab, onTab, liveWc, onOpenLive }) {
 }
 
 /* ── circular NEXT MATCH countdown (Figma 142-18690) ── */
-function CountdownRing({ nextMatch, cdStr }) {
+function CountdownRing({ nextMatch, live = false }) {
+  // Self-ticking leaf: the 1s clock lives HERE so only this ring re-renders each second.
+  // It used to live in WorldCupPage state, which re-rendered — and, via the inline tab
+  // components, fully REMOUNTED — the entire page (hero image, bracket, SVG) every second.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (live) return; // no clock while a match is live — the label is static "LIVE NOW"
+    const iv = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [live]);
   if (!nextMatch) return null;
+  const cd = Math.max(0, nextMatch.date - now);
+  const cdStr = live ? "LIVE NOW"
+    : `${Math.floor(cd / 86400000)}d ${Math.floor(cd / 3600000) % 24}h ${Math.floor(cd / 60000) % 60}m ${Math.floor(cd / 1000) % 60}s`;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
       <div style={{ position: "relative", width: 208, height: 208, marginBottom: -66 }}>
@@ -312,7 +325,6 @@ export function WorldCupPage() {
   const [viewUser, setViewUser] = useState(null); // public-profile target
   const [joinErr, setJoinErr] = useState("");
   const [activeGame, setActiveGame] = useState(null);
-  const [now, setNow] = useState(Date.now());
   const [memberCard] = useState(() => loadCard());
   const liveGames = useLiveGames();
   const wcLive = liveGames.filter((g) => g.league === "wcup" && (g.status === "live" || g.status === "halftime"));
@@ -345,17 +357,21 @@ export function WorldCupPage() {
           setStanding(st);
         }
       } else { setJoined(false); }
-    } catch { /* keep last */ }
+    } catch {
+      // Keep the last good data — but if the FIRST load failed (meta still null), default the
+      // event to live so the join CTA isn't invisibly hidden; the backend still gates joins.
+      setMeta((prev) => prev ?? { live: true, degraded: true });
+    }
   }, [auth?.userId]);
 
   useEffect(() => { refresh(); const iv = setInterval(refresh, 30_000); return () => clearInterval(iv); }, [refresh]);
-  useEffect(() => { const iv = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(iv); }, []);
   useEffect(() => { document.title = "Parabolic · World Cup Trading Competition"; }, []);
   // One-shot: push the device-local avatar to the account so leaderboards/feeds can show it.
   useEffect(() => { if (auth?.userId) syncAvatarToBackend({ apiUrl: API_URL, userId: auth.userId, token: authToken() }); }, [auth?.userId]);
 
   const join = useCallback(async () => {
     setJoinErr("");
+    track("wc_join_click", { authed: !!getAuth() });
     if (!getAuth()) { setShowOnboard(true); return; }
     try {
       const res = await fetch(`${API_URL}/event/join`, {
@@ -364,7 +380,7 @@ export function WorldCupPage() {
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.joined) { setJoined(true); setWcBalance(d.worldCupCash); refresh(); return; }
-      if (res.status === 403 && /verify/i.test(d.error || "")) { setShowVerify(true); return; }
+      if (res.status === 403 && /verify/i.test(d.error || "")) { track("wc_verify_shown"); setShowVerify(true); return; }
       if (res.status === 401) { setShowOnboard(true); return; }
       setJoinErr(d.error || "Could not join right now");
     } catch { setJoinErr("Network error — try again"); }
@@ -373,10 +389,9 @@ export function WorldCupPage() {
   const nextMatch = bracket.filter((m) => m.state === "pre" && !m.home.tbd).sort((a, b) => a.date - b.date)[0]
     || bracket.filter((m) => m.state === "pre").sort((a, b) => a.date - b.date)[0];
   const liveMatch = bracket.find((m) => m.state === "in");
-  const cd = nextMatch ? Math.max(0, nextMatch.date - now) : null;
-  const cdStr = cd != null ? `${Math.floor(cd / 86400000)}d ${Math.floor(cd / 3600000) % 24}h ${Math.floor(cd / 60000) % 60}m ${Math.floor(cd / 1000) % 60}s` : null;
 
   const openMatch = async (m) => {
+    if (!m?.backendId) return; // TBD fixture — nothing to open yet
     try {
       const r = await fetch(`${API_URL}/games/${m.backendId}`);
       if (!r.ok) return;
@@ -417,7 +432,7 @@ export function WorldCupPage() {
 
       <div style={{ position: "relative", padding: isMobile ? "60px 16px 60px" : "64px 40px 80px" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: isMobile ? 14 : 18 }}>
-          <CountdownRing nextMatch={liveMatch || nextMatch} cdStr={liveMatch ? "LIVE NOW" : cdStr || "—"} />
+          <CountdownRing nextMatch={liveMatch || nextMatch} live={!!liveMatch} />
         </div>
 
         <div style={{ textAlign: "center", maxWidth: 1253, margin: "0 auto" }}>
@@ -560,7 +575,7 @@ export function WorldCupPage() {
   const navItems = [["home", Home], ["bets", Ticket], ["news", Newspaper], ["leaderboard", Trophy]];
 
   return (
-    <div style={{ height: "100vh", background: "#06070a", fontFamily: fb, color: "#eef1f6", display: "flex", overflow: "hidden" }}>
+    <div style={{ height: "100vh", maxHeight: "100dvh", background: "#06070a", fontFamily: fb, color: "#eef1f6", display: "flex", overflow: "hidden" }}>
       {!isMobile && (
         <WCRail tab={tab} onTab={setTab} liveWc={wcLive} onOpenLive={openGame} />
       )}
@@ -586,10 +601,13 @@ export function WorldCupPage() {
                   </>}
             </div>
           </div>
-          {tab === "home" && <HomeTab />}
+          {/* Plain function calls (not <HomeTab/>): inline-defined components get a NEW type
+              identity on every parent render, so React would unmount + remount the whole tab
+              subtree each time state changes. Calling them inlines their JSX — no boundary. */}
+          {tab === "home" && HomeTab()}
           {tab === "bets" && <div style={{ padding: isMobile ? "64px 4px 10px" : "64px 16px 10px" }}><ActiveBetsPage eventOnly liveGames={wcLive} onTrade={openGame} /></div>}
           {tab === "news" && <div style={{ paddingTop: 56 }}><NewsPage /></div>}
-          {tab === "leaderboard" && <LeaderboardTab />}
+          {tab === "leaderboard" && LeaderboardTab()}
         </div>
       </div>
 
@@ -633,7 +651,7 @@ export function WorldCupPage() {
       {showVerify && auth && (
         <VerifyModal userId={auth.userId}
           onClose={() => setShowVerify(false)}
-          onVerified={() => { setShowVerify(false); join(); }} />
+          onVerified={() => { track("wc_verify_passed"); setShowVerify(false); join(); }} />
       )}
     </div>
   );

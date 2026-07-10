@@ -72,5 +72,24 @@ export function subscribeLive(fn) {
   return () => subscribers.delete(fn);
 }
 
+// Foreground revive: iOS suspends background tabs — timers freeze and the socket can die WITHOUT
+// firing onclose, so the auto-reconnect never triggers. When the tab returns to the foreground,
+// force a fresh connection if the socket is closed or has gone silent (private liquidation /
+// deleverage pushes ride this socket; a zombie connection silently drops them).
+function revive() {
+  clearTimeout(reconnectTimer);
+  backoff = 1000;
+  if (ws) { try { ws.onclose = null; ws.close(); } catch { /* noop */ } ws = null; }
+  connect();
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !started) return;
+    const silent = Date.now() - lastMsgAt > 45_000;
+    const healthy = ws && (ws.readyState === 0 || ws.readyState === 1) && !silent;
+    if (!healthy) revive();
+  });
+}
+
 /* Timestamp of the last message received — used by REST-fallback heartbeats. */
 export function lastMessageAt() { return lastMsgAt; }

@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { LOGO_WORDMARK } from "../../lib/logos.js";
 import { BARCODE_WIDTHS } from "../../lib/onboarding.js";
-import cardTexture from "../../assets/cardTexture.png";
+import cardTexture from "../../assets/cardTexture.webp"; // 51KB webp (alpha kept) — the 527KB png was pure page weight at 32% opacity
 
 const BASE_W = 339;
 const BASE_H = 191;

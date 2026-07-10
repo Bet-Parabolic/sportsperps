@@ -230,19 +230,25 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   }), [g.away]);
 
   // ── helpers ─────────────────────────────────────────────────────────────
-  const [toast, setToast] = useState(null);      // most-recent notification, auto-dismisses (mobile surface)
-  const toastTimerRef = useRef(null);
-  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+  const [toasts, setToasts] = useState([]);      // stacked transient notifications (mobile surface)
+  const toastTimersRef = useRef({});
+  useEffect(() => () => Object.values(toastTimersRef.current).forEach(clearTimeout), []);
+  const dismissToast = useCallback((id) => {
+    setToasts(p => p.filter(t => t.id !== id));
+    clearTimeout(toastTimersRef.current[id]);
+    delete toastTimersRef.current[id];
+  }, []);
   const notify = useCallback((msg, type) => {
     const id = Date.now() + Math.random();
     // Persist in the activity tray (newest first), capped — they don't auto-dismiss.
     setNotifs(p => [{id, msg, type: type||'info', t: Date.now()}, ...p].slice(0, 40));
     // Mobile: the tray lives in the desktop wager panel, so on a phone a rejection was a silent
-    // no-op (A7 finding #2). Surface every notification as a transient floating toast too.
-    setToast({ id, msg, type: type || 'info' });
-    clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
-  }, []);
+    // no-op (A7 finding #2). Surface every notification as a floating toast too — a stacked
+    // queue (max 3), NOT one slot, so a burst (fill → points, liquidation → settlement) can't
+    // overwrite a message before it's read. Critical types (red/yellow) linger 8s vs 4s.
+    setToasts(p => [...p.slice(-2), { id, msg, type: type || 'info' }]);
+    toastTimersRef.current[id] = setTimeout(() => dismissToast(id), type === 'red' || type === 'yellow' ? 8000 : 4000);
+  }, [dismissToast]);
   const clearNotifs = useCallback(() => setNotifs([]), []);
 
   const addMark = useCallback((chartT, p, mt, side) => {
@@ -565,6 +571,15 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     const iv = setInterval(poll, 5000);
     return () => clearInterval(iv);
   }, [initGame.id, settled, userId]);
+
+  // Foreground refetch: iOS throttles/pauses timers in background tabs, so on return the odds can
+  // be up to a full interval stale (and a dead socket may not have fired onclose yet). Poll
+  // immediately when the tab becomes visible again — liveSocket.js handles its own reconnect.
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === 'visible') pollRef.current?.(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
 
   // ── session-expired handling: a 401 on any authed call (or a WS subscribe_error) routes here ──
   // Clear the stale session in local state and open the sign-in modal with a clear notice, instead
@@ -1344,13 +1359,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
                               <div>
                                 <div style={{fontSize:9,color:B.green,fontWeight:600,marginBottom:3}}>Take Profit ¢</div>
-                                <input type="number" min={1} max={99} value={tpslEdit.tp} placeholder="—" onChange={e=>setTpslEdit(c=>({...c,tp:e.target.value}))}
-                                  style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:7,padding:'6px 8px',color:B.green,fontSize:12,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                                <input type="number" inputMode="decimal" min={1} max={99} value={tpslEdit.tp} placeholder="—" onChange={e=>setTpslEdit(c=>({...c,tp:e.target.value}))}
+                                  style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:7,padding:'6px 8px',color:B.green,fontSize:isMobile?16:12,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                               </div>
                               <div>
                                 <div style={{fontSize:9,color:B.red,fontWeight:600,marginBottom:3}}>Stop Loss ¢</div>
-                                <input type="number" min={1} max={99} value={tpslEdit.sl} placeholder="—" onChange={e=>setTpslEdit(c=>({...c,sl:e.target.value}))}
-                                  style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:7,padding:'6px 8px',color:B.red,fontSize:12,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                                <input type="number" inputMode="decimal" min={1} max={99} value={tpslEdit.sl} placeholder="—" onChange={e=>setTpslEdit(c=>({...c,sl:e.target.value}))}
+                                  style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:7,padding:'6px 8px',color:B.red,fontSize:isMobile?16:12,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                               </div>
                             </div>
                             <div style={{fontSize:9,color:'#555',marginBottom:8}}>Triggers when {teamName} reaches the price (TP above, SL below). Entry {(posEntryP*100).toFixed(0)}¢.</div>
@@ -1385,6 +1400,28 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               )}
             </div>
           </div>
+
+          {/* Mobile activity tray — on desktop this lives in the wager panel; phones get their own
+              card under Positions so a missed toast (liquidation, deleverage, rejection) can
+              always be reviewed after the fact. */}
+          {isMobile && notifs.length > 0 && (
+            <div style={{margin:'8px 12px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',padding:'12px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                <span style={{fontSize:10,color:'#555',fontWeight:600,letterSpacing:'0.06em'}}>ACTIVITY ({notifs.length})</span>
+                <button onClick={clearNotifs} style={{background:'transparent',border:'none',color:'#666',fontSize:10,fontWeight:600,cursor:'pointer',padding:0,fontFamily:fb}}>Clear</button>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:170,overflowY:'auto'}}>
+                {notifs.map(n=>(
+                  <div key={n.id} style={{padding:'8px 10px',borderRadius:9,fontWeight:600,fontSize:11.5,lineHeight:1.35,
+                    background:n.type==='green'?B.green+'18':n.type==='red'?B.red+'18':n.type==='yellow'?'#f5a62318':'#161616',
+                    border:`1px solid ${n.type==='green'?B.green+'40':n.type==='red'?B.red+'40':n.type==='yellow'?'#f5a62340':'#262626'}`,
+                    color:n.type==='green'?B.green:n.type==='red'?B.red:n.type==='yellow'?'#f5a623':'#bbb'}}>
+                    {n.msg}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* GAMECAST */}
           <div data-mob="gamecast" style={{margin:isMobile?'8px 12px 0':'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
@@ -1501,8 +1538,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 <div>
                   <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Shares</div>
                   <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:10,padding:'9px 10px'}}>
-                    <input type="number" value={shareCount} min={0} onChange={e=>{const s=Math.max(0,+e.target.value);setOrderMargin(Math.min(Math.max(0,(s*entryP)/eL),balance));}}
-                      style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:15,fontWeight:700,fontFamily:fm}}/>
+                    <input type="number" inputMode="decimal" value={shareCount} min={0} onChange={e=>{const s=Math.max(0,+e.target.value);setOrderMargin(Math.min(Math.max(0,(s*entryP)/eL),balance));}}
+                      style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:16,fontWeight:700,fontFamily:fm}}/>
                   </div>
                 </div>
                 <div style={{color:'#333',fontSize:14,fontWeight:700,paddingBottom:11,textAlign:'center'}}>⇄</div>
@@ -1510,8 +1547,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Margin</div>
                   <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:10,padding:'9px 10px',display:'flex',alignItems:'center',gap:3}}>
                     <span style={{color:'#555',fontSize:12,fontWeight:600}}>$</span>
-                    <input type="number" value={Math.round(eM)} min={0} onChange={e=>setOrderMargin(Math.min(Math.max(0,+e.target.value),balance))}
-                      style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:15,fontWeight:700,fontFamily:fm}}/>
+                    <input type="number" inputMode="decimal" value={Math.round(eM)} min={0} onChange={e=>setOrderMargin(Math.min(Math.max(0,+e.target.value),balance))}
+                      style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:16,fontWeight:700,fontFamily:fm}}/>
                   </div>
                 </div>
               </div>
@@ -1524,8 +1561,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <div style={{marginBottom:12,padding:'10px 12px',background:'#0a0a0a',borderRadius:10,border:'1px solid #2a2a2a'}}>
                 <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:6}}>Limit Price</div>
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
-                  <input type="number" min={1} max={99} value={limitCents} onChange={e=>setLimitCents(Math.min(99,Math.max(1,+e.target.value)))}
-                    style={{flex:1,background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:8,padding:'7px 10px',color:B.primaryLight,fontSize:15,fontWeight:700,fontFamily:fm,outline:'none'}}/>
+                  <input type="number" inputMode="decimal" min={1} max={99} value={limitCents} onChange={e=>setLimitCents(Math.min(99,Math.max(1,+e.target.value)))}
+                    style={{flex:1,background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:8,padding:'7px 10px',color:B.primaryLight,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none'}}/>
                   <span style={{fontSize:13,color:'#555',fontWeight:600}}>¢</span>
                 </div>
               </div>
@@ -1536,13 +1573,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                 <div>
                   <div style={{fontSize:10,color:B.green,fontWeight:600,marginBottom:4}}>Take Profit ¢</div>
-                  <input type="number" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="—"
-                    style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:8,padding:'7px 10px',color:B.green,fontSize:13,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                  <input type="number" inputMode="decimal" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="—"
+                    style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:8,padding:'7px 10px',color:B.green,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                 </div>
                 <div>
                   <div style={{fontSize:10,color:B.red,fontWeight:600,marginBottom:4}}>Stop Loss ¢</div>
-                  <input type="number" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="—"
-                    style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:8,padding:'7px 10px',color:B.red,fontSize:13,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                  <input type="number" inputMode="decimal" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="—"
+                    style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:8,padding:'7px 10px',color:B.red,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                 </div>
               </div>
             </div>
@@ -1829,17 +1866,23 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         />
       )}
       {tradeCard && <TradeCard card={tradeCard} onClose={()=>setTradeCard(null)}/>}
-      {/* Mobile floating toast — the activity tray lives in the desktop wager panel, so phones need
-          their own surface or rejections are invisible (A7 finding #2). Sits above the bottom nav
-          + wager sheet; auto-dismisses in 4s; tap to dismiss early. */}
-      {isMobile && toast && (
-        <div onClick={()=>setToast(null)} style={{position:'fixed',left:12,right:12,bottom:'calc(68px + env(safe-area-inset-bottom))',zIndex:80,
-          padding:'12px 14px',borderRadius:12,fontWeight:600,fontSize:13,lineHeight:1.35,fontFamily:fb,cursor:'pointer',
-          background:toast.type==='green'?'#0d2a1d':toast.type==='red'?'#2a0f0d':'#15181d',
-          border:`1px solid ${toast.type==='green'?B.green+'55':toast.type==='red'?B.red+'55':'#2a2e35'}`,
-          color:toast.type==='green'?B.green:toast.type==='red'?B.red:'#d5d9e0',
-          boxShadow:'0 8px 28px rgba(0,0,0,.55)'}}>
-          {toast.msg}
+      {/* Mobile floating toasts — the activity tray lives in the desktop wager panel, so phones need
+          their own surface or rejections are invisible (A7 finding #2). Stacked queue (max 3) so
+          bursts don't overwrite each other; zIndex 1200 keeps them visible above the auth/verify
+          modals (1000) and the profile page (900); tap any to dismiss early. */}
+      {isMobile && toasts.length > 0 && (
+        <div style={{position:'fixed',left:12,right:12,bottom:'calc(68px + env(safe-area-inset-bottom))',zIndex:1200,
+          display:'flex',flexDirection:'column',gap:8}}>
+          {toasts.map(t => (
+            <div key={t.id} onClick={()=>dismissToast(t.id)} style={{
+              padding:'12px 14px',borderRadius:12,fontWeight:600,fontSize:13,lineHeight:1.35,fontFamily:fb,cursor:'pointer',
+              background:t.type==='green'?'#0d2a1d':t.type==='red'?'#2a0f0d':'#15181d',
+              border:`1px solid ${t.type==='green'?B.green+'55':t.type==='red'?B.red+'55':'#2a2e35'}`,
+              color:t.type==='green'?B.green:t.type==='red'?B.red:'#d5d9e0',
+              boxShadow:'0 8px 28px rgba(0,0,0,.55)',animation:'slideUp .2s ease'}}>
+              {t.msg}
+            </div>
+          ))}
         </div>
       )}
     </div>
