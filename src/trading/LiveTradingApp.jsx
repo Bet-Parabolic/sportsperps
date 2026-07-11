@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { B, brighten, fb, fd, fm } from "../lib/theme.js";
+import { pickTeamColors } from "../lib/teamColors.js";
 import { API_URL } from "../lib/constants.js";
 import { calcPnL, clamp, fmtPct, fmtShares, fmtUsd, liqPrice, makeBook, maxLev, pctClr, periodLabel } from "../lib/helpers.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
@@ -144,8 +145,6 @@ function LevSlider({ eL, ml, onChange, compact = false, liq = null, cap = null }
 }
 
 export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade, onOnboard, worldcup = false }) {
-  // ── normalise team colors from backend ──────────────────────────────────
-  const nc = c => c ? (c.startsWith('#') ? c : '#'+c) : null;
 
   // ── auth/userId: guest UUID until the user signs up; auth session adds username/token ──
   const [auth, setAuth] = useState(getAuth);          // { userId, username, token } | null
@@ -262,18 +261,26 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const closedIdsRef = useRef(new Set());       // position ids already moved to history (dedupe)
 
   // ── derived team objects ────────────────────────────────────────────────
+  // Kit-color selection + WCAG guard (see lib/teamColors.js). Replaces the old blind rules
+  // (home→color, away→altColor||color) that shipped England's WHITE away kit and Switzerland's
+  // pale-mint second kit onto solid buttons under hardcoded white text. Both kits are scored per
+  // team; every pick is guaranteed legible on the dark UI, and btnText is the black/white label
+  // that reads on a SOLID fill of that color.
+  const teamCols = useMemo(() => pickTeamColors(g.home, g.away, { homeFallback: B.primary, awayFallback: '#ef4444' }), [g.home, g.away]);
   const HOME = useMemo(() => ({
     name:    g.home.name,
     short:   g.home.abbreviation,
     logoUrl: g.home.logo,
-    light:   nc(g.home.color) || B.primary,
-  }), [g.home]);
+    light:   teamCols.home.light,
+    btnText: teamCols.home.btnText,
+  }), [g.home, teamCols]);
   const AWAY = useMemo(() => ({
     name:    g.away.name,
     short:   g.away.abbreviation,
     logoUrl: g.away.logo,
-    light:   nc(g.away.altColor || g.away.color) || '#ef4444',
-  }), [g.away]);
+    light:   teamCols.away.light,
+    btnText: teamCols.away.btnText,
+  }), [g.away, teamCols]);
 
   // ── helpers ─────────────────────────────────────────────────────────────
   const [toasts, setToasts] = useState([]);      // stacked transient notifications (mobile surface)
@@ -1770,7 +1777,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               border:settled?'2px solid #333':'2px solid '+B.green,
               cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
               background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,
-              color:'#fff',opacity:settled||eM<10?0.4:1}}>
+              color:settled?'#fff':orderSide==='home'?HOME.btnText:AWAY.btnText,opacity:settled||eM<10?0.4:1}}>
               {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
             {/* Account */}
@@ -1977,7 +1984,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     </div>
                     <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
                       border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
-                      background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,color:'#fff',opacity:settled||eM<10?0.4:1}}>
+                      background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,color:settled?'#fff':orderSide==='home'?HOME.btnText:AWAY.btnText,opacity:settled||eM<10?0.4:1}}>
                       {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>
