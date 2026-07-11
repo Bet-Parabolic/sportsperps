@@ -1034,7 +1034,9 @@ function WCEconTab({ data }) {
   if (!data) return <Panel title="World Cup economics"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   const sign = (n) => ((n || 0) >= 0 ? C.primaryLt : C.red);
   const m = data.money || {}, v = data.vault || {};
-  const driftBig = Math.abs(data.conservationDrift || 0) > 0.01 && (data.openPositions || 0) === 0;
+  // Drift alarms ONLY when both books are flat: users can be fully closed while the vault still
+  // carries counterparty legs to settlement (their value isn't in vault cash — expected drift).
+  const driftBig = Math.abs(data.conservationDrift || 0) > 0.01 && (data.openPositions || 0) === 0 && !data.vaultInventoryOpen;
   return (
     <>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
@@ -1082,7 +1084,7 @@ function WCEconTab({ data }) {
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <Stat label="Open interest" value={fmtUsd(data.openInterest)} sub={`${data.openPositions ?? 0} open positions`} />
         <Stat label="Conservation drift" value={fmtSigned(data.conservationDrift)} color={driftBig ? C.red : C.mut}
-          sub={data.openPositions > 0 ? "open inventory in flight — closes at settlement" : driftBig ? "⚠ should be $0 with no open positions" : "money conserves"} />
+          sub={data.openPositions > 0 || data.vaultInventoryOpen ? "open inventory in flight — closes at settlement" : driftBig ? "⚠ should be $0 with all books flat" : "money conserves"} />
       </div>
 
       <ShadowMMPanel />
