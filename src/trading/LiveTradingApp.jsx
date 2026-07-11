@@ -20,7 +20,7 @@ import { DepositModal } from "../components/DepositModal.jsx";
 import { NavRail } from "../components/NavRail.jsx";
 import { FloatingChat } from "../components/FloatingChat.jsx";
 import { isBookmarked, syncBookmarks, toggleBookmark as toggleBookmarkStore } from "../lib/bookmarks.js";
-import { MessageCircle, Bookmark, Share2, BarChart3, Zap, Briefcase, Mic } from "lucide-react";
+import { MessageCircle, Bookmark, Share2, BarChart3, Zap, Briefcase, Mic, Home, Ticket, Newspaper, Trophy } from "lucide-react";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -1787,19 +1787,32 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             )}
 
-            {/* Sticky bottom tab bar — visually identical to the WC home nav (icon-only, #050505) */}
+            {/* Floating trade button — the WC nav below navigates away, so this is the wager-sheet entry point */}
+            {worldcup&&onNavTo&&!showWager&&(
+              <button aria-label="Trade" onClick={()=>setShowWager(true)} style={{position:'fixed',right:16,bottom:'calc(72px + env(safe-area-inset-bottom))',zIndex:41,width:52,height:52,borderRadius:26,border:'none',background:B.primary,color:'#000',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 6px 20px rgba(31,209,130,0.35)'}}>
+                <Zap size={22} color="#000" fill="#000"/>
+              </button>
+            )}
+
+            {/* Sticky bottom tab bar — WC mode: the exact WC home nav (Home/Bets/News/Leaderboard) */}
             <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:'#050505',borderTop:'1px solid #131313',display:'flex',height:56,paddingBottom:'env(safe-area-inset-bottom)'}}>
-              {[['score',BarChart3,'Score'],['trade',Zap,'Trade'],['positions',Briefcase,'Positions'],['gamecast',Mic,'Plays']].map(([id,Icon,label])=>(
-                <button key={id} aria-label={label} onClick={()=>{
-                  if(id==='trade'){setShowWager(w=>!w);}
-                  else{setShowWager(false);
-                    const el=document.querySelector('[data-mob="'+id+'"]');
-                    if(el)el.scrollIntoView({behavior:'smooth'});}
-                }} style={{flex:1,background:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
-                  <Icon size={20} color={id==='trade'&&showWager?'#fff':'#5a6170'} />
-                  {id==='positions'&&gamePositions.length>0&&<span style={{position:'absolute',top:8,right:'26%',fontSize:8,background:B.primary,color:'#000',borderRadius:8,padding:'1px 4px',fontWeight:700,fontFamily:fm}}>{gamePositions.length}</span>}
-                </button>
-              ))}
+              {worldcup&&onNavTo
+                ? [['home',Home],['bets',Ticket],['news',Newspaper],['leaderboard',Trophy]].map(([key,Icon])=>(
+                    <button key={key} aria-label={key} onClick={()=>onNavTo(key)} style={{flex:1,background:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <Icon size={20} color="#5a6170" />
+                    </button>
+                  ))
+                : [['score',BarChart3,'Score'],['trade',Zap,'Trade'],['positions',Briefcase,'Positions'],['gamecast',Mic,'Plays']].map(([id,Icon,label])=>(
+                    <button key={id} aria-label={label} onClick={()=>{
+                      if(id==='trade'){setShowWager(w=>!w);}
+                      else{setShowWager(false);
+                        const el=document.querySelector('[data-mob="'+id+'"]');
+                        if(el)el.scrollIntoView({behavior:'smooth'});}
+                    }} style={{flex:1,background:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+                      <Icon size={20} color={id==='trade'&&showWager?'#fff':'#5a6170'} />
+                      {id==='positions'&&gamePositions.length>0&&<span style={{position:'absolute',top:8,right:'26%',fontSize:8,background:B.primary,color:'#000',borderRadius:8,padding:'1px 4px',fontWeight:700,fontFamily:fm}}>{gamePositions.length}</span>}
+                    </button>
+                  ))}
             </div>
 
             {/* Mobile wager sheet */}
