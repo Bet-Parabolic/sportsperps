@@ -10,7 +10,7 @@ import { API_URL } from "../lib/constants.js";
 import { currentUserId } from "../lib/auth.js";
 import { fmtUsd } from "../lib/helpers.js";
 
-export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false }) {
+export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, showMarkets = false }) {
   const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
   const [games, setGames] = useState(new Map());
@@ -55,6 +55,52 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false }) {
 
   const card = { background: "#101114", border: "1px solid #1c1e24", borderRadius: 14, padding: "14px 16px", marginBottom: 8 };
 
+  // Tradeable markets right now: live + pregame (eventOnly → WC games only). Bets render above these.
+  const markets = showMarkets
+    ? [...games.values()].filter((g) =>
+        (!eventOnly || g.id.startsWith("wcup_")) &&
+        (g.status === "live" || g.status === "halftime" || g.pregame))
+      .sort((a, b) => {
+        const rank = (g) => (g.status === "live" || g.status === "halftime" ? 0 : 1);
+        return rank(a) - rank(b);
+      })
+    : [];
+  const hasBets = positions.length > 0 || orders.length > 0;
+
+  const MarketsSection = () => markets.length === 0 ? null : (
+    <>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#777", letterSpacing: "0.1em", fontFamily: fm, margin: `${hasBets ? 18 : 0}px 0 10px 2px` }}>MARKETS ({markets.length})</div>
+      {markets.map((g) => {
+        const isLive = g.status === "live" || g.status === "halftime";
+        const px = g.oracle?.indexPrice;
+        return (
+          <div key={g.id} onClick={() => onTrade && onTrade(g)} style={{ ...card, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {g.home?.logo && <img src={g.home.logo} alt="" style={{ width: 30, height: 30, objectFit: "contain" }} />}
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
+                  {g.home?.name ?? "Home"} vs {g.away?.name ?? "Away"}
+                  {isLive
+                    ? <span style={{ fontSize: 9, fontWeight: 800, color: B.green, background: B.green + "18", padding: "2px 7px", borderRadius: 999, fontFamily: fm }}>● LIVE</span>
+                    : <span style={{ fontSize: 9, fontWeight: 800, color: "#8b93a5", background: "#8b93a518", padding: "2px 7px", borderRadius: 999, fontFamily: fm }}>PREGAME</span>}
+                </div>
+                <div style={{ fontSize: 11.5, color: "#666", fontFamily: fm, marginTop: 2 }}>
+                  {isLive ? `${g.home?.score ?? 0} - ${g.away?.score ?? 0}` : "Market open · trade now"}
+                </div>
+              </div>
+            </div>
+            {px != null && (
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: fm, fontWeight: 800, fontSize: 15, color: "#fff" }}>{(px * 100).toFixed(0)}¢</div>
+                <div style={{ fontSize: 10, color: "#555" }}>{g.home?.abbreviation ?? g.home?.name ?? "home"}</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+
   return (
     <div style={{ flex: 1, overflow: "auto", background: "#0a0a0a", padding: "32px 40px" }}>
       <div style={{ marginBottom: 22 }}>
@@ -68,12 +114,22 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false }) {
 
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: "#555" }}>Loading…</div>
-      ) : positions.length === 0 && orders.length === 0 ? (
-        <div style={{ ...card, textAlign: "center", padding: "48px 20px" }}>
-          <div style={{ fontSize: 30, marginBottom: 10 }}>🎟️</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>No active bets yet</div>
-          <div style={{ fontSize: 12.5, color: "#666" }}>Open a position from any live or pre-game market and it'll show up here.</div>
-        </div>
+      ) : !hasBets ? (
+        markets.length > 0 ? (
+          <>
+            <div style={{ ...card, textAlign: "center", padding: "20px 16px", marginBottom: 18 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff", marginBottom: 3 }}>No active bets yet</div>
+              <div style={{ fontSize: 12, color: "#666" }}>Pick a market below to open your first position.</div>
+            </div>
+            {MarketsSection()}
+          </>
+        ) : (
+          <div style={{ ...card, textAlign: "center", padding: "48px 20px" }}>
+            <div style={{ fontSize: 30, marginBottom: 10 }}>🎟️</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>No active bets yet</div>
+            <div style={{ fontSize: 12.5, color: "#666" }}>Open a position from any live or pre-game market and it'll show up here.</div>
+          </div>
+        )
       ) : (
         <>
           {positions.length > 0 && (
@@ -120,6 +176,8 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false }) {
               ))}
             </>
           )}
+
+          {MarketsSection()}
         </>
       )}
     </div>

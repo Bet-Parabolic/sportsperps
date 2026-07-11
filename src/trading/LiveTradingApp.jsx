@@ -20,7 +20,7 @@ import { DepositModal } from "../components/DepositModal.jsx";
 import { NavRail } from "../components/NavRail.jsx";
 import { FloatingChat } from "../components/FloatingChat.jsx";
 import { isBookmarked, syncBookmarks, toggleBookmark as toggleBookmarkStore } from "../lib/bookmarks.js";
-import { MessageCircle, Bookmark, Share2 } from "lucide-react";
+import { MessageCircle, Bookmark, Share2, BarChart3, Zap, Briefcase, Mic } from "lucide-react";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -191,6 +191,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [notifs,     setNotifs]     = useState([]);
   const [markers,    setMarkers]    = useState([]);
   const [showWager,  setShowWager]  = useState(false);
+  const sheetDragY = useRef(null); // touch-start Y of the wager-sheet handle (swipe-down dismiss)
   const [showProfile, setShowProfile] = useState(false);
   // Account pfp mirrors the member-card avatar (re-read when the profile closes).
   const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
@@ -1328,7 +1329,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
             <div style={{padding:'10px 16px'}}>
               {positions.length===0&&gameClosed.length===0 ? (
-                <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'20px 0'}}>{settled?'Game settled':'No open positions yet'}</div>
+                <div style={{textAlign:'center',padding:'20px 0'}}>
+                  <div style={{fontSize:13,color:'#555'}}>{settled?'Game settled':'No open positions yet'}</div>
+                  {isMobile&&!settled&&(
+                    <button onClick={()=>setShowWager(true)} style={{marginTop:14,padding:'13px 44px',borderRadius:12,border:'none',background:B.primary,color:'#000',fontFamily:fb,fontWeight:800,fontSize:14,cursor:'pointer'}}>
+                      ⚡ Trade
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
                   {positions.map(pos=>{
@@ -1779,20 +1787,17 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             )}
 
-            {/* Sticky bottom tab bar */}
-            <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:'#0a0a0a',borderTop:'1px solid #1a1a1a',display:'flex',height:56,paddingBottom:'env(safe-area-inset-bottom)'}}>
-              {[['score','📊','Score'],['trade','⚡','Trade'],['positions','💼','Positions'],['gamecast','🎙','Plays']].map(([id,icon,label])=>(
-                <button key={id} onClick={()=>{
+            {/* Sticky bottom tab bar — visually identical to the WC home nav (icon-only, #050505) */}
+            <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:'#050505',borderTop:'1px solid #131313',display:'flex',height:56,paddingBottom:'env(safe-area-inset-bottom)'}}>
+              {[['score',BarChart3,'Score'],['trade',Zap,'Trade'],['positions',Briefcase,'Positions'],['gamecast',Mic,'Plays']].map(([id,Icon,label])=>(
+                <button key={id} aria-label={label} onClick={()=>{
                   if(id==='trade'){setShowWager(w=>!w);}
                   else{setShowWager(false);
                     const el=document.querySelector('[data-mob="'+id+'"]');
                     if(el)el.scrollIntoView({behavior:'smooth'});}
-                }} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,border:'none',
-                  background:id==='trade'&&showWager?B.primary+'20':'transparent',cursor:'pointer',
-                  color:id==='trade'?B.primary:'#666',fontFamily:fb,position:'relative'}}>
-                  <span style={{fontSize:18}}>{icon}</span>
-                  <span style={{fontSize:9,fontWeight:600}}>{label}</span>
-                  {id==='positions'&&gamePositions.length>0&&<span style={{position:'absolute',top:6,right:'22%',fontSize:8,background:B.primary,color:'#000',borderRadius:8,padding:'1px 4px',fontWeight:700}}>{gamePositions.length}</span>}
+                }} style={{flex:1,background:'transparent',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+                  <Icon size={20} color={id==='trade'&&showWager?'#fff':'#5a6170'} />
+                  {id==='positions'&&gamePositions.length>0&&<span style={{position:'absolute',top:8,right:'26%',fontSize:8,background:B.primary,color:'#000',borderRadius:8,padding:'1px 4px',fontWeight:700,fontFamily:fm}}>{gamePositions.length}</span>}
                 </button>
               ))}
             </div>
@@ -1802,7 +1807,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <div style={{position:'fixed',inset:0,zIndex:50,display:'flex',flexDirection:'column',justifyContent:'flex-end'}} onClick={e=>{if(e.target===e.currentTarget)setShowWager(false);}}>
                 <div style={{background:'rgba(0,0,0,0.6)',position:'absolute',inset:0}}/>
                 <div style={{position:'relative',background:'#0a0a0a',borderRadius:'20px 20px 0 0',border:'1px solid #1f1f1f',maxHeight:'90vh',overflow:'auto',animation:'slideUp .25s ease',paddingBottom:'env(safe-area-inset-bottom)'}}>
-                  <div style={{display:'flex',justifyContent:'center',padding:'10px 0 0'}}>
+                  <div onClick={()=>setShowWager(false)}
+                    onTouchStart={e=>{sheetDragY.current=e.touches[0].clientY;}}
+                    onTouchEnd={e=>{if(sheetDragY.current!=null&&e.changedTouches[0].clientY-sheetDragY.current>40)setShowWager(false);sheetDragY.current=null;}}
+                    style={{display:'flex',justifyContent:'center',padding:'12px 0 8px',cursor:'pointer',touchAction:'none'}}>
                     <div style={{width:36,height:4,borderRadius:2,background:'#333'}}/>
                   </div>
                   <div style={{padding:'0 16px 16px'}}>

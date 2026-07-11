@@ -698,7 +698,7 @@ export function WorldCupPage() {
       )}
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ flex: 1, overflowY: "auto", paddingBottom: isMobile ? 68 : 0, position: "relative" }}>
+        <main style={{ flex: 1, overflowY: "auto", paddingBottom: isMobile ? 68 : 0, position: "relative" }}>
           {/* header overlays the tab content (Figma: wordmark + auth pills float on the stadium hero) */}
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 64, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "0 16px" : "0 40px" }}>
             <img src={LOGO_WORDMARK} alt="Parabolic" style={{ height: 22 }} />
@@ -722,16 +722,16 @@ export function WorldCupPage() {
               identity on every parent render, so React would unmount + remount the whole tab
               subtree each time state changes. Calling them inlines their JSX — no boundary. */}
           {tab === "home" && HomeTab()}
-          {tab === "bets" && <div style={{ padding: isMobile ? "64px 4px 10px" : "64px 16px 10px" }}><ActiveBetsPage eventOnly liveGames={wcLive} onTrade={openGame} /></div>}
+          {tab === "bets" && <div style={{ padding: isMobile ? "64px 4px 10px" : "64px 16px 10px" }}><ActiveBetsPage eventOnly liveGames={wcLive} onTrade={openGame} showMarkets={isMobile} /></div>}
           {tab === "news" && <div style={{ paddingTop: 56 }}><NewsPage /></div>}
           {tab === "leaderboard" && LeaderboardTab()}
-        </div>
+        </main>
       </div>
 
       {isMobile && (
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, background: "#050505", borderTop: "1px solid #131313", display: "flex", height: 56, paddingBottom: "env(safe-area-inset-bottom)" }}>
           {navItems.map(([key, Icon]) => (
-            <button key={key} onClick={() => setTab(key)} style={{ flex: 1, background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <button key={key} aria-label={key} onClick={() => setTab(key)} style={{ flex: 1, background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon size={20} color={tab === key ? "#fff" : "#5a6170"} />
             </button>
           ))}
