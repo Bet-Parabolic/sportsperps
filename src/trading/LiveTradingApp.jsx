@@ -930,7 +930,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // the stale higher value keeps getting submitted and rejected, hard-sticking the user.
   useEffect(() => { if (orderLev > ml) setOrderLev(ml); }, [ml, orderLev]);
   const team = orderSide==='home' ? HOME : AWAY;
-  const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL);
+  // Event (WC) games run MM=0 — the estimated liq is the BANKRUPTCY price (full buffer), not
+  // the main ledger's half-margin maintenance trigger.
+  const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL, isEventGame ? 0 : undefined);
   // Liquidation info for the leverage control's card, in the ORDER'S OWN side scale.
   const liqSideShown = orderSide==='home' ? liqP : 1-liqP;
   const liqPtsAway = Math.abs((orderSide==='home' ? oPrice : 1-oPrice) - liqSideShown) * 100;

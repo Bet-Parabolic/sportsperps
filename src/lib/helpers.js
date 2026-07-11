@@ -54,8 +54,10 @@ export function maxLev(p){const d=Math.min(p,1-p);if(d>=.40)return 10;if(d>=.25)
 /* Liquidation price in HOME-scale — the MAINTENANCE-margin trigger (matches backend getLiqPrice).
    Liq fires when equity hits ½ the initial margin (a cushion above bankruptcy), so the buffer is
    (entryCost/lev)·(1−MAINT). home entryCost=entry, away entryCost=1−entry.  MAINT=0.5. */
+/* Maintenance is PER-LEDGER since July 11: main runs 0.5; the World Cup EVENT ledger runs 0
+   (liquidation only at bankruptcy — full margin buffer). Callers pass maint=0 for WC games. */
 const LIQ_MAINT = 0.5;
-export function liqPrice(side,entry,lev){const buf=(side==="home"?entry:1-entry)/lev*(1-LIQ_MAINT);return side==="home"?entry-buf:entry+buf;}
+export function liqPrice(side,entry,lev,maint=LIQ_MAINT){const buf=(side==="home"?entry:1-entry)/lev*(1-maint);return side==="home"?entry-buf:entry+buf;}
 export function calcPnL(side,exposure,entry,mark){return side==="home"?exposure*(mark-entry)/entry:exposure*(entry-mark)/entry;}
 
 /* Sport-appropriate period label */
