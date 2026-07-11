@@ -1698,7 +1698,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
               <div>
                 <div style={{fontSize:12,fontWeight:700,color:reduceOnly?B.primaryLight:'#888'}}>Reduce Only</div>
-                <div style={{fontSize:10,color:'#444'}}>Order can only reduce an existing position</div>
+                <div style={{fontSize:10,color:'#444',lineHeight:1.5}}>Only closes or shrinks a position you already hold — never opens a new one or adds to it. Use it to lock in an exit without accidentally flipping sides.</div>
               </div>
             </div>
             {/* Submit */}
@@ -1892,12 +1892,45 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <div style={{marginBottom:12}}>
                       <LevSlider eL={eL} ml={ml} onChange={setOrderLev} compact liq={levLiq} cap={{ px: oPrice }}/>
                     </div>
+                    {/* Risk tools — TP/SL in the order's own side scale (same states the desktop panel binds) */}
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:6}}>Risk Tools <span style={{color:'#383838'}}>optional</span></div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                        <div>
+                          <div style={{fontSize:10,color:B.green,fontWeight:600,marginBottom:4}}>Take Profit ¢</div>
+                          <input type="number" inputMode="decimal" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="—"
+                            style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:8,padding:'9px 10px',color:B.green,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                        </div>
+                        <div>
+                          <div style={{fontSize:10,color:B.red,fontWeight:600,marginBottom:4}}>Stop Loss ¢</div>
+                          <input type="number" inputMode="decimal" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="—"
+                            style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:8,padding:'9px 10px',color:B.red,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Reduce Only */}
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'9px 12px',background:reduceOnly?B.primary+'10':'#111',borderRadius:10,border:'1px solid '+(reduceOnly?B.primary+'30':'#1a1a1a'),cursor:'pointer'}} onClick={()=>setReduceOnly(r=>!r)}>
+                      <div style={{width:16,height:16,borderRadius:4,border:'1.5px solid '+(reduceOnly?B.primary:'#333'),background:reduceOnly?B.primary:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .15s'}}>
+                        {reduceOnly&&<span style={{fontSize:10,color:'#000',fontWeight:900,lineHeight:1}}>✓</span>}
+                      </div>
+                      <div>
+                        <div style={{fontSize:12,fontWeight:700,color:reduceOnly?B.primaryLight:'#888'}}>Reduce Only</div>
+                        <div style={{fontSize:10,color:'#555',lineHeight:1.5}}>Only closes or shrinks a position you already hold — it can never open a new one or add to it. Use it to lock in an exit without accidentally flipping sides.</div>
+                      </div>
+                    </div>
                     <div style={{background:'#111',borderRadius:12,padding:'10px 14px',marginBottom:14,fontSize:12}}>
-                      {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['If '+team.name+' wins','+'+fmtUsd(orderSide==='home'?expo*(1-oPrice)/oPrice:expo*oPrice/(1-oPrice)),B.green]].map(([l,v,c],i)=>(
+                      {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['If '+team.name+' wins','+'+fmtUsd(orderSide==='home'?expo*(1-oPrice)/oPrice:expo*oPrice/(1-oPrice)),B.green],['Max loss','-'+fmtUsd(eM),B.red]].map(([l,v,c],i)=>(
                         <div key={l} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderTop:i>0?'1px solid #1a1a1a':'none'}}>
                           <span style={{color:'#555'}}>{l}</span><span style={{color:c,fontWeight:600,fontFamily:fm}}>{v}</span>
                         </div>
                       ))}
+                      {/* Estimated liquidation for THIS order (entry at the current price, chosen leverage) */}
+                      {!reduceOnly&&eL>1&&(()=>{const liqCol=liqPtsAway>15?B.green:liqPtsAway>5?'#ff9f1c':B.red;return(
+                        <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderTop:'1px solid #1a1a1a'}}>
+                          <span style={{color:'#555'}}>Est. liquidation</span>
+                          <span style={{color:liqCol,fontWeight:700,fontFamily:fm}}>{(liqSideShown*100).toFixed(1)}¢ · {liqPtsAway.toFixed(1)} pts away</span>
+                        </div>
+                      );})()}
                     </div>
                     <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
                       border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
