@@ -26,6 +26,12 @@
     <meta name="twitter:description" content="Free entry. $10,000 World Cup Cash per entrant — trade live win probability. Prizes $2,000 · $1,000 · $500." />
     <meta name="twitter:image" content="https://app.parabolic.gg/og-worldcup.jpg" />
 
+    <!-- LCP: the stadium hero is the largest contentful paint, but as a JS-imported asset the
+         browser couldn't discover it until main.js + the WorldCupPage chunk loaded (~5s of chain
+         on 4G → LCP 7.7s). Served from public/ at a STABLE url + preloaded here, it downloads in
+         parallel with the JS. WorldCupPage/CardShareModal/Onboarding reference the same url. -->
+    <link rel="preload" as="image" href="/stadium.webp" fetchpriority="high" />
+
     <!-- Fonts: load from the head so text doesn't flash unstyled while React boots -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

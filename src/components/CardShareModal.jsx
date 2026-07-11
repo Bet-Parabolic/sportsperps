@@ -11,7 +11,7 @@ import { API_URL } from "../lib/constants.js";
 import { LOGO_WORDMARK } from "../lib/logos.js";
 import { BARCODE_WIDTHS } from "../lib/onboarding.js";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
-import stadiumBg from "../assets/worldcup/stadium.webp";
+const stadiumBg = "/stadium.webp"; // stable public/ url — same file worldcup.html preloads (no double-download)
 
 const GREEN = "#5ed87e";
 const fmtRoi = (v) => `${v >= 0 ? "+" : ""}${Number(v ?? 0).toFixed(2)}%`;

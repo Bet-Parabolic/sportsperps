@@ -13,7 +13,9 @@ import { useLiveGames } from "../lib/useLiveGames.js";
 import { loadCard, parseAvatar, syncAvatarToBackend } from "../lib/onboarding.js";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { PublicProfilePage } from "./PublicProfilePage.jsx";
-import stadiumBg from "../assets/worldcup/stadium.webp"; // 218KB webp (was a 418KB jpg) — first paint of the WC funnel
+// Stadium hero: served from public/ at a STABLE url (not a hashed JS import) so worldcup.html
+// can <link rel="preload"> it — the LCP element must not wait for the JS chain to be discovered.
+const stadiumBg = "/stadium.webp"; // 218KB webp (was a 418KB jpg) — first paint of the WC funnel
 import stadiumLbBg from "../assets/worldcup/stadium-leaderboard.webp"; // Figma 142-17157 rebuilt from the raw 4K source (the node export was palette-dithered = grainy): retina 2432px, design darkening baked in
 import fifa26 from "../assets/worldcup/fifa26.png";
 import laurelImg from "../assets/worldcup/laurel.svg";

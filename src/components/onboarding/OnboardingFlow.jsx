@@ -23,7 +23,7 @@ import { MemberCard } from "./MemberCard.jsx";
 import { SignaturePad } from "./SignaturePad.jsx";
 import { LanyardStrap } from "../CardShareModal.jsx";
 import { LOGO_WORDMARK } from "../../lib/logos.js";
-import stadiumBg from "../../assets/worldcup/stadium.webp";
+const stadiumBg = "/stadium.webp"; // stable public/ url — same file worldcup.html preloads (no double-download)
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
