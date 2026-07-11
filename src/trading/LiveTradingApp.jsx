@@ -1499,39 +1499,43 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
           </div>
 
-          {/* Mobile activity tray — on desktop this lives in the wager panel; phones get their own
-              card under Positions so a missed toast (liquidation, deleverage, rejection) can
-              always be reviewed after the fact. */}
-          {isMobile && notifs.length > 0 && (
-            <div style={{margin:'8px 12px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',padding:'12px 14px'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                <span style={{fontSize:10,color:'#555',fontWeight:600,letterSpacing:'0.06em'}}>ACTIVITY ({notifs.length})</span>
-                <button onClick={clearNotifs} style={{background:'transparent',border:'none',color:'#666',fontSize:10,fontWeight:600,cursor:'pointer',padding:0,fontFamily:fb}}>Clear</button>
-              </div>
-              <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:170,overflowY:'auto'}}>
-                {notifs.map(n=>(
-                  <div key={n.id} style={{padding:'8px 10px',borderRadius:9,fontWeight:600,fontSize:11.5,lineHeight:1.35,
-                    background:n.type==='green'?B.green+'18':n.type==='red'?B.red+'18':n.type==='yellow'?'#f5a62318':'#161616',
-                    border:`1px solid ${n.type==='green'?B.green+'40':n.type==='red'?B.red+'40':n.type==='yellow'?'#f5a62340':'#262626'}`,
-                    color:n.type==='green'?B.green:n.type==='red'?B.red:n.type==='yellow'?'#f5a623':'#bbb'}}>
-                    {n.msg}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* (Mobile activity card removed — wager activity lives in the "Wager Activity" tab
+              of the gamecast box below, same as desktop. Toasts still cover immediacy.) */}
 
           {/* GAMECAST */}
           <div data-mob="gamecast" style={{margin:isMobile?'8px 12px 0':'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
             <div style={{display:'flex',borderBottom:'1px solid #1f1f1f'}}>
-              {[['gamecast','Gamecast',playLog.length],['boxscore','Box Score',0],['chat','Chat',0]].map(([id,label,count])=>(
+              {[['activity','Wager Activity',notifs.length],['gamecast','Gamecast',playLog.length],['boxscore','Box Score',0],['chat','Chat',0]].map(([id,label,count])=>(
                 <button key={id} onClick={()=>setBottomTab(id)} style={{padding:'10px 20px',fontSize:13,fontWeight:600,border:'none',cursor:'pointer',fontFamily:fb,
                   background:'transparent',color:bottomTab===id?'#fff':'#666',borderBottom:bottomTab===id?'2px solid '+B.primary:'2px solid transparent'}}>
-                  {label}{id==='gamecast'&&count>0&&<span style={{color:B.primary,marginLeft:4,fontSize:11}}>{count}</span>}
+                  {label}{(id==='gamecast'||id==='activity')&&count>0&&<span style={{color:B.primary,marginLeft:4,fontSize:11}}>{count}</span>}
                 </button>
               ))}
             </div>
             <div style={{minHeight:200,padding:'10px 16px',maxHeight:320,overflow:'auto'}}>
+              {bottomTab==='activity' && (
+                <div>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',marginBottom:6}}>
+                    {notifs.length>0&&(
+                      <button onClick={clearNotifs} style={{background:'transparent',border:'none',color:'#666',fontSize:10,fontWeight:600,cursor:'pointer',padding:0,fontFamily:fb}}>Clear</button>
+                    )}
+                  </div>
+                  {notifs.length===0?(
+                    <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>No wagers yet — your fills, closes and risk events land here</div>
+                  ):(
+                    <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                      {notifs.map(n=>(
+                        <div key={n.id} style={{padding:'8px 10px',borderRadius:9,fontWeight:600,fontSize:11.5,lineHeight:1.35,
+                          background:n.type==='green'?B.green+'18':n.type==='red'?B.red+'18':n.type==='yellow'?'#f5a62318':'#161616',
+                          border:`1px solid ${n.type==='green'?B.green+'40':n.type==='red'?B.red+'40':n.type==='yellow'?'#f5a62340':'#262626'}`,
+                          color:n.type==='green'?B.green:n.type==='red'?B.red:n.type==='yellow'?'#f5a623':'#bbb'}}>
+                          {n.msg}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {bottomTab==='gamecast' && (playLog.length===0 ? (
                 <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>🏀 Waiting for plays…</div>
               ) : (
@@ -1751,29 +1755,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 );})}
               </div>
             )}
-            {/* Activity tray — persistent trading-action notifications (don't auto-dismiss) */}
-            <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid #1f1f1f'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-                <span style={{fontSize:10,color:'#555',fontWeight:600,letterSpacing:'0.06em'}}>ACTIVITY{notifs.length>0?` (${notifs.length})`:''}</span>
-                {notifs.length>0&&(
-                  <button onClick={clearNotifs} style={{background:'transparent',border:'none',color:'#666',fontSize:10,fontWeight:600,cursor:'pointer',padding:0,fontFamily:fb}}>Clear</button>
-                )}
-              </div>
-              {notifs.length===0?(
-                <div style={{fontSize:11,color:'#444',padding:'6px 0'}}>No activity yet</div>
-              ):(
-                <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:170,overflowY:'auto'}}>
-                  {notifs.map(n=>(
-                    <div key={n.id} style={{padding:'8px 10px',borderRadius:9,fontWeight:600,fontSize:11.5,lineHeight:1.35,
-                      background:n.type==='green'?B.green+'18':n.type==='red'?B.red+'18':n.type==='yellow'?'#f5a62318':'#161616',
-                      border:`1px solid ${n.type==='green'?B.green+'40':n.type==='red'?B.red+'40':n.type==='yellow'?'#f5a62340':'#262626'}`,
-                      color:n.type==='green'?B.green:n.type==='red'?B.red:n.type==='yellow'?'#f5a623':'#bbb'}}>
-                      {n.msg}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* (Activity tray moved to the "Wager Activity" tab in the gamecast box — the wager
+                panel stays focused on placing the next bet.) */}
           </div>)}
 
           {rightTab==='book'&&(()=>{
