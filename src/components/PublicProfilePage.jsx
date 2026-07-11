@@ -44,7 +44,7 @@ const StatBox = ({ label, value, color = "#fff" }) => (
   </div>
 );
 
-export function PublicProfilePage({ targetId, onClose }) {
+export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
   const me = currentUserId();
   const [p, setP] = useState(null);
   const [err, setErr] = useState("");
@@ -57,12 +57,15 @@ export function PublicProfilePage({ targetId, onClose }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`${API_URL}/profile/${targetId}/public`);
+      // WC surface → stats/positions/trades come from the EVENT ledger (competition-only
+      // traders have empty main-app numbers).
+      const r = await fetch(`${API_URL}/profile/${targetId}/public${worldcup ? "?ledger=wc" : ""}`);
       if (r.status === 403) { setErr("This profile is private."); return; }
       if (!r.ok) { setErr("Profile not found."); return; }
       setP(await r.json());
       fetch(`${API_URL}/event/standing/${targetId}`).then((x) => (x.ok ? x.json() : null)).then(setWc).catch(() => {});
-      fetch(`${API_URL}/profile/${targetId}/trades?limit=50`).then((x) => (x.ok ? x.json() : null)).then((d) => setTrades(d?.trades || [])).catch(() => {});
+      const tradesUrl = worldcup ? `${API_URL}/event/profile/${targetId}/trades?limit=50` : `${API_URL}/profile/${targetId}/trades?limit=50`;
+      fetch(tradesUrl).then((x) => (x.ok ? x.json() : null)).then((d) => setTrades(d?.trades || [])).catch(() => {});
       if (me && getAuth()) {
         fetch(`${API_URL}/follows/${me}?token=${encodeURIComponent(authToken() || "")}`)
           .then((x) => (x.ok ? x.json() : null))
@@ -164,7 +167,7 @@ export function PublicProfilePage({ targetId, onClose }) {
                 <div key={i} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
                   <div>
                     <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: fm, letterSpacing: "0.1em", color: B.dim, marginBottom: 4 }}>{leagueOf(pos.gameId).emoji} {leagueOf(pos.gameId).label}</div>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: B.white, textTransform: "capitalize" }}>{pos.side} · {pos.leverage}x</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: B.white, textTransform: pos.teamName ? "none" : "capitalize" }}>{pos.teamName || pos.side} · {pos.leverage}x</div>
                     <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{fmtUsd(pos.margin)} · {(pos.entryPx * 100).toFixed(0)}¢ → {(pos.markPrice * 100).toFixed(0)}¢</div>
                   </div>
                   <div style={{ fontFamily: fm, fontWeight: 700, color: pos.pnl >= 0 ? B.primary : B.red }}>{pos.pnl >= 0 ? "+" : ""}{fmtUsd(pos.pnl)}</div>
@@ -206,7 +209,7 @@ export function PublicProfilePage({ targetId, onClose }) {
                       <div key={t.id ?? i} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px" }}>
                         <div>
                           <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: fm, letterSpacing: "0.1em", color: B.dim, marginBottom: 4 }}>{lg.emoji} {lg.label}</div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: B.white, textTransform: "capitalize" }}>{t.side} · {t.leverage}x</div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: B.white, textTransform: t.teamName ? "none" : "capitalize" }}>{t.teamName || t.side} · {t.leverage}x</div>
                           <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{(t.entryPx * 100).toFixed(0)}¢ → {t.exitPx != null ? (t.exitPx * 100).toFixed(0) + "¢" : "—"}</div>
                         </div>
                         <div style={{ textAlign: "right" }}>

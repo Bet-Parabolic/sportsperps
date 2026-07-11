@@ -754,7 +754,7 @@ export function WorldCupPage() {
         </div>
       )}
 
-      {viewUser && <PublicProfilePage targetId={viewUser} onClose={() => setViewUser(null)} />}
+      {viewUser && <PublicProfilePage worldcup targetId={viewUser} onClose={() => setViewUser(null)} />}
       {showRules && <RulesModal onClose={() => setShowRules(false)} />}
       {showShareCard && (() => {
         const meLb = lb.find((e) => e.userId === userId);
