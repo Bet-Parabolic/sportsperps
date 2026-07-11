@@ -267,31 +267,72 @@ export const TvChart = forwardRef(function TvChart(
 
     // Mobile: vertical drag ON the Y axis zooms the Y range around its center — drag up to
     // zoom in, drag down to zoom out (touch parallel of the wheel-over-axis behavior above).
-    // Touches elsewhere keep their existing behavior (horizontal pan, page scroll).
+    // Double-tap the axis to reset to the full 0–100% view.
+    // While zoomed in, a vertical drag ON THE CHART pans the visible price window (content
+    // follows the finger) instead of scrolling the page — otherwise levels that fell outside
+    // the zoomed window (e.g. a TP above it) would be unreachable. At full 0–100% the page
+    // scrolls exactly as before; horizontal drags always stay with the chart's X pan.
     const yTouch = { active: false, startY: 0, startRange: [0, 1] };
+    const panTouch = { active: false, decided: false, take: false, startX: 0, startY: 0, startRange: [0, 1] };
+    let lastAxisTap = 0;
     const onTouchStart = (e) => {
       if (e.touches.length !== 1) return;
       const r = el.getBoundingClientRect();
       const psw = chart.priceScale("right").width() || 48;
-      if (e.touches[0].clientX <= r.right - psw) return;   // not on the Y axis
-      yTouch.active = true; yTouch.startY = e.touches[0].clientY; yTouch.startRange = [...yRange.current];
-      autoFit.current = false;
-      e.preventDefault(); e.stopImmediatePropagation();
+      const t = e.touches[0];
+      if (t.clientX > r.right - psw) {
+        // On the Y axis → zoom drag; double-tap resets to 0–100%.
+        const now = Date.now();
+        if (now - lastAxisTap < 300) { yRange.current = [0, 1]; applyY(); lastAxisTap = 0; }
+        else lastAxisTap = now;
+        yTouch.active = true; yTouch.startY = t.clientY; yTouch.startRange = [...yRange.current];
+        autoFit.current = false;
+        e.preventDefault(); e.stopImmediatePropagation();
+        return;
+      }
+      // On the chart, and Y is zoomed in → candidate for a vertical pan. Direction is decided
+      // on the first real movement so horizontal X-pans pass through untouched.
+      const [lo, hi] = yRange.current;
+      if (hi - lo < 0.999) {
+        panTouch.active = true; panTouch.decided = false; panTouch.take = false;
+        panTouch.startX = t.clientX; panTouch.startY = t.clientY; panTouch.startRange = [lo, hi];
+      }
     };
     const onTouchMove = (e) => {
-      if (!yTouch.active) return;
+      if (yTouch.active) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        const dy = e.touches[0].clientY - yTouch.startY;
+        const [lo0, hi0] = yTouch.startRange;
+        const ns = Math.min(1, Math.max(0.02, (hi0 - lo0) * Math.exp(dy * 0.006)));
+        const c = (lo0 + hi0) / 2;
+        let nlo = c - ns / 2, nhi = c + ns / 2;
+        if (nlo < 0) { nhi -= nlo; nlo = 0; }
+        if (nhi > 1) { nlo -= nhi - 1; nhi = 1; }
+        yRange.current = [Math.max(0, +nlo.toFixed(4)), Math.min(1, +nhi.toFixed(4))];
+        applyY();
+        return;
+      }
+      if (!panTouch.active) return;
+      const t = e.touches[0];
+      const dx = t.clientX - panTouch.startX, dy = t.clientY - panTouch.startY;
+      if (!panTouch.decided) {
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;      // too small to call
+        panTouch.decided = true;
+        panTouch.take = Math.abs(dy) > Math.abs(dx);           // vertical → we pan Y; horizontal → chart pans X
+      }
+      if (!panTouch.take) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      const dy = e.touches[0].clientY - yTouch.startY;
-      const [lo0, hi0] = yTouch.startRange;
-      const ns = Math.min(1, Math.max(0.02, (hi0 - lo0) * Math.exp(dy * 0.006)));
-      const c = (lo0 + hi0) / 2;
-      let nlo = c - ns / 2, nhi = c + ns / 2;
+      autoFit.current = false;
+      const plotH = Math.max(1, el.clientHeight);
+      const [lo0, hi0] = panTouch.startRange;
+      const shift = (dy / plotH) * (hi0 - lo0);                // content follows the finger
+      let nlo = lo0 + shift, nhi = hi0 + shift;
       if (nlo < 0) { nhi -= nlo; nlo = 0; }
       if (nhi > 1) { nlo -= nhi - 1; nhi = 1; }
-      yRange.current = [Math.max(0, +nlo.toFixed(4)), Math.min(1, +nhi.toFixed(4))];
+      yRange.current = [+nlo.toFixed(4), +nhi.toFixed(4)];
       applyY();
     };
-    const onTouchEnd = () => { yTouch.active = false; };
+    const onTouchEnd = () => { yTouch.active = false; panTouch.active = false; panTouch.take = false; };
     el.addEventListener("touchstart", onTouchStart, { passive: false, capture: true });
     el.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
     el.addEventListener("touchend", onTouchEnd, { capture: true });
