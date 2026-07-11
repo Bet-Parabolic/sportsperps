@@ -1,7 +1,9 @@
 /**
- * News page (nav-rail newspaper icon) — the Following feed: live trading activity of every
- * trader you follow (opens, closes, TP/SL, liquidations, settlements with PnL). Sports-news
- * articles remain the coming-soon half.
+ * News page (nav-rail newspaper icon) — two feeds:
+ *   • World Cup — live headlines/injuries/lineups aggregated server-side (GET /api/news:
+ *     ESPN WC news + BBC/Guardian/Sky RSS + optional X accounts), refreshed every 5 min.
+ *   • Following — trading activity of every trader you follow (opens, closes, TP/SL,
+ *     liquidations, settlements with PnL).
  */
 import { useCallback, useEffect, useState } from "react";
 import { Newspaper } from "lucide-react";
@@ -30,10 +32,74 @@ const ago = (t) => {
   return `${Math.round(s / 86400)}d ago`;
 };
 
-export function NewsPage() {
+const CATEGORY_CHIP = {
+  injury: { label: "INJURY", color: "#ff5247", bg: "rgba(255,82,71,0.14)" },
+  lineup: { label: "LINEUPS", color: "#ffd98a", bg: "rgba(255,173,10,0.12)" },
+};
+
+function NewsFeed() {
+  const [data, setData] = useState(null); // null = loading
+  const [failed, setFailed] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_URL}/news?limit=60`);
+      if (!r.ok) throw new Error();
+      setData(await r.json()); setFailed(false);
+    } catch { setFailed(true); if (!data) setData({ items: [] }); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { load(); const iv = setInterval(load, 60_000); return () => clearInterval(iv); }, [load]);
+
+  const items = data?.items || [];
+  return (
+    <div style={{ maxWidth: 680 }}>
+      {data == null && (
+        <div style={{ display: "grid", gap: 12 }}>
+          {[0, 1, 2, 3].map((i) => <div key={i} style={{ height: 84, borderRadius: 16, background: "rgba(255,255,255,0.05)", animation: "pulse 1.7s ease-in-out infinite" }} />)}
+        </div>
+      )}
+      {data != null && items.length === 0 && (
+        <div style={{ border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 16, padding: "34px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 26, marginBottom: 10 }}>📰</div>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: "#fff", marginBottom: 5 }}>
+            {failed ? "Couldn't load the news feed" : "No stories yet"}
+          </div>
+          <div style={{ fontSize: 12.5, color: "#8a8f98" }}>{failed ? "Check your connection — retrying automatically." : "Fresh World Cup coverage lands here every few minutes."}</div>
+        </div>
+      )}
+      {items.map((n) => {
+        const chip = CATEGORY_CHIP[n.category];
+        return (
+          <a key={n.url} href={n.url} target="_blank" rel="noopener noreferrer"
+            style={{ display: "flex", gap: 14, padding: "14px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", textDecoration: "none", alignItems: "flex-start" }}>
+            {n.image && (
+              <img src={n.image} alt="" loading="lazy"
+                style={{ width: 108, height: 68, objectFit: "cover", borderRadius: 10, flexShrink: 0, background: "#14161a" }}
+                onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: fm, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.1em", color: n.source.startsWith("@") ? "#8ecbff" : B.primaryLight }}>{n.source.toUpperCase()}</span>
+                {chip && <span style={{ fontFamily: fm, fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", color: chip.color, background: chip.bg, padding: "2px 8px", borderRadius: 999 }}>{chip.label}</span>}
+                <span style={{ fontFamily: fm, fontSize: 10.5, color: "#6f7581" }}>{ago(n.publishedAt)}</span>
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", lineHeight: 1.35, marginBottom: 3 }}>{n.title}</div>
+              {n.summary && (
+                <div style={{ fontSize: 12.5, color: "#8a8f98", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{n.summary}</div>
+              )}
+            </div>
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+function FollowingFeed() {
   const authed = !!getAuth();
   const me = currentUserId();
-  const [events, setEvents] = useState(null);   // null = loading
+  const [events, setEvents] = useState(null);
   const [followingCount, setFollowingCount] = useState(0);
 
   const load = useCallback(async () => {
@@ -50,65 +116,74 @@ export function NewsPage() {
   useEffect(() => { load(); const iv = setInterval(load, 30_000); return () => clearInterval(iv); }, [load]);
 
   return (
+    <div style={{ maxWidth: 640 }}>
+      <div style={{ fontSize: 13, color: "#8a8f98", marginBottom: 16 }}>
+        {followingCount > 0
+          ? `Live moves from the ${followingCount} trader${followingCount === 1 ? "" : "s"} you follow.`
+          : "Follow traders from the leaderboard to see their moves here."}
+      </div>
+      {events == null && <div style={{ color: "#8a8f98", fontSize: 13, padding: "24px 0" }}>Loading…</div>}
+      {events?.length === 0 && (
+        <div style={{ border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 16, padding: "34px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 26, marginBottom: 10 }}>👀</div>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: "#fff", marginBottom: 5 }}>Nothing here yet</div>
+          <div style={{ fontSize: 12.5, color: "#8a8f98", lineHeight: 1.6 }}>
+            {authed
+              ? "Open a public trader's profile from the leaderboard and hit Follow — their opens, cash-outs, TP/SL hits and liquidations land here with PnL."
+              : "Log in, then follow traders from the leaderboard to build your feed."}
+          </div>
+        </div>
+      )}
+      {events?.map((e, i) => {
+        const av = parseAvatar(e.avatar);
+        const pnlish = e.pnl != null && e.type !== "open";
+        return (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", background: "#1d2026", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {av ? <AvatarCircle avatar={av} size={34} /> : <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 14, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, color: "#e8ebf0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <span style={{ fontWeight: 700, color: "#fff" }}>{e.username || "trader"}</span>{" "}
+                {(VERB[e.type] || (() => e.type))(e)}
+                {e.game ? <span style={{ color: "#9aa0a8" }}> · {e.game}</span> : null}
+              </div>
+              <div style={{ fontSize: 11, color: "#6f7581", marginTop: 2, fontFamily: fm }}>{ago(e.at)}</div>
+            </div>
+            {pnlish && (
+              <span style={{ fontFamily: fb, fontWeight: 700, fontSize: 14, color: e.pnl >= 0 ? GREEN : "#ff5247", flexShrink: 0 }}>
+                {e.pnl >= 0 ? "+" : "−"}${Math.abs(e.pnl).toFixed(2)}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function NewsPage() {
+  const [tab, setTab] = useState("news"); // news | following
+  return (
     <div style={{ flex: 1, overflow: "auto", background: "#0a0a0a", padding: "32px 40px 60px", display: "flex", flexDirection: "column", fontFamily: fb }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
         <Newspaper size={18} color={B.primary} />
         <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.12em", fontFamily: fm }}>NEWS</div>
       </div>
-      <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 4 }}>Following</h2>
-      <div style={{ fontSize: 13, color: "#8a8f98", marginBottom: 22 }}>
-        {followingCount > 0
-          ? `Live moves from the ${followingCount} trader${followingCount === 1 ? "" : "s"} you follow.`
-          : "Follow traders from the leaderboard to see their moves here."}
+      <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 14 }}>
+        {tab === "news" ? "World Cup" : "Following"}
+      </h2>
+
+      <div style={{ display: "inline-flex", background: "#111", border: "1px solid #1f1f1f", borderRadius: 999, padding: 3, gap: 3, marginBottom: 20, alignSelf: "flex-start" }}>
+        {[["news", "World Cup"], ["following", "Following"]].map(([k, label]) => (
+          <button key={k} onClick={() => setTab(k)} style={{
+            padding: "7px 20px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: fd, fontWeight: 700, fontSize: 13,
+            background: tab === k ? "#fff" : "transparent", color: tab === k ? "#0a0a0a" : "#888",
+          }}>{label}</button>
+        ))}
       </div>
 
-      <div style={{ maxWidth: 640 }}>
-        {events == null && <div style={{ color: "#8a8f98", fontSize: 13, padding: "24px 0" }}>Loading…</div>}
-        {events?.length === 0 && (
-          <div style={{ border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 16, padding: "34px 24px", textAlign: "center" }}>
-            <div style={{ fontSize: 26, marginBottom: 10 }}>👀</div>
-            <div style={{ fontSize: 14.5, fontWeight: 700, color: "#fff", marginBottom: 5 }}>Nothing here yet</div>
-            <div style={{ fontSize: 12.5, color: "#8a8f98", lineHeight: 1.6 }}>
-              {authed
-                ? "Open a public trader's profile from the leaderboard and hit Follow — their opens, cash-outs, TP/SL hits and liquidations land here with PnL."
-                : "Log in, then follow traders from the leaderboard to build your feed."}
-            </div>
-          </div>
-        )}
-        {events?.map((e, i) => {
-          const av = parseAvatar(e.avatar);
-          const pnlish = e.pnl != null && e.type !== "open";
-          return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", background: "#1d2026", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                {av ? <AvatarCircle avatar={av} size={34} /> : <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 14, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, color: "#e8ebf0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  <span style={{ fontWeight: 700, color: "#fff" }}>{e.username || "trader"}</span>{" "}
-                  {(VERB[e.type] || (() => e.type))(e)}
-                  {e.game ? <span style={{ color: "#9aa0a8" }}> · {e.game}</span> : null}
-                </div>
-                <div style={{ fontSize: 11, color: "#6f7581", marginTop: 2, fontFamily: fm }}>{ago(e.at)}</div>
-              </div>
-              {pnlish && (
-                <span style={{ fontFamily: fb, fontWeight: 700, fontSize: 14, color: e.pnl >= 0 ? GREEN : "#ff5247", flexShrink: 0 }}>
-                  {e.pnl >= 0 ? "+" : "−"}${Math.abs(e.pnl).toFixed(2)}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div style={{ marginTop: 44, maxWidth: 640, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "18px 20px", display: "flex", alignItems: "center", gap: 14 }}>
-        <span style={{ fontSize: 22 }}>📰</span>
-        <div>
-          <span style={{ display: "inline-block", fontSize: 9.5, fontWeight: 800, fontFamily: fm, letterSpacing: "0.1em", color: B.primaryLight, background: B.primary + "1c", padding: "3px 9px", borderRadius: 999, marginBottom: 5 }}>COMING SOON</span>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff" }}>Market-moving sports news</div>
-          <div style={{ fontSize: 12, color: "#8a8f98", lineHeight: 1.5 }}>Injury reports, lineups, and momentum stories next to the price they move.</div>
-        </div>
-      </div>
+      {tab === "news" ? <NewsFeed /> : <FollowingFeed />}
     </div>
   );
 }
