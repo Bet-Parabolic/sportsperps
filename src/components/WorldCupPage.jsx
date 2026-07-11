@@ -497,7 +497,7 @@ export function WorldCupPage() {
           </h1>
           <p style={{ fontFamily: fb, color: "rgba(255,255,255,0.88)", fontSize: isMobile ? 13.5 : 15, lineHeight: 1.5, maxWidth: 640, margin: "16px auto 0", textShadow: "0 2px 14px rgba(0,0,0,0.6)" }}>
             $10,000 World Cup Cash per entrant, trade live win probability through the bracket.<br />
-            Cash prizes $1,000 · $500 · $250
+            Cash prizes $2,000 · $1,000 · $500
           </p>
 
           {meta?.live && (joined

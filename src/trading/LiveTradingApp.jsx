@@ -1055,12 +1055,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <MessageCircle size={17} color={showChatPop?'#fff':'#9aa0a8'}/>
               {chatUnread && <span style={{position:'absolute',top:5,right:5,width:8,height:8,borderRadius:'50%',background:'#ff5b3a',border:'1.5px solid #0a0a0a'}}/>}
             </button>
-            <button onClick={toggleBookmark} title={bookmarked?'Remove bookmark':'Bookmark this market'} style={{width:34,height:34,borderRadius:'50%',border:'none',background:'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            {!worldcup && <button onClick={toggleBookmark} title={bookmarked?'Remove bookmark':'Bookmark this market'} style={{width:34,height:34,borderRadius:'50%',border:'none',background:'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
               <Bookmark size={17} color={bookmarked?B.primary:'#9aa0a8'} fill={bookmarked?B.primary:'none'}/>
-            </button>
-            <button onClick={shareMarket} title="Share this market" style={{width:34,height:34,borderRadius:'50%',border:'none',background:'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            </button>}
+            {!worldcup && <button onClick={shareMarket} title="Share this market" style={{width:34,height:34,borderRadius:'50%',border:'none',background:'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
               <Share2 size={16} color='#9aa0a8'/>
-            </button>
+            </button>}
           </div>}
           {!isMobile&&<span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 10px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
@@ -1083,7 +1083,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
       {/* BODY */}
       <div style={{display:'flex',height:isMobile?'auto':'calc(100vh - 56px)',flexDirection:isMobile?'column':'row',minHeight:isMobile?'calc(100vh - 56px)':'auto'}}>
-        {!isMobile && <NavRail active={null} onNav={(tab)=>onNavTo?.(tab)} liveGames={liveGames} onTrade={onTrade}/>}
+        {!isMobile && <NavRail active={null} onNav={(tab)=>onNavTo?.(tab)} liveGames={liveGames} onTrade={onTrade} hide={worldcup ? ["bookmarks"] : []}/>}
 
         {/* LEFT SIDEBAR */}
         {!isMobile&&<div style={{width:260,borderRight:'1px solid #1a1a1a',overflow:'auto',flexShrink:0,padding:'16px 0'}}>
