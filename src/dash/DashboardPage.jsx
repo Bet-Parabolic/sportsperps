@@ -1029,6 +1029,65 @@ function WaitlistTab({ data }) {
   );
 }
 
+// ─── WC Economics tab — the EVENT ledger only (isolated competition monitoring). ────────────────
+function WCEconTab({ data }) {
+  if (!data) return <Panel title="World Cup economics"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const sign = (n) => ((n || 0) >= 0 ? C.primaryLt : C.red);
+  const m = data.money || {}, v = data.vault || {};
+  const driftBig = Math.abs(data.conservationDrift || 0) > 0.01 && (data.openPositions || 0) === 0;
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <Stat label="Competition" value={data.live ? "LIVE" : "CLOSED"} color={data.live ? C.primaryLt : C.mut} />
+        <Stat label="Participants" value={data.participants ?? 0} sub={`$${(data.grantPer || 10000).toLocaleString()} grant each`} />
+        <Stat label="WC Cash granted" value={fmtUsd(data.granted)} />
+        <Stat label="Active traders" value={`${data.traders?.active ?? 0} / ${data.traders?.total ?? 0}`} sub="placed ≥1 trade" />
+        <Stat label="Volume" value={fmtUsd(m.volume)} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, marginBottom: 12 }}>
+        <Panel title="Entrant money">
+          {[
+            ["Cash balances", fmtUsd(m.userCash), null],
+            ["Margin in open positions", fmtUsd(m.openMargin), null],
+            ["Unrealized PnL", fmtSigned(m.unrealizedPnl), sign(m.unrealizedPnl)],
+            ["Realized PnL (lifetime)", fmtSigned(m.closedPnl), sign(m.closedPnl)],
+            ["Total equity", fmtUsd(m.equity), null],
+          ].map(([k, val, clr]) => (
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 2px", borderBottom: "1px solid " + C.border, fontSize: 13 }}>
+              <span style={{ color: C.mut }}>{k}</span><span style={{ color: clr || C.text, fontWeight: 700 }}>{val}</span>
+            </div>
+          ))}
+        </Panel>
+
+        <Panel title="Event house (vault · insurance · fees)">
+          {[
+            ["Vault balance", fmtUsd(v.balance), null],
+            ["vs $50k seed", fmtSigned((v.balance || 0) - (v.seed || 50000)), sign((v.balance || 0) - (v.seed || 50000))],
+            ["Vault realized PnL", fmtSigned(v.realizedPnl), sign(v.realizedPnl)],
+            ["Vault unrealized (open inventory)", fmtSigned(v.unrealizedPnl), sign(v.unrealizedPnl)],
+            ["Short liability", fmtUsd(v.liability), null],
+            ["Funding collected", fmtSigned(v.fundingCollected), sign(v.fundingCollected)],
+            ["Taker fees / maker rebates", `${fmtUsd(data.fees?.takerFees)} / ${fmtUsd(data.fees?.makerRebates)}`, null],
+            ["Insurance fund", fmtUsd(data.insurance?.balance), null],
+            ["House realized (PnL+funding+fees)", fmtSigned(data.houseRealized), sign(data.houseRealized)],
+          ].map(([k, val, clr]) => (
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 2px", borderBottom: "1px solid " + C.border, fontSize: 13 }}>
+              <span style={{ color: C.mut }}>{k}</span><span style={{ color: clr || C.text, fontWeight: 700 }}>{val}</span>
+            </div>
+          ))}
+        </Panel>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <Stat label="Open interest" value={fmtUsd(data.openInterest)} sub={`${data.openPositions ?? 0} open positions`} />
+        <Stat label="Conservation drift" value={fmtSigned(data.conservationDrift)} color={driftBig ? C.red : C.mut}
+          sub={data.openPositions > 0 ? "open inventory in flight — closes at settlement" : driftBig ? "⚠ should be $0 with no open positions" : "money conserves"} />
+      </div>
+    </>
+  );
+}
+
 // ─── Users tab — account directory: contact fields for winner payouts + support. ────────────────
 function UsersTab({ data }) {
   const [q, setQ] = useState("");
@@ -1211,6 +1270,8 @@ export function DashboardPage() {
   const [alertsData, setAlertsData] = useState(null);
   const [usersData, setUsersData] = useState(null);
   const [feedbackData, setFeedbackData] = useState(null);
+  const [wcVaultData, setWcVaultData] = useState(null);
+  const [wcEconData, setWcEconData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -1226,7 +1287,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg, wl, alr, usr, fbk] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg, wl, alr, usr, fbk, wcv, wce] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -1244,6 +1305,8 @@ export function DashboardPage() {
         safe(adminFetch("/admin/alerts?limit=300")),
         safe(adminFetch("/admin/users?limit=2000")),
         safe(adminFetch("/admin/feedback?limit=300")),
+        safe(adminFetch("/admin/event/vault")),
+        safe(adminFetch("/admin/event/economics")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -1262,6 +1325,8 @@ export function DashboardPage() {
       if (alr) setAlertsData(alr);
       if (usr) setUsersData(usr);
       if (fbk) setFeedbackData(fbk);
+      if (wcv) setWcVaultData(wcv);
+      if (wce) setWcEconData(wce);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -1287,11 +1352,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : tab === "waitlist" ? "Waitlist" : tab === "alerts" ? "Alerts" : tab === "users" ? "Users" : tab === "feedback" ? "Feedback" : "Oracle accuracy"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : tab === "waitlist" ? "Waitlist" : tab === "alerts" ? "Alerts" : tab === "users" ? "Users" : tab === "feedback" ? "Feedback" : tab === "wcvault" ? "World Cup vault" : tab === "wcecon" ? "World Cup economics" : "Oracle accuracy"}</div>
           <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : tab === "execution" ? "Internal dashboard · fills · rejections · slippage · mix" : tab === "risk" ? "Internal dashboard · bad debt · solvency · exposure · drawdown" : tab === "alerts" ? "Internal dashboard · live conditions · fire/resolve history · runbooks" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"], ["risk", "Risk"], ["alerts", (alertsData?.active?.length ? `Alerts (${alertsData.active.length})` : "Alerts")], ["users", "Users"], ["feedback", "Feedback"], ["waitlist", "Waitlist"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["economics", "Economics"], ["wcvault", "🏆 Vault"], ["wcecon", "🏆 Econ"], ["health", "Health"], ["product", "Product"], ["execution", "Execution"], ["risk", "Risk"], ["alerts", (alertsData?.active?.length ? `Alerts (${alertsData.active.length})` : "Alerts")], ["users", "Users"], ["feedback", "Feedback"], ["waitlist", "Waitlist"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -1335,6 +1400,11 @@ export function DashboardPage() {
       {tab === "users" && <UsersTab data={usersData} />}
 
       {tab === "feedback" && <FeedbackTab data={feedbackData} />}
+
+      {/* WC competition — EVENT ledger only, isolated from the main-ledger Vault/Economics tabs */}
+      {tab === "wcvault" && <VaultTab vault={wcVaultData} history={[]} hedge={null} />}
+
+      {tab === "wcecon" && <WCEconTab data={wcEconData} />}
 
       {tab === "alerts" && <AlertsTab data={alertsData} />}
 
