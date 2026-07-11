@@ -15,6 +15,7 @@ import { TradeCard } from "../components/TradeCard.jsx";
 import { getAuth, currentUserId, authToken, isLoggedIn, handleUnauthorized, setSessionExpiredHandler } from "../lib/auth.js";
 import { track } from "../lib/track.js";
 import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
+import { parseAvatar } from "../lib/onboarding.js";
 import { loadCard } from "../lib/onboarding.js";
 import { DepositModal } from "../components/DepositModal.jsx";
 import { NavRail } from "../components/NavRail.jsx";
@@ -189,9 +190,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [reduceOnly, setReduceOnly] = useState(false);
   const [rightTab,   setRightTab]   = useState('order');
   const [bottomTab,  setBottomTab]  = useState('gamecast');
-  // Wager Activity: SERVER-BACKED history of every wager across the whole platform (opens,
-  // cash-outs, TP/SL fires, liquidations, settlements — both ledgers), so refreshes and
-  // late-joiners always see the full record. Toasts below stay the in-the-moment channel.
+  // Wager Activity: THIS GAME's public wager tape — every public profile's opens, cash-outs,
+  // TP/SL fires, liquidations and settlements in this match, server-persisted so refreshes
+  // and late-joiners see the full scrollable history. Toasts stay the in-the-moment channel.
   const [activity, setActivity] = useState([]);
   // Local notif tray persists per account too (feeds the floating toasts).
   const notifsKey = `parabolic_activity_${userId}`;
@@ -615,9 +616,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           } catch (e) { /* event endpoints unavailable — keep local state */ }
         }
 
-        // Own wager history (ALL games, both ledgers) — powers the Wager Activity tab.
+        // THIS game's wager tape (all public traders) — powers the Wager Activity tab.
         try {
-          const actRes = await fetch(`${API_URL}/activity/${userId}?limit=100&token=${encodeURIComponent(authToken() || '')}`);
+          const actRes = await fetch(`${API_URL}/activity/game/${g.id}?limit=100`);
           if (actRes.ok) { const ad = await actRes.json(); if (Array.isArray(ad.events)) setActivity(ad.events); }
         } catch (e) { /* keep last known history */ }
 
@@ -1543,16 +1544,21 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       const margin=e.notional&&e.leverage?e.notional/e.leverage:null;
                       const agoS=Math.max(1,Math.round((Date.now()-e.at)/1000));
                       const agoTxt=agoS<60?agoS+'s':agoS<3600?Math.round(agoS/60)+'m':agoS<86400?Math.round(agoS/3600)+'h':Math.round(agoS/86400)+'d';
+                      const av=parseAvatar(e.avatar);
                       return(
                         <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'8px 10px',borderRadius:9,background:'#0c0e12',border:'1px solid #15171c'}}>
                           <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                            <div style={{width:24,height:24,borderRadius:'50%',overflow:'hidden',background:'#1d2026',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                              {av?<AvatarCircle avatar={av} size={24}/>:<span style={{fontWeight:800,fontSize:11,color:'#cfd4dc',fontFamily:fb}}>{(e.username||'?').charAt(0).toUpperCase()}</span>}
+                            </div>
                             <span style={{fontSize:9.5,fontWeight:700,fontFamily:fm,padding:'2px 7px',borderRadius:5,background:A[1]+'22',color:A[1],flexShrink:0,whiteSpace:'nowrap'}}>{A[0]}</span>
                             <div style={{minWidth:0}}>
                               <div style={{fontSize:12.5,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                                {e.teamName||e.side||'—'}{e.leverage?<span style={{color:'#8a93a6',fontWeight:600}}> · {e.leverage}x</span>:null}
+                                <span style={{color:e.userId===userId?B.primary:'#fff'}}>{e.username||'trader'}{e.userId===userId?' (you)':''}</span>
+                                <span style={{color:'#8a93a6',fontWeight:600}}> · {e.teamName||e.side||'—'}{e.leverage?` · ${e.leverage}x`:''}</span>
                               </div>
                               <div style={{fontSize:10.5,color:'#666',fontFamily:fm,marginTop:1}}>
-                                {[margin!=null&&('margin '+fmtUsd(margin)),e.notional!=null&&('notional '+fmtUsd(e.notional)),e.game].filter(Boolean).join(' · ')}
+                                {[margin!=null&&('margin '+fmtUsd(margin)),e.notional!=null&&('notional '+fmtUsd(e.notional))].filter(Boolean).join(' · ')}
                               </div>
                             </div>
                           </div>
