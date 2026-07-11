@@ -1029,6 +1029,96 @@ function WaitlistTab({ data }) {
   );
 }
 
+// ─── Users tab — account directory: contact fields for winner payouts + support. ────────────────
+function UsersTab({ data }) {
+  const [q, setQ] = useState("");
+  if (!data) return <Panel title="Users"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const all = data.users || [];
+  const needle = q.trim().toLowerCase();
+  const rows = needle
+    ? all.filter((u) => [u.username, u.email, u.walletAddress, u.xHandle, u.userId].some((v) => v && String(v).toLowerCase().includes(needle)))
+    : all;
+  const when = (ts) => (ts ? new Date(ts).toLocaleDateString() : "—");
+  const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
+  const check = (v) => (v ? <span style={{ color: C.primary }}>✓</span> : <span style={{ color: C.mut }}>—</span>);
+  const registered = all.filter((u) => u.hasPassword);
+
+  const exportCsv = () => {
+    const cols = ["userId", "username", "email", "emailVerified", "phone", "phoneVerified", "walletAddress", "xHandle", "points", "tradeCount", "createdAt"];
+    const esc = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const lines = [cols.join(",")].concat(rows.map((r) => cols.map((c) => esc(c === "createdAt" ? (r.createdAt ? new Date(r.createdAt).toISOString() : "") : r[c])).join(",")));
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `parabolic-users-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+        <Stat label="Total accounts" value={data.count ?? all.length} />
+        <Stat label="Registered (credentialed)" value={registered.length} />
+        <Stat label="Email + phone verified" value={all.filter((u) => u.emailVerified && u.phoneVerified).length} />
+        <Stat label="Wallet linked" value={all.filter((u) => u.walletAddress).length} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search username / email / wallet / X…"
+          style={{ marginLeft: "auto", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 13px", color: C.text, fontSize: 13, outline: "none", width: 260 }} />
+        <button onClick={exportCsv} disabled={!rows.length} style={{ background: C.surface, border: `1px solid ${C.border}`, color: rows.length ? C.text : C.mut, borderRadius: 8, padding: "9px 16px", cursor: rows.length ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 600 }}>Export CSV</button>
+      </div>
+
+      <Panel title={`Accounts (${rows.length}${needle ? ` of ${all.length}` : ""})`}>
+        {rows.length === 0
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No matching accounts.</div>
+          : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={th}>Username</th><th style={th}>Email</th><th style={th}>✓Em</th><th style={th}>Phone</th><th style={th}>✓Ph</th>
+                <th style={th}>Wallet</th><th style={th}>X</th><th style={th}>Points</th><th style={th}>Trades</th><th style={th}>Joined</th>
+              </tr></thead>
+              <tbody>{rows.slice(0, 500).map((u) => (
+                <tr key={u.userId}>
+                  <td style={{ ...td, fontWeight: 600, color: u.hasPassword ? C.text : C.mut }} title={u.userId}>{u.username || `guest-${u.userId.slice(0, 6)}`}</td>
+                  <td style={td}>{u.email || "—"}</td>
+                  <td style={td}>{check(u.emailVerified)}</td>
+                  <td style={{ ...td, whiteSpace: "nowrap" }}>{u.phone || "—"}</td>
+                  <td style={td}>{check(u.phoneVerified)}</td>
+                  <td style={{ ...td, fontFamily: "monospace", fontSize: 12 }} title={u.walletAddress || ""}>{short(u.walletAddress)}</td>
+                  <td style={td}>{u.xHandle ? `@${u.xHandle}` : "—"}</td>
+                  <td style={td}>{(u.points || 0).toLocaleString()}</td>
+                  <td style={td}>{u.tradeCount || 0}</td>
+                  <td style={{ ...td, color: C.mut, whiteSpace: "nowrap" }}>{when(u.createdAt)}</td>
+                </tr>
+              ))}</tbody>
+            </table>{rows.length > 500 && <div style={{ color: C.mut, fontSize: 12, marginTop: 8 }}>Showing first 500 — narrow with search or use Export CSV for the full list.</div>}</div>}
+      </Panel>
+    </>
+  );
+}
+
+// ─── Feedback tab — in-product submissions (profile-page widget). ──────────────────────────────
+function FeedbackTab({ data }) {
+  if (!data) return <Panel title="Feedback"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
+  const rows = data.feedback || [];
+  const when = (ts) => (ts ? new Date(ts).toLocaleString() : "—");
+  return (
+    <Panel title={`Feedback (${rows.length})`}>
+      {rows.length === 0
+        ? <div style={{ color: C.mut, fontSize: 13 }}>Nothing yet — submissions from the profile-page widget land here.</div>
+        : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>
+              <th style={th}>When</th><th style={th}>User</th><th style={th}>Surface</th><th style={{ ...th, width: "55%" }}>Message</th>
+            </tr></thead>
+            <tbody>{rows.map((r) => (
+              <tr key={r.id ?? `${r.created_at}-${r.user_id}`}>
+                <td style={{ ...td, color: C.mut, whiteSpace: "nowrap" }}>{when(r.created_at)}</td>
+                <td style={{ ...td, fontWeight: 600 }} title={r.user_id || ""}>{r.username || (r.user_id ? `guest-${String(r.user_id).slice(0, 6)}` : "anon")}</td>
+                <td style={td}>{r.context || "—"}</td>
+                <td style={{ ...td, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{r.message}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>}
+    </Panel>
+  );
+}
+
 // ─── Alerts tab — live conditions + persisted fire→resolve history, click any row for the
 // knowledge-base breakdown (what it is / why it fired / how to fix / how to prevent). ───────────
 function AlertsTab({ data }) {
@@ -1119,6 +1209,8 @@ export function DashboardPage() {
   const [riskData, setRiskData] = useState(null);
   const [waitlistData, setWaitlistData] = useState(null);
   const [alertsData, setAlertsData] = useState(null);
+  const [usersData, setUsersData] = useState(null);
+  const [feedbackData, setFeedbackData] = useState(null);
   const [explore, setExplore] = useState(null);
   const [err, setErr] = useState("");
 
@@ -1134,7 +1226,7 @@ export function DashboardPage() {
     // Resilient: a single failing/undeployed endpoint shouldn't blank the dashboard. 401 still logs out.
     const safe = (p) => p.catch((e) => { if (String(e.message) === "401") throw e; return null; });
     try {
-      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg, wl, alr] = await Promise.all([
+      const [s, src, cov, set, lv, vlt, vh, hlth, prod, econ, exec, rsk, hdg, wl, alr, usr, fbk] = await Promise.all([
         safe(adminFetch("/admin/oracle/summary")),
         safe(adminFetch("/admin/oracle/sources")),
         safe(adminFetch("/admin/oracle/coverage")),
@@ -1150,6 +1242,8 @@ export function DashboardPage() {
         safe(adminFetch("/vault/hedge")),
         safe(adminFetch("/admin/waitlist?limit=500")),
         safe(adminFetch("/admin/alerts?limit=300")),
+        safe(adminFetch("/admin/users?limit=2000")),
+        safe(adminFetch("/admin/feedback?limit=300")),
       ]);
       if (s) setSummary(s);
       if (src) setSources(src);
@@ -1166,6 +1260,8 @@ export function DashboardPage() {
       if (hdg) setHedgeData(hdg);
       if (wl) setWaitlistData(wl);
       if (alr) setAlertsData(alr);
+      if (usr) setUsersData(usr);
+      if (fbk) setFeedbackData(fbk);
     } catch (e) {
       if (String(e.message) === "401") { localStorage.removeItem(TOK); setAuthed(false); }
       else setErr("Failed to load");
@@ -1191,11 +1287,11 @@ export function DashboardPage() {
       <style>{TIP_CSS}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
-          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : tab === "waitlist" ? "Waitlist" : tab === "alerts" ? "Alerts" : "Oracle accuracy"}</div>
+          <div style={{ color: C.text, fontWeight: 800, fontSize: 20 }}>{tab === "vault" ? "Vault monitor" : tab === "health" ? "Reliability & health" : tab === "product" ? "Product analytics" : tab === "economics" ? "Engine economics" : tab === "execution" ? "Execution quality" : tab === "risk" ? "Risk & solvency" : tab === "waitlist" ? "Waitlist" : tab === "alerts" ? "Alerts" : tab === "users" ? "Users" : tab === "feedback" ? "Feedback" : "Oracle accuracy"}</div>
           <div style={{ color: C.mut, fontSize: 12 }}>{tab === "vault" ? "Internal dashboard · liability · hedging · vault fills" : tab === "health" ? "Internal dashboard · feeds · match rate · API · staleness" : tab === "product" ? "Internal dashboard · funnel · retention · DAU/WAU" : tab === "economics" ? "Internal dashboard · house P&L · fees · funding · trends" : tab === "execution" ? "Internal dashboard · fills · rejections · slippage · mix" : tab === "risk" ? "Internal dashboard · bad debt · solvency · exposure · drawdown" : tab === "alerts" ? "Internal dashboard · live conditions · fire/resolve history · runbooks" : "Internal dashboard · all sports · graded forecasts"}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"], ["risk", "Risk"], ["alerts", (alertsData?.active?.length ? `Alerts (${alertsData.active.length})` : "Alerts")], ["waitlist", "Waitlist"]].map(([id, label]) => (
+          {[["oracle", "Oracle"], ["vault", "Vault"], ["health", "Health"], ["product", "Product"], ["economics", "Economics"], ["execution", "Execution"], ["risk", "Risk"], ["alerts", (alertsData?.active?.length ? `Alerts (${alertsData.active.length})` : "Alerts")], ["users", "Users"], ["feedback", "Feedback"], ["waitlist", "Waitlist"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{ background: tab === id ? C.surface : "transparent", border: `1px solid ${tab === id ? C.border : "transparent"}`, color: tab === id ? C.text : C.mut, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: tab === id ? 700 : 500 }}>{label}</button>
           ))}
           <button onClick={load} style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13 }}>↻ Refresh</button>
@@ -1235,6 +1331,10 @@ export function DashboardPage() {
       {tab === "risk" && <RiskTab data={riskData} />}
 
       {tab === "waitlist" && <WaitlistTab data={waitlistData} />}
+
+      {tab === "users" && <UsersTab data={usersData} />}
+
+      {tab === "feedback" && <FeedbackTab data={feedbackData} />}
 
       {tab === "alerts" && <AlertsTab data={alertsData} />}
 
