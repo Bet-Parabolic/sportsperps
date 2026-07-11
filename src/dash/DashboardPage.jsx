@@ -1063,7 +1063,7 @@ function WCEconTab({ data }) {
         <Panel title="Event house (vault · insurance · fees)">
           {[
             ["Vault balance", fmtUsd(v.balance), null],
-            ["vs $50k seed", fmtSigned((v.balance || 0) - (v.seed || 50000)), sign((v.balance || 0) - (v.seed || 50000))],
+            [`vs seed (${fmtUsd(v.seed)})`, fmtSigned((v.balance || 0) - (v.seed || 0)), sign((v.balance || 0) - (v.seed || 0))],
             ["Vault realized PnL", fmtSigned(v.realizedPnl), sign(v.realizedPnl)],
             ["Vault unrealized (open inventory)", fmtSigned(v.unrealizedPnl), sign(v.unrealizedPnl)],
             ["Short liability", fmtUsd(v.liability), null],
