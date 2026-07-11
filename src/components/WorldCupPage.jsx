@@ -341,6 +341,34 @@ function BracketSkeleton({ isMobile }) {
   );
 }
 
+/* ── competition rules modal (opened from the Rules link under the hero prize line) ── */
+function RulesModal({ onClose }) {
+  const rules = [
+    ["One entry per person.", "Signup requires email and phone verification, with no VoIP or burner numbers. This is how we keep the prize pool honest."],
+    ["Trade fairly.", "Accounts showing manipulation, collusion, or multi-accounting are voided from prize eligibility."],
+    ["Winners are paid in USDC to the EVM wallet on their account:", "the wallet you signed up with, or one you add under Profile → Account details. Standings are final at the whistle of the Final on July 19."],
+  ];
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 900, fontFamily: fb }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)" }} />
+      <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: "min(480px, 92vw)", background: "#101114", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 20, padding: "22px 24px 24px", boxShadow: "0 40px 100px rgba(0,0,0,0.6)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <span style={{ fontFamily: fd, fontSize: 18, fontWeight: 700, color: "#fff" }}>Competition rules</span>
+          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 15, background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", fontSize: 14, cursor: "pointer" }}>✕</button>
+        </div>
+        {rules.map(([lead, rest], i) => (
+          <div key={i} style={{ display: "flex", gap: 12, marginBottom: i < rules.length - 1 ? 14 : 0 }}>
+            <span style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 12, background: "rgba(255,229,113,0.12)", border: "1px solid rgba(255,229,113,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fm, fontSize: 11, fontWeight: 700, color: "#ffe571" }}>{i + 1}</span>
+            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: "#9aa3b2" }}>
+              <span style={{ color: "#fff", fontWeight: 700 }}>{lead}</span> {rest}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ErrorStrip({ onRetry, children }) {
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", textAlign: "center", background: "rgba(255,82,71,0.07)", border: "1px solid rgba(255,82,71,0.25)", borderRadius: 16, padding: "22px 20px" }}>
@@ -369,6 +397,7 @@ export function WorldCupPage() {
   const [showVerify, setShowVerify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [viewUser, setViewUser] = useState(null); // public-profile target
   const [joinErr, setJoinErr] = useState("");
   const [activeGame, setActiveGame] = useState(null);
@@ -500,6 +529,9 @@ export function WorldCupPage() {
             $10,000 World Cup Cash per entrant, trade live win probability through the bracket.<br />
             Cash prizes $2,000 · $1,000 · $500
           </p>
+          <button onClick={() => setShowRules(true)} style={{ background: "none", border: "none", cursor: "pointer", marginTop: 10, fontFamily: fb, fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.75)", textDecoration: "underline", textUnderlineOffset: 3, textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>
+            Rules
+          </button>
 
           {meta?.live && (joined
             ? <div style={{ marginTop: 20, display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
@@ -707,6 +739,7 @@ export function WorldCupPage() {
       )}
 
       {viewUser && <PublicProfilePage targetId={viewUser} onClose={() => setViewUser(null)} />}
+      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
       {showShareCard && (() => {
         const meLb = lb.find((e) => e.userId === userId);
         return (
