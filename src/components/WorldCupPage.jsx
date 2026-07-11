@@ -527,11 +527,11 @@ export function WorldCupPage() {
           </h1>
           <p style={{ fontFamily: fb, color: "rgba(255,255,255,0.88)", fontSize: isMobile ? 13.5 : 15, lineHeight: 1.5, maxWidth: 640, margin: "16px auto 0", textShadow: "0 2px 14px rgba(0,0,0,0.6)" }}>
             $10,000 World Cup Cash per entrant, trade live win probability through the bracket.<br />
-            Cash prizes $2,000 · $1,000 · $500
+            Cash prizes $2,000 · $1,000 · $500{" · "}
+            <button onClick={() => setShowRules(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: "inherit", fontWeight: 600, color: "rgba(255,255,255,0.75)", textDecoration: "underline", textUnderlineOffset: 3, verticalAlign: "baseline", textShadow: "inherit" }}>
+              Rules
+            </button>
           </p>
-          <button onClick={() => setShowRules(true)} style={{ background: "none", border: "none", cursor: "pointer", marginTop: 10, fontFamily: fb, fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.75)", textDecoration: "underline", textUnderlineOffset: 3, textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>
-            Rules
-          </button>
 
           {meta?.live && (joined
             ? <div style={{ marginTop: 20, display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
