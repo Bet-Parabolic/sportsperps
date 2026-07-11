@@ -868,7 +868,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     try {
       const res = await fetch(`${API_URL}/positions/triggers`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, gameId: pos.gameId, tp, sl }),
+        body: JSON.stringify({ userId, gameId: pos.gameId, tp, sl, token: authToken() }),
       });
       const tm = pos.side === 'home' ? HOME : AWAY;
       if (res.ok) notify(`TP/SL updated for ${tm.short}${tp?` · TP ${Math.round(tp*100)}¢`:''}${sl?` · SL ${Math.round(sl*100)}¢`:''}${!tp&&!sl?' · cleared':''}`, 'info');
@@ -1774,12 +1774,16 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 <div style={{fontSize:10,color:'#444',lineHeight:1.5}}>Only closes or shrinks a position you already hold — never opens a new one or adds to it. Use it to lock in an exit without accidentally flipping sides.</div>
               </div>
             </div>
-            {/* Submit */}
+            {/* Submit — always the brand-green CTA (like Launch App); team identity = the logo
+                on the button. Team KIT colors stay on the side selectors/accents only, so no
+                team's color data can ever make this button illegible. */}
             <button onClick={placeOrder} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
               border:settled?'2px solid #333':'2px solid '+B.green,
               cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
-              background:settled?'#222':orderSide==='home'?HOME.btnBg:AWAY.btnBg,
-              color:settled?'#fff':orderSide==='home'?HOME.btnText:AWAY.btnText,opacity:settled||eM<10?0.4:1}}>
+              background:settled?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,
+              color:'#fff',opacity:settled||eM<10?0.4:1,
+              display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              {!settled&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:18,height:18,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
               {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
             {/* Account */}
@@ -1986,7 +1990,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     </div>
                     <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
                       border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
-                      background:settled?'#222':orderSide==='home'?HOME.btnBg:AWAY.btnBg,color:settled?'#fff':orderSide==='home'?HOME.btnText:AWAY.btnText,opacity:settled||eM<10?0.4:1}}>
+                      background:settled?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,color:'#fff',opacity:settled||eM<10?0.4:1,
+                      display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                      {!settled&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:20,height:20,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
                       {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>

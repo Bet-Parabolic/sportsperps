@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { B, fb, fd, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { fmtUsd } from "../lib/helpers.js";
+import { authToken } from "../lib/auth.js";
 
 export function ProfileModal({ userId, onClose }) {
   const [profile, setProfile] = useState(null);
@@ -13,11 +14,12 @@ export function ProfileModal({ userId, onClose }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/profile/${userId}`).then(r=>r.json()).then(d=>{
+    const tk = `token=${encodeURIComponent(authToken() || "")}`; // own-profile reads are token-gated
+    fetch(`${API_URL}/profile/${userId}?${tk}`).then(r=>r.json()).then(d=>{
       if(d.email||d.username){setProfile(d);setEmail(d.email||'');setUsername(d.username||'');}
       setLoading(false);
     }).catch(()=>setLoading(false));
-    fetch(`${API_URL}/profile/${userId}/trades?limit=20`).then(r=>r.json()).then(d=>setTrades(d.trades||[])).catch(()=>{});
+    fetch(`${API_URL}/profile/${userId}/trades?limit=20&${tk}`).then(r=>r.json()).then(d=>setTrades(d.trades||[])).catch(()=>{});
   }, [userId]);
 
   const saveProfile = async () => {
@@ -29,7 +31,7 @@ export function ProfileModal({ userId, onClose }) {
       if(res.ok){
         setProfile(data);localStorage.setItem('perpdictions_profile',JSON.stringify(data));
         // Refresh trade history after profile creation
-        fetch(`${API_URL}/profile/${userId}/trades?limit=20`).then(r=>r.json()).then(d=>setTrades(d.trades||[])).catch(()=>{});
+        fetch(`${API_URL}/profile/${userId}/trades?limit=20&token=${encodeURIComponent(authToken() || "")}`).then(r=>r.json()).then(d=>setTrades(d.trades||[])).catch(()=>{});
       }
       else setError(data.error||'Failed to save');
     } catch(e){setError(e.message);}
