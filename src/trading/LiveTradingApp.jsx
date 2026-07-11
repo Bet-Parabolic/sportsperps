@@ -189,7 +189,16 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [reduceOnly, setReduceOnly] = useState(false);
   const [rightTab,   setRightTab]   = useState('order');
   const [bottomTab,  setBottomTab]  = useState('gamecast');
-  const [notifs,     setNotifs]     = useState([]);
+  // Wager Activity has MEMORY: the tray persists per account so a refresh (or coming back
+  // later) still shows every fill/close/risk event. Capped at 40, account-keyed.
+  const notifsKey = `parabolic_activity_${userId}`;
+  const [notifs,     setNotifs]     = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem(notifsKey) || "[]"); return Array.isArray(s) ? s.slice(0, 40) : []; }
+    catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(notifsKey, JSON.stringify(notifs.slice(0, 40))); } catch { /* storage blocked */ }
+  }, [notifs, notifsKey]);
   const [markers,    setMarkers]    = useState([]);
   const [showWager,  setShowWager]  = useState(false);
   const sheetDragY = useRef(null); // touch-start Y of the wager-sheet handle (swipe-down dismiss)
