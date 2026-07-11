@@ -1876,6 +1876,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                         {AWAY.short} <span style={{fontSize:11,opacity:0.7}}>{(awayProb*100).toFixed(0)}¢</span>
                       </button>
                     </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,background:'#1a1a1a',borderRadius:10,padding:'0 14px',marginBottom:6}}>
+                      <span style={{color:'#555',fontFamily:fm,fontWeight:700,fontSize:14}}>$</span>
+                      <input type="number" inputMode="decimal" min={0} value={Math.round(eM)||''} placeholder="Wager amount"
+                        onChange={e=>setOrderMargin(Math.min(Math.max(0,+e.target.value||0),ledgerBal))}
+                        style={{flex:1,background:'transparent',border:'none',outline:'none',color:'#fff',fontFamily:fm,fontWeight:700,fontSize:16,padding:'12px 0'}}/>
+                      <span style={{color:'#444',fontSize:11,fontFamily:fm}}>max {fmtUsd(ledgerBal)}</span>
+                    </div>
                     <div style={{display:'flex',gap:6,marginBottom:12}}>
                       {[100,250,500,1000].map(v=>(
                         <button key={v} onClick={()=>setOrderMargin(v)} style={{flex:1,padding:'11px 0',fontSize:12,fontWeight:700,border:'none',cursor:'pointer',fontFamily:fm,borderRadius:10,
