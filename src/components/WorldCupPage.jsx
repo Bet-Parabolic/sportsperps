@@ -308,6 +308,47 @@ function CountdownRing({ nextMatch, live = false }) {
   );
 }
 
+/* ── first-paint skeletons + error strip (no blank panels while the APIs answer) ── */
+const SkelBlock = ({ w, h, r = 14, style }) => (
+  <div style={{ width: w, height: h, borderRadius: r, background: "rgba(255,255,255,0.055)", animation: "pulse 1.7s ease-in-out infinite", ...style }} />
+);
+
+function BracketSkeleton({ isMobile }) {
+  if (isMobile) {
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <SkelBlock w="100%" h={140} r={20} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <SkelBlock w="100%" h={112} r={20} /><SkelBlock w="100%" h={112} r={20} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <SkelBlock w="100%" h={94} r={18} /><SkelBlock w="100%" h={94} r={18} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 26 }}>
+      <SkelBlock w={120} h={230} r={18} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
+        <SkelBlock w={346} h={150} r={20} />
+        <div style={{ display: "flex", gap: 16 }}><SkelBlock w={204} h={122} r={20} /><SkelBlock w={204} h={122} r={20} /></div>
+        <SkelBlock w={240} h={110} r={20} />
+      </div>
+      <SkelBlock w={120} h={230} r={18} />
+    </div>
+  );
+}
+
+function ErrorStrip({ onRetry, children }) {
+  return (
+    <div style={{ maxWidth: 460, margin: "0 auto", textAlign: "center", background: "rgba(255,82,71,0.07)", border: "1px solid rgba(255,82,71,0.25)", borderRadius: 16, padding: "22px 20px" }}>
+      <div style={{ fontFamily: fb, fontSize: 14, color: "#f2b5b0", lineHeight: 1.5 }}>{children}</div>
+      <button onClick={onRetry} style={{ marginTop: 12, background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 999, padding: "8px 18px", color: "#fff", fontFamily: fb, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Try again</button>
+    </div>
+  );
+}
+
 export function WorldCupPage() {
   const [tab, setTab] = useState("home");
   const [meta, setMeta] = useState(null);
@@ -325,6 +366,7 @@ export function WorldCupPage() {
   const [viewUser, setViewUser] = useState(null); // public-profile target
   const [joinErr, setJoinErr] = useState("");
   const [activeGame, setActiveGame] = useState(null);
+  const [loadState, setLoadState] = useState("loading"); // loading | ok | error — first-paint gate
   const [memberCard] = useState(() => loadCard());
   const liveGames = useLiveGames();
   const wcLive = liveGames.filter((g) => g.league === "wcup" && (g.status === "live" || g.status === "halftime"));
@@ -357,10 +399,12 @@ export function WorldCupPage() {
           setStanding(st);
         }
       } else { setJoined(false); }
+      setLoadState("ok");
     } catch {
       // Keep the last good data — but if the FIRST load failed (meta still null), default the
       // event to live so the join CTA isn't invisibly hidden; the backend still gates joins.
       setMeta((prev) => prev ?? { live: true, degraded: true });
+      setLoadState((s) => (s === "ok" ? "ok" : "error"));
     }
   }, [auth?.userId]);
 
@@ -432,7 +476,14 @@ export function WorldCupPage() {
 
       <div style={{ position: "relative", padding: isMobile ? "60px 16px 60px" : "64px 40px 80px" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: isMobile ? 14 : 18 }}>
-          <CountdownRing nextMatch={liveMatch || nextMatch} live={!!liveMatch} />
+          {(liveMatch || nextMatch)
+            ? <CountdownRing nextMatch={liveMatch || nextMatch} live={!!liveMatch} />
+            : loadState === "loading"
+              ? <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, paddingTop: 8 }}>
+                  <SkelBlock w={190} h={190} r={999} />
+                  <SkelBlock w={200} h={38} r={6} />
+                </div>
+              : null}
         </div>
 
         <div style={{ textAlign: "center", maxWidth: 1253, margin: "0 auto" }}>
@@ -463,7 +514,11 @@ export function WorldCupPage() {
         </div>
 
         <div style={{ marginTop: isMobile ? 40 : 56 }}>
-          {bracket.length > 0 && <Bracket matches={bracket} onOpen={openMatch} isMobile={isMobile} probs={probs} />}
+          {bracket.length > 0
+            ? <Bracket matches={bracket} onOpen={openMatch} isMobile={isMobile} probs={probs} />
+            : loadState === "loading"
+              ? <BracketSkeleton isMobile={isMobile} />
+              : <ErrorStrip onRetry={refresh}>Couldn't load the bracket — check your connection and try again.</ErrorStrip>}
         </div>
 
         <p style={{ textAlign: "center", color: "#4a4f58", fontSize: 11.5, lineHeight: 1.8, maxWidth: 780, margin: "70px auto 0" }}>
@@ -541,9 +596,26 @@ export function WorldCupPage() {
             </div>
           )}
           {lb.length === 0 && (
-            <div style={{ textAlign: "center", color: "#8a93a6", fontSize: 13, padding: "60px 0" }}>
-              {meta?.live ? "No entrants yet — be first on the board." : "The board opens with the competition."}
-            </div>
+            loadState === "loading" ? (
+              <div style={{ paddingTop: 70 }}>
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: isMobile ? 24 : 50 }}>
+                  <SkelBlock w={82} h={84} r={999} />
+                  <SkelBlock w={104} h={106} r={999} />
+                  <SkelBlock w={82} h={84} r={999} />
+                </div>
+                <div style={{ maxWidth: 560, margin: "44px auto 0", display: "grid", gap: 12 }}>
+                  <SkelBlock w="100%" h={50} r={12} /><SkelBlock w="100%" h={50} r={12} /><SkelBlock w="100%" h={50} r={12} />
+                </div>
+              </div>
+            ) : loadState === "error" ? (
+              <div style={{ paddingTop: 80 }}>
+                <ErrorStrip onRetry={refresh}>Couldn't load the leaderboard — check your connection and try again.</ErrorStrip>
+              </div>
+            ) : (
+              <div style={{ textAlign: "center", color: "#8a93a6", fontSize: 13, padding: "60px 0" }}>
+                {meta?.live ? "No entrants yet — be first on the board." : "The board opens with the competition."}
+              </div>
+            )
           )}
 
           {rest.length > 0 && (
