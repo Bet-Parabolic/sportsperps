@@ -1,7 +1,7 @@
 {
   "name": "perps-io",
   "private": true,
-  "version": "1.2.12",
+  "version": "1.2.13",
   "type": "module",
   "scripts": {
     "dev": "vite",

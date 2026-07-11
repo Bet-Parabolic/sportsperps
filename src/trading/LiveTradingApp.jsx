@@ -1781,9 +1781,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               border:settled?'2px solid #333':'2px solid '+B.green,
               cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
               background:settled?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,
-              color:'#fff',opacity:settled||eM<10?0.4:1,
+              color:settled?'#fff':'#000',opacity:settled||eM<10?0.4:1,
               display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-              {!settled&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:18,height:18,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
+              {!settled&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:24,height:24,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
               {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
             {/* Account */}
@@ -1990,9 +1990,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     </div>
                     <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
                       border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
-                      background:settled?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,color:'#fff',opacity:settled||eM<10?0.4:1,
+                      background:settled?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,color:settled?'#fff':'#000',opacity:settled||eM<10?0.4:1,
                       display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                      {!settled&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:20,height:20,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
+                      {!settled&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:26,height:26,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
                       {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>
