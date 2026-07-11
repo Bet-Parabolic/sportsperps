@@ -272,6 +272,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     short:   g.home.abbreviation,
     logoUrl: g.home.logo,
     light:   teamCols.home.light,
+    btnBg:   teamCols.home.btnBg,
     btnText: teamCols.home.btnText,
   }), [g.home, teamCols]);
   const AWAY = useMemo(() => ({
@@ -279,6 +280,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     short:   g.away.abbreviation,
     logoUrl: g.away.logo,
     light:   teamCols.away.light,
+    btnBg:   teamCols.away.btnBg,
     btnText: teamCols.away.btnText,
   }), [g.away, teamCols]);
 
@@ -1776,7 +1778,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <button onClick={placeOrder} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
               border:settled?'2px solid #333':'2px solid '+B.green,
               cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
-              background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,
+              background:settled?'#222':orderSide==='home'?HOME.btnBg:AWAY.btnBg,
               color:settled?'#fff':orderSide==='home'?HOME.btnText:AWAY.btnText,opacity:settled||eM<10?0.4:1}}>
               {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
@@ -1984,7 +1986,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     </div>
                     <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
                       border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
-                      background:settled?'#222':orderSide==='home'?HOME.light:AWAY.light,color:settled?'#fff':orderSide==='home'?HOME.btnText:AWAY.btnText,opacity:settled||eM<10?0.4:1}}>
+                      background:settled?'#222':orderSide==='home'?HOME.btnBg:AWAY.btnBg,color:settled?'#fff':orderSide==='home'?HOME.btnText:AWAY.btnText,opacity:settled||eM<10?0.4:1}}>
                       {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>

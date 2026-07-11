@@ -84,6 +84,19 @@ export function ensureReadableOn(color, bg = TERMINAL_BG, min = 4.5) {
   return out;
 }
 
+/** Darken until the color reads as text on a LIGHT `bg` at ≥ `min` (England red on white). */
+export function ensureDarkOn(color, bg, min = 4.5) {
+  const rgb = parse(color);
+  if (!rgb) return color;
+  let [h, s, l] = rgbToHsl(...rgb);
+  let out = toHex(...rgb);
+  for (let i = 0; i < 24 && contrast(out, bg) < min; i++) {
+    l = Math.max(0.05, l - 0.04);
+    out = hslToHex(h, s, l);
+  }
+  return out;
+}
+
 // ── kit-color selection ──────────────────────────────────────────────────────
 // A kit color is usable as this team's accent if it's actually a COLOR (not the white/grey
 // away shirt) and isn't so bright that black text would be needed on the dark UI's tints.
@@ -105,15 +118,49 @@ function clashes(a, b) {
   return hueDiff(ha, hb) < 25 && sa > 0.2 && sb > 0.2 && contrast(a, b) < 1.6;
 }
 
+// "White kit" detection — a near-white/undyed shirt color (England's away #FFFFFF). Such a color
+// becomes the button PLATE with the other kit color as its label, never text on a dark UI.
+const nearWhite = (hex) => {
+  const rgb = parse(hex);
+  if (!rgb) return false;
+  const [, s] = rgbToHsl(...rgb);
+  const L = relLum(hex);
+  return L >= 0.88 || (L >= 0.8 && s <= 0.25);
+};
+
+// Label fallback for a solid kit-colored plate. Plain luminance math picks BLACK on pure red
+// (5.2:1 vs 4.0:1), but bold button text reads better white there and 4.0:1 clears the WCAG
+// large/bold-text bar — so bias to white whenever white reaches 3:1.
+const plateLabel = (bg) => (contrast(bg, "#ffffff") >= 3 ? "#ffffff" : "#000000");
+
 /**
- * Choose accents for both sides from each team's TWO kit colors.
+ * Choose colors for both sides from each team's TWO kit colors.
  * `home`/`away` are the backend team objects ({ color, altColor }).
- * Returns { home: { light, btnText }, away: { light, btnText } } where `light` is safe as
- * text/tint on the dark UI and `btnText` is the label color for a SOLID `light` fill.
+ * Returns per side:
+ *   light   — accent safe as text/tint on the dark UI (chart legend, borders, tints)
+ *   btnBg   — solid Buy-button plate: the primary kit color, or the white kit when one
+ *             of the pair is a white shirt (England → white plate)
+ *   btnText — the OTHER kit color when the pairing passes ≥4.5:1 (Argentina sky/navy,
+ *             England white/red), else the verified white/black fallback (Switzerland
+ *             red/white, Norway red/white)
  */
 export function pickTeamColors(home, away, { homeFallback = "#1fd182", awayFallback = "#ff5247" } = {}) {
   const candidates = (t) => [t?.color, t?.altColor].map((c) => (c && !String(c).startsWith("#") ? "#" + c : c)).filter((c) => parse(c));
   const usable = (t) => candidates(t).filter(isVivid);
+
+  // The kit PAIR for the solid button: plate + label, contrast-verified.
+  const btnPair = (t, fallback) => {
+    const [A, B] = candidates(t);                            // A = first kit, B = second kit
+    const white = [A, B].find((c) => c && nearWhite(c));
+    const other = white === A ? B : A;
+    if (white && other && !nearWhite(other)) {
+      // White-shirt kit: white plate, the trim color as the label (darkened until it reads).
+      return { btnBg: white, btnText: ensureDarkOn(other, white, 4.5) };
+    }
+    const plate = A && !nearWhite(A) ? A : fallback;         // primary kit plate (a white plate only happens WITH a trim color above)
+    const label = B && !nearWhite(B) && contrast(plate, B) >= 4.5 ? B : plateLabel(plate);
+    return { btnBg: plate, btnText: label };
+  };
 
   const pickSide = (t, fallback, opponentPick) => {
     const u = usable(t);
@@ -136,7 +183,7 @@ export function pickTeamColors(home, away, { homeFallback = "#1fd182", awayFallb
   const homePick = pickSide(home, homeFallback, null);
   const awayPick = pickSide(away, awayFallback, homePick);
   return {
-    home: { light: homePick, btnText: labelOn(homePick) },
-    away: { light: awayPick, btnText: labelOn(awayPick) },
+    home: { light: homePick, ...btnPair(home, homeFallback) },
+    away: { light: awayPick, ...btnPair(away, awayFallback) },
   };
 }
