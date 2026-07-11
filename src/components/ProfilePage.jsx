@@ -116,19 +116,12 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
         <SectionTitle>Account</SectionTitle>
         <Group>
           <Row label="Account details" onClick={() => setView("account")} />
-          <Row label="Payment & deposits" onClick={() => setView("transactions")} />
-          <Row label="Deposit limit" value="Coming soon" last />
+          <Row label="Payment & deposits" onClick={() => setView("transactions")} last />
         </Group>
 
         <SectionTitle>Security</SectionTitle>
         <Group>
           <PrivacyRow userId={userId} profile={profile} onSaved={load} />
-        </Group>
-
-        <SectionTitle>Preferences</SectionTitle>
-        <Group>
-          <Row label="Language" value="English" />
-          <Row label="Currency" value="USD" last />
         </Group>
 
         <SectionTitle>About</SectionTitle>
@@ -418,19 +411,12 @@ function Transactions({ profile, onLinkWallet }) {
 }
 
 // ── Referrals sub-screen ───────────────────────────────────────────────────
-function Referrals({ username }) {
-  const link = `https://parabolic.gg/?ref=${encodeURIComponent(username)}`;
-  const [copied, setCopied] = useState(false);
-  const copy = () => { navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1800); }); };
+function Referrals() {
   return (
     <div>
-      <div style={{ ...card, textAlign: "center", padding: "22px 16px" }}>
+      <div style={{ ...card, textAlign: "center", padding: "26px 16px" }}>
         <div style={{ fontFamily: fd, fontSize: 18, fontWeight: 700, color: B.white }}>Invite friends</div>
-        <div style={{ color: B.dim, fontSize: 13, margin: "8px 0 18px" }}>Share your link — you both earn rewards when they start trading.</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <div style={{ ...input, flex: 1, marginTop: 0, color: B.white, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: fm, fontSize: 13 }}>{link}</div>
-          <button style={saveBtn} onClick={copy}>{copied ? "Copied" : "Copy"}</button>
-        </div>
+        <div style={{ color: B.dim, fontSize: 13, margin: "8px 0 0" }}>Referral program coming soon — you and your friends will both earn rewards when they start trading.</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <StatBox label="Friends joined" value="0" />

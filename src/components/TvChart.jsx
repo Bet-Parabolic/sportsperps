@@ -28,6 +28,9 @@ export const TvChart = forwardRef(function TvChart(
   const scoreRef = useRef([]);       // scoring-play markers: [{ t, price, side, label }]
   const dataTimesRef = useRef([]);   // toT times of the current series points (for snapping markers)
   const layerRef = useRef(null);     // HTML overlay layer for the parabolic-logo scoring dots
+  const riskLayerRef = useRef(null); // HTML overlay for TP/SL/LIQ labels (collision-resolved)
+  const riskRef = useRef({ liq: [], tp: [], sl: [] }); // prices of the active risk lines
+  const lastValsRef = useRef({ h: null, a: null });    // series last values (win-prob axis tags = obstacles)
   const xLayerRef = useRef(null);    // custom x-axis label strip (evenly spaced, no repeats)
   const xTicksRef = useRef(xTicks); xTicksRef.current = xTicks;
   const xFmtRef = useRef(xFmt); xFmtRef.current = xFmt;
@@ -109,11 +112,55 @@ export const TvChart = forwardRef(function TvChart(
     }
   };
 
+  // TP/SL/LIQ labels as an HTML overlay hugging the price axis. Native price-line titles
+  // have no collision logic; here labels are sorted by y and pushed apart so they never
+  // overlap each other OR the series' win-probability axis tags.
+  const placeRiskLabels = () => {
+    const { chart, home } = api.current;
+    const layer = riskLayerRef.current, el = elRef.current;
+    if (!chart || !home || !layer || !el) return;
+    layer.innerHTML = "";
+    const items = [];
+    const pushI = (price, text, color) => { const y = home.priceToCoordinate(price); if (y != null) items.push({ y, text, color }); };
+    riskRef.current.tp.forEach((p) => pushI(p, "TP " + Math.round(p * 100) + "%", "#3b82f6"));
+    riskRef.current.sl.forEach((p) => pushI(p, "SL " + Math.round(p * 100) + "%", "#facc15"));
+    riskRef.current.liq.forEach((p) => pushI(p, "LIQ " + Math.round(p * 100) + "%", B.red));
+    if (!items.length) return;
+    // Obstacles: where the home/away last-value tags sit on the axis (win probabilities).
+    const obs = [];
+    for (const v of [lastValsRef.current.h, lastValsRef.current.a]) {
+      if (v == null) continue;
+      const y = home.priceToCoordinate(v);
+      if (y != null) obs.push(y);
+    }
+    const GAP = 16;                                   // min vertical separation (label ~13px tall)
+    const psw = chart.priceScale("right").width() || 48;
+    items.sort((a, b) => a.y - b.y);
+    const placed = [];
+    for (const it of items) {
+      let y = it.y, moved = true;
+      while (moved) {                                  // y only ever grows → terminates
+        moved = false;
+        for (const p of placed) if (Math.abs(y - p) < GAP) { y = p + GAP; moved = true; }
+        for (const o of obs) if (Math.abs(y - o) < GAP) { y = o + GAP; moved = true; }
+      }
+      y = Math.min(y, el.clientHeight - 10);
+      placed.push(y);
+      const d = document.createElement("div");
+      d.textContent = it.text;
+      d.style.cssText = "position:absolute;right:" + (psw + 4) + "px;top:" + y + "px;transform:translateY(-50%);font:700 9px " + fm +
+        ";color:" + it.color + ";background:#0a0a0ae0;padding:1px 5px;border-radius:4px;border:1px solid " + it.color + "55;white-space:nowrap;pointer-events:none;z-index:6";
+      layer.appendChild(d);
+    }
+  };
+
   // Apply the current Y range to both series so the shared price scale honors it.
   const applyY = () => {
     const prov = () => ({ priceRange: { minValue: yRange.current[0], maxValue: yRange.current[1] } });
     api.current.home?.applyOptions({ autoscaleInfoProvider: prov });
     api.current.away?.applyOptions({ autoscaleInfoProvider: prov });
+    // Coordinates shift with the new range — reposition every overlay on the next frame.
+    requestAnimationFrame(() => { placeScoringLogos(); placeXLabels(); placeRiskLabels(); });
   };
 
   useImperativeHandle(ref, () => ({
@@ -168,7 +215,12 @@ export const TvChart = forwardRef(function TvChart(
     layer.style.cssText = "position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:5";
     el.appendChild(layer);
     layerRef.current = layer;
-    const redraw = () => { placeScoringLogos(); placeXLabels(); };
+    // Overlay layer for the TP/SL/LIQ labels.
+    const rlayer = document.createElement("div");
+    rlayer.style.cssText = "position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:6";
+    el.appendChild(rlayer);
+    riskLayerRef.current = rlayer;
+    const redraw = () => { placeScoringLogos(); placeXLabels(); placeRiskLabels(); };
     chart.timeScale().subscribeVisibleLogicalRangeChange(redraw);
 
     chart.subscribeCrosshairMove((p) => {
@@ -213,6 +265,37 @@ export const TvChart = forwardRef(function TvChart(
     const stopAuto = () => { autoFit.current = false; };
     el.addEventListener("pointerdown", stopAuto);
 
+    // Mobile: vertical drag ON the Y axis zooms the Y range around its center — drag up to
+    // zoom in, drag down to zoom out (touch parallel of the wheel-over-axis behavior above).
+    // Touches elsewhere keep their existing behavior (horizontal pan, page scroll).
+    const yTouch = { active: false, startY: 0, startRange: [0, 1] };
+    const onTouchStart = (e) => {
+      if (e.touches.length !== 1) return;
+      const r = el.getBoundingClientRect();
+      const psw = chart.priceScale("right").width() || 48;
+      if (e.touches[0].clientX <= r.right - psw) return;   // not on the Y axis
+      yTouch.active = true; yTouch.startY = e.touches[0].clientY; yTouch.startRange = [...yRange.current];
+      autoFit.current = false;
+      e.preventDefault(); e.stopImmediatePropagation();
+    };
+    const onTouchMove = (e) => {
+      if (!yTouch.active) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const dy = e.touches[0].clientY - yTouch.startY;
+      const [lo0, hi0] = yTouch.startRange;
+      const ns = Math.min(1, Math.max(0.02, (hi0 - lo0) * Math.exp(dy * 0.006)));
+      const c = (lo0 + hi0) / 2;
+      let nlo = c - ns / 2, nhi = c + ns / 2;
+      if (nlo < 0) { nhi -= nlo; nlo = 0; }
+      if (nhi > 1) { nlo -= nhi - 1; nhi = 1; }
+      yRange.current = [Math.max(0, +nlo.toFixed(4)), Math.min(1, +nhi.toFixed(4))];
+      applyY();
+    };
+    const onTouchEnd = () => { yTouch.active = false; };
+    el.addEventListener("touchstart", onTouchStart, { passive: false, capture: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
+    el.addEventListener("touchend", onTouchEnd, { capture: true });
+
     const ro = new ResizeObserver(() => { chart.applyOptions({ width: el.clientWidth }); redraw(); });
     ro.observe(el);
     chart.applyOptions({ width: el.clientWidth });
@@ -224,10 +307,15 @@ export const TvChart = forwardRef(function TvChart(
       try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(redraw); } catch (e) {}
       el.removeEventListener("wheel", onWheel, { capture: true });
       el.removeEventListener("pointerdown", stopAuto);
+      el.removeEventListener("touchstart", onTouchStart, { capture: true });
+      el.removeEventListener("touchmove", onTouchMove, { capture: true });
+      el.removeEventListener("touchend", onTouchEnd, { capture: true });
       chart.remove();
       try { layer.remove(); } catch (e) {}   // remove imperatively-appended overlays so a
+      try { rlayer.remove(); } catch (e) {}
       try { tip.remove(); } catch (e) {}      // re-mount (StrictMode/remount) can't leave a stale, duplicated layer
       layerRef.current = null;
+      riskLayerRef.current = null;
       api.current = {};
     };
   }, [height]);
@@ -256,10 +344,12 @@ export const TvChart = forwardRef(function TvChart(
     // `data` — kept as their own list (not one-per-point) so adjacent scores never collide.
     scoreRef.current = scoringPlays;
 
+    lastValsRef.current = { h: hd.length ? hd[hd.length - 1].value : null, a: ad.length ? ad[ad.length - 1].value : null };
     api.current.last = hd.length ? fromT(hd[hd.length - 1].time) : null;
     if (autoFit.current) chart?.timeScale().fitContent();
     placeScoringLogos();
     placeXLabels();
+    placeRiskLabels();
   }, [data, scoringPlays, xTicks]);
 
   // price lines: 0.5 midline (no axis label), liquidations, resting limit orders.
@@ -275,14 +365,20 @@ export const TvChart = forwardRef(function TvChart(
     add(0.5, "#ffffff1a", "", LineStyle.Dashed, 1, false);   // faint 50% reference, no axis label
     // Open position entry → green dotted "Entry Price" line.
     entryLines.forEach((en) => add(en.entryOnChart, B.green, "Entry Price", LineStyle.Dotted, 1));
-    // Liquidation: one label = the win % level that triggers it (matches the line's position
-    // on the chart's win-prob axis — no separate, conflicting axis tag).
-    liqLines.forEach((ll) => add(ll.liqOnChart, B.red, "LIQ " + Math.round(ll.liqOnChart * 100) + "%", LineStyle.Dashed, 2, false));
+    // Liquidation / TP / SL lines: label rendering moved to the placeRiskLabels overlay
+    // (native titles can't avoid colliding with each other or the win-prob axis tags).
+    liqLines.forEach((ll) => add(ll.liqOnChart, B.red, "", LineStyle.Dashed, 2, false));
     // Resting limit orders → green dotted line at the order price (removed once filled/cancelled).
     limitOrders.forEach((lo) => add(lo.side === "home" ? lo.limitPrice : 1 - lo.limitPrice, B.green, "LIMIT " + (lo.limitPrice * 100).toFixed(0) + "¢", LineStyle.Dotted, 1));
     // Take-profit → blue dotted; stop-loss → yellow dotted (levels already in home-prob terms).
-    tpLines.forEach((t) => add(t.priceOnChart, "#3b82f6", "TP " + Math.round(t.priceOnChart * 100) + "%", LineStyle.Dotted, 1, false));
-    slLines.forEach((s) => add(s.priceOnChart, "#facc15", "SL " + Math.round(s.priceOnChart * 100) + "%", LineStyle.Dotted, 1, false));
+    tpLines.forEach((t) => add(t.priceOnChart, "#3b82f6", "", LineStyle.Dotted, 1, false));
+    slLines.forEach((s) => add(s.priceOnChart, "#facc15", "", LineStyle.Dotted, 1, false));
+    riskRef.current = {
+      liq: liqLines.map((l) => l.liqOnChart),
+      tp: tpLines.map((t) => t.priceOnChart),
+      sl: slLines.map((s) => s.priceOnChart),
+    };
+    placeRiskLabels();
   }, [oPrice, liqLines, limitOrders, entryLines, tpLines, slLines]);
 
   return (
