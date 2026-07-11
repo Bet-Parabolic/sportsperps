@@ -212,7 +212,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
           ) : positions.map((p, i) => (
             <div key={i} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: B.white, textTransform: "capitalize" }}>{p.side}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: B.white, textTransform: p.teamName ? "none" : "capitalize" }}>{p.teamName || p.side}</div>
                 <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{fmtUsd(p.margin)} · {(p.entryPx * 100).toFixed(0)}¢ · {p.leverage}x</div>
               </div>
               <div style={{ fontFamily: fm, fontWeight: 700, color: p.pnl >= 0 ? B.primary : B.red }}>{p.pnl >= 0 ? "+" : ""}{fmtUsd(p.pnl)}</div>
@@ -272,20 +272,23 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
                   <div key={t.id} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px" }}>
                     <div>
                       <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: fm, letterSpacing: "0.1em", color: B.dim, marginBottom: 4 }}>{lg.emoji} {lg.label}</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: B.white, textTransform: "capitalize" }}>{t.side} · {t.leverage}x</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: B.white, textTransform: t.teamName ? "none" : "capitalize" }}>{t.teamName || t.side} · {t.leverage}x</div>
                       <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{(t.entryPx * 100).toFixed(0)}¢ → {t.exitPx != null ? (t.exitPx * 100).toFixed(0) + "¢" : "—"}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontFamily: fm, fontWeight: 700, color: win ? B.primary : B.red }}>{win ? "+" : ""}{fmtUsd(t.pnl)}</div>
                       <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                        {/* HOW it closed — LIQ/TP/SL/SETTLED tell very different stories than a manual close */}
-                        {t.closeType && t.closeType !== "CLOSED" && (
-                          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "2px 7px", borderRadius: 5,
-                            background: t.closeType === "LIQ" ? "rgba(255,82,71,0.15)" : t.closeType === "TP" ? "rgba(31,209,130,0.15)" : t.closeType === "SL" ? "rgba(255,159,28,0.15)" : "rgba(138,147,166,0.15)",
-                            color: t.closeType === "LIQ" ? B.red : t.closeType === "TP" ? B.primary : t.closeType === "SL" ? "#ff9f1c" : B.dim }}>
-                            {t.closeType === "LIQ" ? "☠ LIQ" : t.closeType}
-                          </span>
-                        )}
+                        {/* HOW it ended — always shown: TP/SL fired, liquidated, closed by the
+                            user, or held all the way to settlement. */}
+                        {(() => {
+                          const ct = t.closeType || "CLOSED";
+                          const [label, clr, bg] = ct === "LIQ" ? ["☠ LIQUIDATED", B.red, "rgba(255,82,71,0.15)"]
+                            : ct === "TP" ? ["TP HIT", B.primary, "rgba(31,209,130,0.15)"]
+                            : ct === "SL" ? ["SL HIT", "#ff9f1c", "rgba(255,159,28,0.15)"]
+                            : ct === "SETTLED" ? ["HELD TO SETTLEMENT", "#8ab8ff", "rgba(96,150,255,0.15)"]
+                            : ["CLOSED BY YOU", B.dim, "rgba(138,147,166,0.15)"];
+                          return <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "2px 7px", borderRadius: 5, background: bg, color: clr, whiteSpace: "nowrap" }}>{label}</span>;
+                        })()}
                         <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "2px 7px", borderRadius: 5, background: win ? "rgba(31,209,130,0.15)" : "rgba(255,82,71,0.15)", color: win ? B.primary : B.red }}>{win ? "WIN" : "LOSE"}</span>
                       </div>
                     </div>
