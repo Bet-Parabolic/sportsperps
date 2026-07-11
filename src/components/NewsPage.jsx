@@ -12,6 +12,7 @@ import { API_URL } from "../lib/constants.js";
 import { getAuth, authToken, currentUserId } from "../lib/auth.js";
 import { parseAvatar } from "../lib/onboarding.js";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
+import { PublicProfilePage } from "./PublicProfilePage.jsx";
 
 const GREEN = "#5ed87e";
 
@@ -98,7 +99,7 @@ function NewsFeed() {
   );
 }
 
-function FollowingFeed() {
+function FollowingFeed({ onOpenUser }) {
   const authed = !!getAuth();
   const me = currentUserId();
   const [events, setEvents] = useState(null);
@@ -141,12 +142,16 @@ function FollowingFeed() {
         const pnlish = e.pnl != null && e.type !== "open";
         return (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", background: "#1d2026", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {/* Avatar + name open the trader's profile */}
+            <div onClick={() => onOpenUser?.(e.userId)} title="View profile"
+              style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", background: "#1d2026", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: onOpenUser ? "pointer" : "default" }}>
               {av ? <AvatarCircle avatar={av} size={34} /> : <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 14, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, color: "#e8ebf0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                <span style={{ fontWeight: 700, color: "#fff" }}>{e.username || "trader"}</span>{" "}
+                <span onClick={() => onOpenUser?.(e.userId)}
+                  style={{ fontWeight: 700, color: "#fff", cursor: onOpenUser ? "pointer" : "default", textDecoration: onOpenUser ? "underline" : "none", textUnderlineOffset: 3, textDecorationColor: "rgba(255,255,255,0.25)" }}>
+                  {e.username || "trader"}</span>{" "}
                 {(VERB[e.type] || (() => e.type))(e)}
                 {e.game ? <span style={{ color: "#9aa0a8" }}> · {e.game}</span> : null}
               </div>
@@ -164,8 +169,11 @@ function FollowingFeed() {
   );
 }
 
-export function NewsPage() {
+export function NewsPage({ onOpenUser }) {
   const [tab, setTab] = useState("news"); // news | following
+  // No handler from the host surface (main-app terminal) → render our own profile overlay.
+  const [localUser, setLocalUser] = useState(null);
+  const openUser = onOpenUser || ((id) => setLocalUser(id));
   return (
     <div style={{ flex: 1, overflow: "auto", background: "#0a0a0a", padding: "32px 40px 60px", display: "flex", flexDirection: "column", fontFamily: fb }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -185,7 +193,8 @@ export function NewsPage() {
         ))}
       </div>
 
-      {tab === "news" ? <NewsFeed /> : <FollowingFeed />}
+      {tab === "news" ? <NewsFeed /> : <FollowingFeed onOpenUser={openUser} />}
+      {localUser && <PublicProfilePage targetId={localUser} onClose={() => setLocalUser(null)} />}
     </div>
   );
 }

@@ -739,7 +739,7 @@ export function WorldCupPage() {
               subtree each time state changes. Calling them inlines their JSX — no boundary. */}
           {tab === "home" && HomeTab()}
           {tab === "bets" && <div style={{ padding: isMobile ? "64px 4px 10px" : "64px 16px 10px" }}><ActiveBetsPage eventOnly liveGames={wcLive} onTrade={openGame} showMarkets={isMobile} /></div>}
-          {tab === "news" && <div style={{ paddingTop: 56 }}><NewsPage /></div>}
+          {tab === "news" && <div style={{ paddingTop: 56 }}><NewsPage onOpenUser={(id) => setViewUser(id)} /></div>}
           {tab === "leaderboard" && LeaderboardTab()}
         </main>
       </div>
