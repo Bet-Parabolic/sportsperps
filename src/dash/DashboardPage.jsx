@@ -1079,12 +1079,92 @@ function WCEconTab({ data }) {
         </Panel>
       </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <Stat label="Open interest" value={fmtUsd(data.openInterest)} sub={`${data.openPositions ?? 0} open positions`} />
         <Stat label="Conservation drift" value={fmtSigned(data.conservationDrift)} color={driftBig ? C.red : C.mut}
           sub={data.openPositions > 0 ? "open inventory in flight — closes at settlement" : driftBig ? "⚠ should be $0 with no open positions" : "money conserves"} />
       </div>
+
+      <ShadowMMPanel />
     </>
+  );
+}
+
+// ─── Shadow margin-maintenance panel — the event ledger runs MM=0 for the competition; this
+// shows the recorded 0.5 / 0.25 counterfactuals: what each maintenance level would have meant
+// for the insurance fund, the vault, and the traders. ───────────────────────────────────────
+function ShadowMMPanel() {
+  const [mm, setMm] = useState(0.5);
+  const [rep, setRep] = useState(null);
+  useEffect(() => {
+    let live = true;
+    const load = () => adminFetch(`/admin/event/shadowliq?mm=${mm}`).then((d) => { if (live) setRep(d); }).catch(() => {});
+    setRep(null); load();
+    const iv = setInterval(load, 30_000);
+    return () => { live = false; clearInterval(iv); };
+  }, [mm]);
+
+  const sign = (n) => ((n || 0) >= 0 ? C.primaryLt : C.red);
+  const toggle = (
+    <div style={{ display: "inline-flex", background: C.surface, borderRadius: 8, padding: 2, gap: 2 }}>
+      {[0.5, 0.25].map((v) => (
+        <button key={v} onClick={() => setMm(v)} style={{
+          padding: "5px 14px", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", borderRadius: 6,
+          background: mm === v ? C.primary : "transparent", color: mm === v ? "#000" : C.mut,
+        }}>MM {v}</button>
+      ))}
+    </div>
+  );
+
+  return (
+    <Panel title={<span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <span>Shadow margin maintenance <span style={{ color: C.mut, fontWeight: 400 }}>· live ledger runs MM = 0</span></span>{toggle}</span>}>
+      {!rep ? <div style={{ color: C.mut, fontSize: 13 }}>Loading…</div> : (
+        <>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+            <Stat label="Would-be liquidations" value={rep.wouldBeLiquidations ?? 0} sub={`at MM ${mm}`} />
+            <Stat label="Insurance fund gain" value={fmtUsd(rep.insuranceFundGain)} sub="penalties the scenario collects" color={C.primaryLt} />
+            <Stat label="Equity returned to traders" value={fmtUsd(rep.equityReturnedToTraders)} sub="what they'd walk away with" />
+            <Stat label="Traders vs scenario" value={fmtSigned(rep.traderNetVsScenario)} color={sign(rep.traderNetVsScenario)}
+              sub={`MM=0 has ${(rep.traderNetVsScenario || 0) >= 0 ? "helped" : "hurt"} them (${rep.outcomesKnown ?? 0} outcomes known)`} />
+            <Stat label="Vault vs scenario" value={fmtSigned(rep.vaultNetVsScenario)} color={sign(rep.vaultNetVsScenario)}
+              sub="mirror of the traders' delta" />
+            <Stat label="After the trigger" value={`${rep.stillOpen ?? 0} open · ${rep.closedLater ?? 0} closed`} sub="what actually happened" />
+          </div>
+          {(rep.rows || []).length > 0 && (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead><tr>
+                  {["When", "Game", "Side", "Lev", "Entry", "Trigger", "Margin", "Scenario PnL", "Actual PnL", "Δ (actual−scen)", "Status"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", color: C.mut, fontWeight: 600, padding: "6px 8px", borderBottom: "1px solid " + C.border, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {rep.rows.map((r, i) => (
+                    <tr key={i}>
+                      <td style={{ padding: "6px 8px", color: C.mut, whiteSpace: "nowrap" }}>{new Date(r.ts).toLocaleTimeString()}</td>
+                      <td style={{ padding: "6px 8px", color: C.text }}>{r.game_id}</td>
+                      <td style={{ padding: "6px 8px", color: C.text }}>{r.side}</td>
+                      <td style={{ padding: "6px 8px", color: C.text }}>{r.leverage}x</td>
+                      <td style={{ padding: "6px 8px", color: C.text }}>{(r.entry_px * 100).toFixed(1)}¢</td>
+                      <td style={{ padding: "6px 8px", color: C.text }}>{(r.trigger_px * 100).toFixed(1)}¢</td>
+                      <td style={{ padding: "6px 8px", color: C.text }}>{fmtUsd(r.margin)}</td>
+                      <td style={{ padding: "6px 8px", color: sign(r.scenarioPnl), fontWeight: 700 }}>{fmtSigned(r.scenarioPnl)}</td>
+                      <td style={{ padding: "6px 8px", color: r.actualPnl == null ? C.mut : sign(r.actualPnl), fontWeight: 700 }}>{r.actualPnl == null ? "—" : fmtSigned(r.actualPnl)}</td>
+                      <td style={{ padding: "6px 8px", color: r.delta == null ? C.mut : sign(r.delta), fontWeight: 700 }}>{r.delta == null ? "—" : fmtSigned(r.delta)}</td>
+                      <td style={{ padding: "6px 8px", color: C.mut, whiteSpace: "nowrap" }}>{r.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {(rep.rows || []).length === 0 && (
+            <div style={{ color: C.mut, fontSize: 12.5 }}>No shadow liquidations recorded yet at MM {mm} — no event position has crossed that maintenance trigger.</div>
+          )}
+        </>
+      )}
+    </Panel>
   );
 }
 
