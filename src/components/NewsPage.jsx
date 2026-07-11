@@ -15,13 +15,15 @@ import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 
 const GREEN = "#5ed87e";
 
+// Always speak in TEAM terms — users bet Norway, they don't "open home".
+const team = (e) => e.teamName || (e.side ? e.side : "");
 const VERB = {
-  open: (e) => `opened ${e.side} ${e.leverage ? `${e.leverage}x` : ""}${e.notional ? ` · $${Math.round(e.notional).toLocaleString()}` : ""}`,
-  close: () => "cashed out",
-  tp: () => "hit take-profit ✅",
-  sl: () => "hit stop-loss",
-  liquidation: () => "got liquidated 💥",
-  settlement: () => "settled at the whistle",
+  open: (e) => `bet ${team(e)} ${e.leverage ? `${e.leverage}x` : ""}${e.notional ? ` · $${Math.round(e.notional).toLocaleString()}` : ""}`,
+  close: (e) => `cashed out ${team(e)}`,
+  tp: (e) => `hit take-profit on ${team(e)} ✅`,
+  sl: (e) => `hit stop-loss on ${team(e)}`,
+  liquidation: (e) => `got liquidated on ${team(e)} 💥`,
+  settlement: (e) => `rode ${team(e)} to the whistle`,
 };
 
 const ago = (t) => {

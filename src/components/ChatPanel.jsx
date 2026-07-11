@@ -21,7 +21,7 @@ export function ChatPanel({ gameId, userId, homeShort = "Home", awayShort = "Awa
   useEffect(() => {
     let alive = true;
     setMessages([]);
-    fetch(`${API_URL}/chat/${gameId}?limit=100`).then((r) => r.json()).then((d) => {
+    fetch(`${API_URL}/chat/${gameId}?limit=200`).then((r) => r.json()).then((d) => {
       if (alive && Array.isArray(d.messages)) setMessages(d.messages);
     }).catch(() => {});
     return () => { alive = false; };
