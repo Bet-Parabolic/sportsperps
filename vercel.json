@@ -18,11 +18,11 @@
     },
     {
       "source": "/worldcup",
-      "destination": "/"
+      "destination": "/worldcup.html"
     },
     {
       "source": "/worldcup/(.*)",
-      "destination": "/"
+      "destination": "/worldcup.html"
     }
   ]
 }
