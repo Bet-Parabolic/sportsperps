@@ -82,16 +82,63 @@ export function StatCard({ width = 336, username, avatar, rank = null, roiPct = 
   );
 }
 
-/* ── canvas PNG of the card for the download button ── */
+/* ── canvas PNG for the download button — the FULL share composition (stadium panel +
+   WORLD CUP lanyard + card), matching what the modal shows, not just the bare card. ── */
+const loadImg = (src) => new Promise((res) => {
+  const i = new Image();
+  i.onload = () => res(i); i.onerror = () => res(null);
+  i.src = src;
+});
+
 async function downloadCardPng({ username, avatar, rank, roiPct, trades }) {
-  const W = 860, H = 486, R = 48, P = 56;
+  const W = 1296, H = 1156, R = 48;      // 2× the modal's 648×578 stadium panel
+  const CW = 860, CH = 486, P = 56;      // card size + inner padding
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const ctx = c.getContext("2d");
   const rr = (x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
-  const grad = ctx.createLinearGradient(0, 0, W, H);
+
+  // ── stadium panel (rounded clip, cover-crop biased toward the pitch like the modal) ──
+  rr(0, 0, W, H, R); ctx.save(); ctx.clip();
+  const bg = await loadImg(stadiumBg);
+  if (bg && bg.width) {
+    const scale = Math.max(W / bg.width, H / bg.height);
+    const dw = bg.width * scale, dh = bg.height * scale;
+    ctx.drawImage(bg, (W - dw) / 2, (H - dh) * 0.68, dw, dh);
+  } else { ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, W, H); }
+  const vg = ctx.createRadialGradient(W / 2, H * 0.3, H * 0.25, W / 2, H * 0.45, H * 0.9);
+  vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.45)");
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+  // wordmark top-left
+  const wm = await loadImg(LOGO_WORDMARK);
+  if (wm && wm.width) { const wh = 36; ctx.drawImage(wm, 52, 46, wm.width * (wh / wm.height), wh); }
+
+  // ── red WORLD CUP lanyard strap + buckle ──
+  const strapW = 72, strapH = 300, sx = W / 2 - strapW / 2;
+  const sg = ctx.createLinearGradient(sx, 0, sx + strapW, 0);
+  sg.addColorStop(0, "#7c121a"); sg.addColorStop(0.32, "#c22531"); sg.addColorStop(0.68, "#a01b26"); sg.addColorStop(1, "#6e0f16");
+  ctx.fillStyle = sg; ctx.fillRect(sx, 0, strapW, strapH);
+  ctx.save(); ctx.translate(W / 2 + 5, strapH / 2); ctx.rotate(Math.PI / 2);
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.font = "700 15px monospace"; ctx.textAlign = "center";
+  ctx.fillText("W O R L D   C U P", 0, 0);
+  ctx.restore();
+  rr(W / 2 - 60, strapH - 4, 120, 26, 8); ctx.fillStyle = "#1c1c1e"; ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.14)"; ctx.lineWidth = 2; ctx.stroke();
+
+  // ── the card, centered under the strap (drop shadow, then local coords) ──
+  const cx0 = (W - CW) / 2, cy0 = strapH + 14;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.55)"; ctx.shadowBlur = 60; ctx.shadowOffsetY = 30;
+  rr(cx0, cy0, CW, CH, R); ctx.fillStyle = "#121214"; ctx.fill();
+  ctx.restore();
+  ctx.save(); ctx.translate(cx0, cy0);
+
+  const grad = ctx.createLinearGradient(0, 0, CW, CH);
   grad.addColorStop(0, "#1d1d20"); grad.addColorStop(0.45, "#121214"); grad.addColorStop(1, "#0e0e10");
-  rr(0, 0, W, H, R); ctx.fillStyle = grad; ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 2; rr(1, 1, W - 2, H - 2, R); ctx.stroke();
+  rr(0, 0, CW, CH, R); ctx.fillStyle = grad; ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 2; rr(1, 1, CW - 2, CH - 2, R); ctx.stroke();
+  // lanyard notch slot
+  rr(CW / 2 - 50, 18, 100, 16, 8); ctx.fillStyle = "#050505"; ctx.fill();
   // barcode + member line
   let bx = P;
   for (const w of BARCODE_WIDTHS) { ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(bx, P, w * 3.6, 30); bx += w * 3.6 + 3.5; }
@@ -100,16 +147,15 @@ async function downloadCardPng({ username, avatar, rank, roiPct, trades }) {
   if (rank != null) {
     const label = `#${rank}`; ctx.font = "700 26px monospace";
     const tw = ctx.measureText(label).width;
-    rr(W - P - tw - 44, P - 6, tw + 44, 52, 26); ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fill();
-    ctx.fillStyle = "#fff"; ctx.fillText(label, W - P - tw - 22, P + 30);
+    rr(CW - P - tw - 44, P - 6, tw + 44, 52, 26); ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.fillText(label, CW - P - tw - 22, P + 30);
   }
   // avatar
-  const ax = P + 52, ay = H - 196, ar = 52;
+  const ax = P + 52, ay = CH - 196, ar = 52;
   ctx.save(); ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.clip();
   if (avatar?.kind === "photo") {
-    const img = new Image();
-    await new Promise((res) => { img.onload = res; img.onerror = res; img.src = avatar.uri; });
-    if (img.width) ctx.drawImage(img, ax - ar, ay - ar, ar * 2, ar * 2);
+    const img = await loadImg(avatar.uri);
+    if (img && img.width) ctx.drawImage(img, ax - ar, ay - ar, ar * 2, ar * 2);
     else { ctx.fillStyle = "#26262a"; ctx.fillRect(ax - ar, ay - ar, ar * 2, ar * 2); }
   } else if (avatar?.kind === "emoji") {
     ctx.fillStyle = avatar.bg || "#26262a"; ctx.fillRect(ax - ar, ay - ar, ar * 2, ar * 2);
@@ -117,15 +163,18 @@ async function downloadCardPng({ username, avatar, rank, roiPct, trades }) {
   } else { ctx.fillStyle = "#26262a"; ctx.fillRect(ax - ar, ay - ar, ar * 2, ar * 2); }
   ctx.restore();
   // username
-  ctx.fillStyle = "#fff"; ctx.font = "700 46px system-ui, sans-serif"; ctx.fillText(username, P, H - P);
+  ctx.fillStyle = "#fff"; ctx.font = "700 46px system-ui, sans-serif"; ctx.fillText(username, P, CH - P);
   // ROI + trades
   if (roiPct != null) {
     ctx.textAlign = "right";
     ctx.fillStyle = roiPct >= 0 ? GREEN : "#ff5247"; ctx.font = "700 42px system-ui, sans-serif";
-    ctx.fillText(fmtRoi(roiPct), W - P, H - P - 46);
-    if (trades != null) { ctx.fillStyle = "#a7abb3"; ctx.font = "400 30px system-ui, sans-serif"; ctx.fillText(`${trades} trades`, W - P, H - P); }
+    ctx.fillText(fmtRoi(roiPct), CW - P, CH - P - 46);
+    if (trades != null) { ctx.fillStyle = "#a7abb3"; ctx.font = "400 30px system-ui, sans-serif"; ctx.fillText(`${trades} trades`, CW - P, CH - P); }
     ctx.textAlign = "left";
   }
+  ctx.restore(); // card coords
+  ctx.restore(); // panel clip
+
   const a = document.createElement("a");
   a.href = c.toDataURL("image/png");
   a.download = `${username}-parabolic-card.png`;

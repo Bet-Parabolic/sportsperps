@@ -72,15 +72,6 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
   const points = profile?.points ?? 0;
   const tier = tierOf(points);
 
-  // Favorite discipline = the league this account has bet the most.
-  const favDiscipline = (() => {
-    if (!trades.length) return null;
-    const counts = {};
-    for (const t of trades) { const k = (t.gameId || "").split("_")[0]; counts[k] = (counts[k] || 0) + 1; }
-    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-    return top ? { ...leagueOf(top[0] + "_"), bets: top[1] } : null;
-  })();
-
   const filteredTrades = trades.filter((t) => betFilter === "all" ? true : betFilter === "wins" ? t.pnl >= 0 : t.pnl < 0);
 
   // Full reload after logout: every mounted component holds the old account's state (balance,
@@ -193,23 +184,6 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
             <MemberCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={memberCard.avatar} signature={memberCard.signature} referralCode={referralCodeFor(userId)} />
             <div style={{ fontSize: 11, color: B.dim, marginTop: 6, textAlign: "center" }}>Tap the card to share</div>
           </div>
-
-          {/* Favorite discipline */}
-          {favDiscipline && (
-            <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", background: "linear-gradient(135deg, #14181f, #0e1116)", border: "1px solid #222833" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ fontSize: 26 }}>{favDiscipline.emoji}</div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: B.white }}>{favDiscipline.name}</div>
-                  <div style={{ fontSize: 11, color: B.dim }}>Favorite discipline</div>
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontFamily: fm, fontSize: 18, fontWeight: 800, color: B.white }}>{favDiscipline.bets}</div>
-                <div style={{ fontSize: 10, color: B.dim }}>🏅 Bets</div>
-              </div>
-            </div>
-          )}
 
           {/* Stat grid — All-time P&L / ROI / Win rate / Volume (matches the design's 2x2) */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
