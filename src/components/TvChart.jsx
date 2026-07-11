@@ -138,8 +138,8 @@ export const TvChart = forwardRef(function TvChart(
     items.sort((a, b) => a.y - b.y);
     const placed = [];
     for (const it of items) {
-      let y = it.y, moved = true;
-      while (moved) {                                  // y only ever grows → terminates
+      let y = it.y, moved = true, guard = 40;          // guard: hard bound even if a NaN sneaks in
+      while (moved && guard-- > 0) {                   // y only ever grows → terminates
         moved = false;
         for (const p of placed) if (Math.abs(y - p) < GAP) { y = p + GAP; moved = true; }
         for (const o of obs) if (Math.abs(y - o) < GAP) { y = o + GAP; moved = true; }
@@ -155,12 +155,23 @@ export const TvChart = forwardRef(function TvChart(
   };
 
   // Apply the current Y range to both series so the shared price scale honors it.
+  // rAF-THROTTLED: touch gestures fire ~60–120 moves/sec and a synchronous double
+  // applyOptions per move re-lays-out the whole chart each time — on iOS that pegged the
+  // main thread and hard-froze the page. One application per animation frame, always
+  // reading the LATEST yRange, is visually identical and bounded in cost.
+  const yApplyQueued = useRef(false);
   const applyY = () => {
-    const prov = () => ({ priceRange: { minValue: yRange.current[0], maxValue: yRange.current[1] } });
-    api.current.home?.applyOptions({ autoscaleInfoProvider: prov });
-    api.current.away?.applyOptions({ autoscaleInfoProvider: prov });
-    // Coordinates shift with the new range — reposition every overlay on the next frame.
-    requestAnimationFrame(() => { placeScoringLogos(); placeXLabels(); placeRiskLabels(); });
+    if (yApplyQueued.current) return;
+    yApplyQueued.current = true;
+    requestAnimationFrame(() => {
+      yApplyQueued.current = false;
+      try {
+        const prov = () => ({ priceRange: { minValue: yRange.current[0], maxValue: yRange.current[1] } });
+        api.current.home?.applyOptions({ autoscaleInfoProvider: prov });
+        api.current.away?.applyOptions({ autoscaleInfoProvider: prov });
+        placeScoringLogos(); placeXLabels(); placeRiskLabels();
+      } catch (e) { /* never let a mid-gesture layout error wedge the gesture state */ }
+    });
   };
 
   useImperativeHandle(ref, () => ({
@@ -287,7 +298,8 @@ export const TvChart = forwardRef(function TvChart(
         else lastAxisTap = now;
         yTouch.active = true; yTouch.startY = t.clientY; yTouch.startRange = [...yRange.current];
         autoFit.current = false;
-        e.preventDefault(); e.stopImmediatePropagation();
+        if (e.cancelable) e.preventDefault();
+        e.stopImmediatePropagation();
         return;
       }
       // On the chart, and Y is zoomed in → candidate for a vertical pan. Direction is decided
@@ -300,7 +312,8 @@ export const TvChart = forwardRef(function TvChart(
     };
     const onTouchMove = (e) => {
       if (yTouch.active) {
-        e.preventDefault(); e.stopImmediatePropagation();
+        if (e.cancelable) e.preventDefault();
+        e.stopImmediatePropagation();
         const dy = e.touches[0].clientY - yTouch.startY;
         const [lo0, hi0] = yTouch.startRange;
         const ns = Math.min(1, Math.max(0.02, (hi0 - lo0) * Math.exp(dy * 0.006)));
@@ -321,7 +334,8 @@ export const TvChart = forwardRef(function TvChart(
         panTouch.take = Math.abs(dy) > Math.abs(dx);           // vertical → we pan Y; horizontal → chart pans X
       }
       if (!panTouch.take) return;
-      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.cancelable) e.preventDefault();
+      e.stopImmediatePropagation();
       autoFit.current = false;
       const plotH = Math.max(1, el.clientHeight);
       const [lo0, hi0] = panTouch.startRange;
@@ -332,10 +346,13 @@ export const TvChart = forwardRef(function TvChart(
       yRange.current = [+nlo.toFixed(4), +nhi.toFixed(4)];
       applyY();
     };
-    const onTouchEnd = () => { yTouch.active = false; panTouch.active = false; panTouch.take = false; };
+    const onTouchEnd = () => { yTouch.active = false; panTouch.active = false; panTouch.take = false; panTouch.decided = false; };
     el.addEventListener("touchstart", onTouchStart, { passive: false, capture: true });
     el.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
     el.addEventListener("touchend", onTouchEnd, { capture: true });
+    // iOS cancels touches on system gestures (notification pull, app switch). Without this the
+    // zoom/pan state stayed latched: every later touch kept hijacking moves — page felt frozen.
+    el.addEventListener("touchcancel", onTouchEnd, { capture: true });
 
     const ro = new ResizeObserver(() => { chart.applyOptions({ width: el.clientWidth }); redraw(); });
     ro.observe(el);
@@ -351,6 +368,7 @@ export const TvChart = forwardRef(function TvChart(
       el.removeEventListener("touchstart", onTouchStart, { capture: true });
       el.removeEventListener("touchmove", onTouchMove, { capture: true });
       el.removeEventListener("touchend", onTouchEnd, { capture: true });
+      el.removeEventListener("touchcancel", onTouchEnd, { capture: true });
       chart.remove();
       try { layer.remove(); } catch (e) {}   // remove imperatively-appended overlays so a
       try { rlayer.remove(); } catch (e) {}
