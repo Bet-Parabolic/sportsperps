@@ -65,10 +65,16 @@ const REJECT_COPY = {
   joinRequired: 'Join the championship to trade this match',
 };
 
-function LevSlider({ eL, ml, onChange, compact = false, liq = null }) {
+function LevSlider({ eL, ml, onChange, compact = false, liq = null, cap = null }) {
   const ABS_MAX = 10;
+  const [showWhy, setShowWhy] = useState(false);
   const set = (v) => onChange(Math.min(Math.max(1, v), ml));
   const ptsClose = liq && liq.pts < 5;
+  // Which rule is binding right now? The cap the backend enforces is min(price tier, one-play rule);
+  // if the price tier alone already equals the cap, that's the binding rule — else it's the game clock.
+  const priceCap = cap?.px != null ? maxLev(cap.px) : null;
+  const favPct = cap?.px != null ? Math.round(Math.max(cap.px, 1 - cap.px) * 100) : null;
+  const priceBinds = priceCap != null && priceCap <= ml;
   return (
     <div>
       {/* readout */}
@@ -95,8 +101,33 @@ function LevSlider({ eL, ml, onChange, compact = false, liq = null }) {
         <span style={{fontSize:12,color:'#6a6f77'}}>{ABS_MAX}x</span>
       </div>
       {ml<ABS_MAX && (
-        <div style={{fontSize:9,color:'#666',marginTop:4,textAlign:'center'}}>
-          Leverage is limited as an outcome becomes more certain, so one play can't wipe you out.
+        <div style={{fontSize:11,color:'#8a8f98',marginTop:5,textAlign:'center'}}>
+          Leverage is capped at {ml}x on this market right now.
+          <span onClick={()=>setShowWhy(v=>!v)} style={{color:'#fff',fontWeight:700,cursor:'pointer',marginLeft:6,textDecoration:'underline'}}>{showWhy?'Hide':'Why?'}</span>
+        </div>
+      )}
+      {ml<ABS_MAX && showWhy && (
+        <div style={{marginTop:8,background:'#101216',border:'1px solid #1c1f24',borderRadius:14,padding:'13px 15px',fontSize:12,color:'#9aa0a8',lineHeight:1.6,textAlign:'left'}}>
+          <div style={{marginBottom:9}}>
+            Two safety rules set the ceiling — whichever is <span style={{color:'#fff'}}>lower</span> wins:
+          </div>
+          <div style={{marginBottom:9}}>
+            <span style={{color:priceBinds?B.primary:'#fff',fontWeight:700}}>1 · The price cap{priceBinds?' — binding now':''}.</span>{' '}
+            The closer a price is to 0% or 100%, the less distance there is to liquidation, so the ceiling
+            steps down with the favorite's odds: up to 60% → 10x · 75% → 5x · 85% → 3x · 95% → 2x · beyond → 1x.
+            {favPct != null && <> This market's favorite trades at <span style={{color:'#fff'}}>{favPct}%</span>, so the price cap is <span style={{color:'#fff'}}>{priceCap}x</span>.</>}
+          </div>
+          <div style={{marginBottom:9}}>
+            <span style={{color:!priceBinds?B.primary:'#fff',fontWeight:700}}>2 · The one-play rule{!priceBinds?' — binding now':''}.</span>{' '}
+            Your liquidation buffer must survive one decisive play — a goal, a touchdown, a home run — without
+            gapping straight past your bankruptcy price. The possible swing from one play grows sharply toward the
+            end of a close game (a late goal can move win probability 10+ points), so leverage tightens as the
+            clock runs down while the score stays tight. Early-game and lopsided situations are barely restricted.
+          </div>
+          <div style={{color:'#6a6f77'}}>
+            Backing the favorite keeps a bigger buffer than the underdog, so it's often allowed more leverage at the
+            same price. Caps apply only to opening or adding — <span style={{color:'#9aa0a8'}}>closing is never capped; you can always exit.</span>
+          </div>
         </div>
       )}
       {/* liquidation card */}
@@ -1554,7 +1585,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
               <div style={{fontSize:10,color:'#555',textAlign:'center',marginBottom:12}}>@ {(entryP*100).toFixed(1)}¢ per share</div>
               {/* Leverage slider — progress-bar track, cap-aware (see LevSlider) */}
-              <LevSlider eL={eL} ml={ml} onChange={setOrderLev} liq={levLiq}/>
+              <LevSlider eL={eL} ml={ml} onChange={setOrderLev} liq={levLiq} cap={{ px: oPrice }}/>
             </div>
             {/* Limit price */}
             {orderType==='limit'&&(
@@ -1794,7 +1825,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       ))}
                     </div>
                     <div style={{marginBottom:12}}>
-                      <LevSlider eL={eL} ml={ml} onChange={setOrderLev} compact liq={levLiq}/>
+                      <LevSlider eL={eL} ml={ml} onChange={setOrderLev} compact liq={levLiq} cap={{ px: oPrice }}/>
                     </div>
                     <div style={{background:'#111',borderRadius:12,padding:'10px 14px',marginBottom:14,fontSize:12}}>
                       {[['Entry',(entryP*100).toFixed(1)+'¢','#fff'],['Exposure',fmtUsd(expo),'#fff'],['If '+team.name+' wins','+'+fmtUsd(orderSide==='home'?expo*(1-oPrice)/oPrice:expo*oPrice/(1-oPrice)),B.green]].map(([l,v,c],i)=>(
