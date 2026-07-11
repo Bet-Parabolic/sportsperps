@@ -400,7 +400,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             let ch=false;
             // Only this game's positions are priced by this game's mark — never evaluate
             // another game's position against the wrong price.
-            const upd=cpE.filter(pos=>{if(pos.gameId!==norm.id)return true;const pnl=calcPnL(pos.side,pos.exposure,pos.entry,mp);if(pnl<=-pos.margin*0.95){ch=true;setClosedPos(pr=>[{...pos,closedAt:op,pnl:-pos.margin,closeType:'LIQ'},...pr]);setClosedPnL(p=>p-pos.margin);notify('☠ LIQUIDATED','red');return false;}return true;});
+            const upd=cpE.filter(pos=>{if(pos.gameId!==norm.id)return true;const pnl=calcPnL(pos.side,pos.exposure,pos.entry,mp);if(pnl<=-pos.margin*0.95){ch=true;setClosedPos(pr=>[{...pos,closedAt:op,exitPx:op,pnl:-pos.margin,closeType:'LIQ'},...pr]);setClosedPnL(p=>p-pos.margin);notify('☠ LIQUIDATED','red');return false;}return true;});
             if(ch)setPositions(upd);
           }
           if((norm.status==='final'||norm.status==='completed')&&!settled){setSettled(true);const homeWins=(norm.home.score||0)>(norm.away.score||0);const finalP=homeWins?1.0:0.0;setSettledWinner(homeWins?HOME.name:AWAY.name);const fp=posR.current;if(fp.length){let sp=0;const nc2=fp.map(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,finalP);sp+=pnl;return{...pos,closedAt:finalP,pnl,closeType:'SETTLED'};});setClosedPos(pr=>[...nc2,...pr]);setBalance(b=>b+fp.reduce((s,p)=>s+p.margin,0)+sp);setClosedPnL(p=>p+sp);setPositions([]);notify('🏆 FINAL — '+fmtUsd(sp),'green');}}
@@ -500,8 +500,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           ]);
           if (balRes.ok) {
             const balData = await balRes.json();
-            setBalance(balData.balance);
-            setClosedPnL(balData.closedPnl);
+            // Event game → balance/realized shown in this terminal come from the EVENT ledger
+            // below; writing the MAIN ledger's numbers here would flash unrelated totals.
+            if (!evGameR.current) {
+              setBalance(balData.balance);
+              setClosedPnL(balData.closedPnl);
+            }
           }
           if (posRes.ok) {
             const posData = await posRes.json();
@@ -515,8 +519,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               }));
               // Positions that vanished server-side (liquidation / TP-SL / settlement) and
               // weren't closed by us → record them in history so nothing silently disappears.
+              // Event game: THIS game's positions live on the event ledger, so the main ledger
+              // legitimately never has them — diffing here fabricated a ghost "CLOSED @ 0.0¢"
+              // row and wiped the real position every poll (the visual flicker). Skip; the
+              // event branch below owns this game's diff.
               const liveIds = new Set(mapped.map(p => p.id));
-              const vanished = posR.current.filter(
+              const vanished = evGameR.current ? [] : posR.current.filter(
                 p => p.gameId === g.id && !liveIds.has(p.id) && !closedIdsRef.current.has(p.id)
               );
               if (vanished.length) {
@@ -532,7 +540,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 ]);
                 if (vanished.some(p => (p.pnl ?? 0) <= -(p.margin * 0.9))) notify('☠ Position liquidated', 'red');
               }
-              setPositions(mapped);
+              // Event game: keep this game's (event-ledger) positions; main poll only owns the rest.
+              setPositions(prev => evGameR.current ? [...prev.filter(p => p.gameId === g.id), ...mapped] : mapped);
             }
           }
         } catch(e) { /* backend unavailable, keep local state */ }
@@ -551,6 +560,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               const eb = await ebRes.json();
               setWcJoined(true);
               setWcBalance(eb.balance);
+              // The terminal's Balance/Realized readouts must reflect THIS game's ledger.
+              setBalance(eb.balance);
+              if (eb.closedPnl != null) setClosedPnL(eb.closedPnl);
             }
             if (epRes.ok) {
               const ep = await epRes.json();
@@ -561,6 +573,26 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   liq: p.liqPrice, tp: p.tp, sl: p.sl, pnl: p.pnl, roe: p.roe, openedAt: p.openedAt,
                   event: true, // rendered with the World Cup Cash context
                 }));
+                // Vanished-diff against the EVENT ledger (this is the ledger that owns this game):
+                // a WC position that disappeared server-side (liq / TP-SL / settlement) goes to
+                // the Closed history instead of silently vanishing.
+                const liveIdsE = new Set(mappedE.map(p => p.id));
+                const vanishedE = posR.current.filter(
+                  p => p.gameId === g.id && !liveIdsE.has(p.id) && !closedIdsRef.current.has(p.id)
+                );
+                if (vanishedE.length) {
+                  setClosedPos(pr => [
+                    ...vanishedE.map(p => {
+                      closedIdsRef.current.add(p.id);
+                      const realized = p.pnl ?? 0;
+                      const ct = realized <= -(p.margin * 0.9) ? 'LIQ'
+                               : (g.status === 'final' || g.status === 'completed') ? 'SETTLED' : 'CLOSED';
+                      return { ...p, closedAt: 0, pnl: realized, pnlPct: p.margin>0?realized/p.margin*100:0, closeType: ct };
+                    }),
+                    ...pr,
+                  ]);
+                  if (vanishedE.some(p => (p.pnl ?? 0) <= -(p.margin * 0.9))) notify('☠ Position liquidated', 'red');
+                }
                 setPositions(prev => [...prev.filter(p => p.gameId !== g.id), ...mappedE]);
               }
             }
@@ -1427,7 +1459,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                         return(
                           <div key={cp.id+'-'+i} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:'#0a0a0a',borderRadius:8,fontFamily:fm,fontSize:11,borderLeft:'2px solid '+(cp.side==='home'?HOME.light+'40':AWAY.light+'40'),marginBottom:2}}>
                             <span style={{color:cp.side==='home'?HOME.light:AWAY.light,fontWeight:700,minWidth:60}}>{cptm.short} {cp.leverage}x</span>
-                            <span style={{color:'#555',flex:1}}>{((cp.side==='home'?cp.entry:1-cp.entry)*100).toFixed(1)}¢ → {((cp.side==='home'?cp.closedAt:1-cp.closedAt)*100).toFixed(1)}¢</span>
+                            <span style={{color:'#555',flex:1}}>{((cp.side==='home'?cp.entry:1-cp.entry)*100).toFixed(1)}¢ → {(() => {
+                              // exitPx is the home-terms exit when known; closedAt was a MIXED field
+                              // (price / chart-time / 0) and printed nonsense like "→ 0.0¢".
+                              const ex = cp.exitPx ?? (cp.closeType === 'LIQ' ? cp.liq : null);
+                              return ex != null ? ((cp.side==='home'?ex:1-ex)*100).toFixed(1)+'¢' : '—';
+                            })()}</span>
                             <span style={{color:pctClr(cp.pnl),fontWeight:700}}>{fmtUsd(cp.pnl)}</span>
                             <span style={{fontSize:10,padding:'2px 7px',borderRadius:5,background:typeC+'15',color:typeC,fontWeight:700}}>{cp.closeType}</span>
                           </div>
