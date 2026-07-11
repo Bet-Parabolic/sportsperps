@@ -4,6 +4,7 @@ import { FONT_URL } from "./lib/theme.js";
 import { LOGO_MARK } from "./lib/logos.js";
 import { useLiveGames } from "./lib/useLiveGames.js";
 import { track, initTracking, withVisitorId } from "./lib/track.js";
+import { getAuth } from "./lib/auth.js";
 
 import { LandingPage } from "./components/LandingPage.jsx";
 
@@ -131,6 +132,13 @@ export default function App() {
     if (gated && !isTeamEntry) window.location.replace("/worldcup");
   }, [gated, isTeamEntry]);
 
+  // AUTH GATE (guests eliminated, July 12): a logged-out visitor can only VIEW the World Cup page;
+  // any interaction there opens onboarding (WorldCupPage handles the click-capture on its own auth
+  // state, so the lock lifts the moment they register/login). Every other route/page requires an
+  // account. /dash keeps its own admin password; /waitlist stays public.
+  const loggedOut = !getAuth();
+  const authGate = loggedOut && !isDash && !isWaitlist;
+
   const [page, setPage] = useState(postLogoutAuth ? "onboarding" : isAppDomain ? "trading" : "landing");
   const [liveGame, setLiveGame] = useState(null);
   const [tradingTab, setTradingTab] = useState("home");
@@ -189,14 +197,18 @@ export default function App() {
         button:hover:not(:disabled){filter:brightness(1.15);}button:active:not(:disabled){transform:scale(0.98);}
         *{box-sizing:border-box;margin:0;padding:0;}
       `}</style>
-      {gated
+      {isDash
+        ? <Suspense fallback={<Splash/>}><DashboardPage/></Suspense>
+        : isWaitlist
+        ? <Suspense fallback={<Splash/>}><WaitlistPage/></Suspense>
+        : authGate
+        // Logged out → World Cup page only, with a click-to-onboard lock (the page lifts it once
+        // the visitor registers/logs in). No terminal, no landing, no guest browsing.
+        ? <Suspense fallback={<Splash/>}><WorldCupPage lockedOut /></Suspense>
+        : gated
         ? (isTeamEntry ? <TeamGate onUnlock={() => setGateOpen(true)} /> : <Splash/>)
         : isWorldCup
         ? <Suspense fallback={<Splash/>}><WorldCupPage/></Suspense>
-        : isWaitlist
-        ? <Suspense fallback={<Splash/>}><WaitlistPage/></Suspense>
-        : isDash
-        ? <Suspense fallback={<Splash/>}><DashboardPage/></Suspense>
         : page==="onboarding"
         ? <Suspense fallback={<Splash/>}><OnboardingFlow onDone={()=>setPage("trading")} onGuest={()=>setPage("trading")}/></Suspense>
         : page==="landing"

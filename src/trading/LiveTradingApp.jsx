@@ -148,14 +148,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
   // ── auth/userId: guest UUID until the user signs up; auth session adds username/token ──
   const [auth, setAuth] = useState(getAuth);          // { userId, username, token } | null
-  const userId = auth?.userId || currentUserId();     // trade as the authed account, else guest
+  const userId = auth?.userId || currentUserId();     // the authed account id (null if logged out)
   const [showAuth, setShowAuth] = useState(false);    // login/signup modal
   const [sessionExpired, setSessionExpired] = useState(false); // opened by a 401 (dead/rotated token)
-
-  // Register user with backend on mount (idempotent; guests get a paper balance)
-  useEffect(() => {
-    fetch(`${API_URL}/users`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId}) }).catch(()=>{});
-  }, [userId]);
+  // (Guest elimination: no mount-time POST /users — accounts are created by registration only.
+  //  A logged-out visitor never reaches this terminal; App gates them to the World Cup page.)
 
   // ── state ───────────────────────────────────────────────────────────────
   const [g, setG]           = useState(initGame);

@@ -382,7 +382,7 @@ function ErrorStrip({ onRetry, children }) {
   );
 }
 
-export function WorldCupPage() {
+export function WorldCupPage({ lockedOut = false }) {
   const [tab, setTab] = useState("home");
   const [meta, setMeta] = useState(null);
   const [bracket, setBracket] = useState([]);
@@ -706,7 +706,12 @@ export function WorldCupPage() {
   const navItems = [["home", Home], ["bets", Ticket], ["news", Newspaper], ["leaderboard", Trophy]];
 
   return (
-    <div style={{ height: "100vh", maxHeight: "100dvh", background: "#06070a", fontFamily: fb, color: "#eef1f6", display: "flex", overflow: "hidden" }}>
+    <div
+      // Guest elimination: a logged-out visitor may VIEW + scroll the WC page, but ANY click opens
+      // onboarding. onClickCapture intercepts taps before children handle them; scroll (wheel/touch)
+      // is untouched. Once onboarding is open (or the visitor logs in → !lockedOut) it stops firing.
+      onClickCapture={lockedOut && !auth && !showOnboard ? (e) => { e.preventDefault(); e.stopPropagation(); setShowOnboard(true); } : undefined}
+      style={{ height: "100vh", maxHeight: "100dvh", background: "#06070a", fontFamily: fb, color: "#eef1f6", display: "flex", overflow: "hidden" }}>
       {!isMobile && (
         <WCRail tab={tab} onTab={setTab} liveWc={wcLive} onOpenLive={openGame} />
       )}

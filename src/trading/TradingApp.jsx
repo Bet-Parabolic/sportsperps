@@ -51,10 +51,8 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
     if (!id) { id = crypto.randomUUID(); localStorage.setItem('perpdictions_userId', id); }
     return id;
   });
-  // Register user with backend
-  useEffect(() => {
-    fetch(`${API_URL}/users`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId}) }).catch(()=>{});
-  }, [userId]);
+  // (Guest elimination: no POST /users mint — accounts exist only via registration. This
+  //  terminal is reached only by logged-in users; App gates everyone else to the WC page.)
   // Analytics: a page_view per terminal tab change.
   useEffect(() => { track("page_view", { page: terminalPage }); }, [terminalPage]);
 

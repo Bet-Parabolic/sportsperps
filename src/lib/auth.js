@@ -1,15 +1,14 @@
-// Auth state + API — username/password accounts on top of the existing localStorage userId.
-//
-// A first-time visitor is a "guest": a random UUID in localStorage (`perpdictions_userId`) with a
-// paper balance. When they sign up we pass that UUID as `claimUserId` so the backend attaches the
-// new credentials to the SAME account — their paper balance, positions and history carry over.
-// The authenticated session ({ userId, username, token }) lives under `parabolic_auth`; the token
-// is sent with order/profile mutations so the backend can verify the account.
+// Auth state + API — username/password accounts. GUESTS ELIMINATED (July 12): there is no
+// anonymous trading identity. A logged-out visitor has NO userId and can only view the World Cup
+// page (App gates everything else). The only place a pre-account UUID exists is the onboarding
+// staging id (`onboardingStagingId`), used to carry email/phone verification through to register,
+// which claims it. The authenticated session ({ userId, username, token }) lives under
+// `parabolic_auth`; the token is sent with every account action.
 
 import { API_URL } from "./constants.js";
 
 const KEY = "parabolic_auth";
-const GUEST_KEY = "perpdictions_userId";
+const STAGING_KEY = "perpdictions_userId"; // onboarding-only staging id (kept key name for continuity)
 
 export function getAuth() {
   try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; }
@@ -17,19 +16,21 @@ export function getAuth() {
 export function isLoggedIn() { return !!getAuth()?.token; }
 export function authToken() { return getAuth()?.token || null; }
 
-// Stable guest id, created on first use. Used as the trading userId until the user signs up.
-export function guestUserId() {
-  let id = localStorage.getItem(GUEST_KEY);
-  if (!id) { id = crypto.randomUUID(); localStorage.setItem(GUEST_KEY, id); }
+// Onboarding staging id — created ONLY when signup runs, so the verify-before-register flow has a
+// stable id to attach email/phone verification to; register(claimUserId) then turns it into the
+// real account. NOT an app-wide guest: nothing outside onboarding calls this.
+export function onboardingStagingId() {
+  let id = localStorage.getItem(STAGING_KEY);
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem(STAGING_KEY, id); }
   return id;
 }
 
-// The userId to trade as: the authenticated account if logged in, otherwise the guest.
-export function currentUserId() { return getAuth()?.userId || guestUserId(); }
+// The authenticated account id, or null when logged out. NEVER mints an id (no guests).
+export function currentUserId() { return getAuth()?.userId || null; }
 
 export function setAuth(a) {
   localStorage.setItem(KEY, JSON.stringify(a));
-  if (a?.userId) localStorage.setItem(GUEST_KEY, a.userId); // keep the trading userId in sync
+  if (a?.userId) localStorage.setItem(STAGING_KEY, a.userId); // staging id becomes the account id
 }
 export function clearAuth() { localStorage.removeItem(KEY); }
 
@@ -45,7 +46,7 @@ async function post(path, body) {
 }
 
 export async function register(username, password) {
-  const data = await post("/auth/register", { username, password, claimUserId: guestUserId() });
+  const data = await post("/auth/register", { username, password, claimUserId: onboardingStagingId() });
   setAuth(data);
   return data;
 }
@@ -56,15 +57,11 @@ export async function login(username, password) {
   return data;
 }
 
-// Log out = clear the session AND mint a fresh guest id. setAuth() syncs the guest key to the
-// account's userId at login, so clearing only the session left the app trading/polling AS the
-// logged-out account (balance, positions and name kept rendering — logout looked like a no-op).
-// A fresh guest id returns the browser to a clean anonymous state; logging back in re-claims the
-// account by username/password as normal. (handleUnauthorized below deliberately KEEPS the guest
-// id — an expired session should re-login into the same account seamlessly.)
+// Log out = clear the session + drop any onboarding staging id. With guests gone there is no
+// anonymous identity to fall back to — the app lands the visitor on the login/onboarding gate.
 export function logout() {
   clearAuth();
-  localStorage.setItem(GUEST_KEY, crypto.randomUUID());
+  try { localStorage.removeItem(STAGING_KEY); } catch { /* noop */ }
 }
 
 // ── Session-expired handling ─────────────────────────────────────────────

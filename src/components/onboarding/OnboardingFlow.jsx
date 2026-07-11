@@ -15,7 +15,11 @@
 import { useEffect, useRef, useState } from "react";
 import { B, fd, fb, fm } from "../../lib/theme.js";
 import { API_URL, GOOGLE_CLIENT_ID } from "../../lib/constants.js";
-import { register, authToken, currentUserId, getAuth, setAuth as setAuthState } from "../../lib/auth.js";
+import { register, authToken, currentUserId, onboardingStagingId, getAuth, setAuth as setAuthState } from "../../lib/auth.js";
+
+// The id the onboarding steps act on: the real account once registered, else the staging id that
+// carries email/phone verification into register(). (currentUserId() is null while logged out.)
+const stagingId = () => getAuth()?.userId || onboardingStagingId();
 import { AuthModal } from "../AuthModal.jsx";
 import { track } from "../../lib/track.js";
 import { draft, resetDraft, persistCard, resizeAvatar, serializeAvatar } from "../../lib/onboarding.js";
@@ -97,7 +101,7 @@ function useCooldown() {
 }
 
 async function verifyPost(path, body) {
-  return post(path, { userId: currentUserId(), token: authToken(), ...body });
+  return post(path, { userId: stagingId(), token: authToken(), ...body });
 }
 
 function CodeBoxes({ code, onChange, onEnter }) {
@@ -222,7 +226,7 @@ function WelcomeStep({ onClose, onLogin, onNext, onProviderAuth, say, preview })
 
   useGoogleButton(gRef, async (credential) => {
     try {
-      const d = await post("/auth/google", { credential, claimUserId: currentUserId() });
+      const d = await post("/auth/google", { credential, claimUserId: stagingId() });
       onProviderAuth(d, "google");
     } catch (e) { say(e.message); }
   });
@@ -236,7 +240,7 @@ function WelcomeStep({ onClose, onLogin, onNext, onProviderAuth, say, preview })
       const [address] = await eth.request({ method: "eth_requestAccounts" });
       const n = await post("/auth/wallet/nonce", { address });
       const signature = await eth.request({ method: "personal_sign", params: [n.message, address] });
-      const d = await post("/auth/wallet", { address, signature, claimUserId: currentUserId() });
+      const d = await post("/auth/wallet", { address, signature, claimUserId: stagingId() });
       onProviderAuth(d, "wallet");
     } catch (e) { say(e?.message?.includes("reject") ? "Wallet signature declined" : (e?.message || "Wallet sign-in failed")); }
     finally { setBusy(false); }
@@ -512,7 +516,7 @@ function SignatureStep({ username, mode, onDraw, onBack, onNext, preview }) {
         extras.username = username;
       }
       if (Object.keys(extras).length) {
-        const res = await fetch(`${API_URL}/profile/${currentUserId()}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...extras, token: authToken() }) });
+        const res = await fetch(`${API_URL}/profile/${stagingId()}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...extras, token: authToken() }) });
         if (mode !== "email" && !res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || "Couldn't save the username");
