@@ -29,7 +29,10 @@ export function TradeCard({ card, onClose }) {
   };
 
   const isClose = card.type==='close';
-  const direction = card.side==='home'?'LONG':'SHORT';
+  // The card always shows the team the user BOUGHT — they are LONG that team's contract by
+  // definition. (The old home-index framing labeled an away-side buy "SHORT <away team>",
+  // which read as the exact opposite of the bet: long England showed "SHORT ENGLAND".)
+  const direction = 'LONG';
   const pnlColor = card.pnl>=0?B.green:B.red;
 
   return (
