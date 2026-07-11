@@ -21,6 +21,7 @@ import { NavRail } from "../components/NavRail.jsx";
 import { FloatingChat } from "../components/FloatingChat.jsx";
 import { isBookmarked, syncBookmarks, toggleBookmark as toggleBookmarkStore } from "../lib/bookmarks.js";
 import { MessageCircle, Bookmark, Share2, BarChart3, Zap, Briefcase, Mic, Home, Ticket, Newspaper, Trophy } from "lucide-react";
+import { webNotify } from "../lib/webNotify.js";
 
 // Accurate, user-facing labels for the backend oracle source names.
 //   ESPN Model  → ESPN's live win-probability model (NBA/NFL/MLB/NHL)
@@ -274,6 +275,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     const id = Date.now() + Math.random();
     // Persist in the activity tray (newest first), capped — they don't auto-dismiss.
     setNotifs(p => [{id, msg, type: type||'info', t: Date.now()}, ...p].slice(0, 40));
+    // Tabbed-away users get the important ones as a browser notification (opt-in; no-op when
+    // the tab is visible — the tray/toast below already covers in-tab).
+    if (type === 'red' || type === 'yellow' || type === 'green') webNotify('Parabolic', msg);
     // Mobile: the tray lives in the desktop wager panel, so on a phone a rejection was a silent
     // no-op (A7 finding #2). Surface every notification as a floating toast too — a stacked
     // queue (max 3), NOT one slot, so a burst (fill → points, liquidation → settlement) can't
@@ -790,7 +794,17 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         notify(addingToPos
           ? 'Added to '+tn.name+' — positions merged, liq updated'
           : tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
+        // Confirm the risk levels that were attached — users setting TP/SL from the mobile sheet
+        // otherwise have no feedback that they took.
+        if (tp || sl) notify('Risk set: '+[tp&&('TP '+(tp*100).toFixed(0)+'¢'), sl&&('SL '+(sl*100).toFixed(0)+'¢')].filter(Boolean).join(' · '), 'info');
         if (result.points?.total > 0) notify('⚡ +'+result.points.total+' points'+(result.points.streak>0?' · 🔥 '+result.points.streakCount+'-day streak':''), 'info');
+        // WC surface: a fresh position pops the shareable card — the competition's viral loop.
+        // Merges/reduces skip it (repeat traders would see it constantly).
+        if (worldcup && !reduceOnly && !addingToPos) {
+          setTradeCard({ type:'open', side:orderSide, teamName:tn.name, teamLogo:orderSide==='home'?HOME.logoUrl:AWAY.logoUrl,
+            teamColor:orderSide==='home'?HOME.light:AWAY.light, entryPx:avgPx, leverage:lev,
+            gameInfo:HOME.short+' vs '+AWAY.short, gameStatus:periodLabel(g.league, g.period, g.clock, g.statusDetail) });
+        }
         pollRef.current?.(); // reconcile immediately so the new position shows now, not in ≤5s
       } else if (result.status === 'resting') {
         // Track it immediately (green dotted line on the chart + Pending entry); the poll
@@ -1269,6 +1283,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             )}
           </div>
+
+          {/* Knockout settlement rule — the #1 soccer-rules question: what happens at full time? */}
+          {worldcup&&g.status!=='final'&&(
+            <div style={{margin:isMobile?'0 12px 8px':'0 24px 8px',textAlign:'center',fontSize:isMobile?10.5:11.5,color:'#556',fontFamily:fb,lineHeight:1.5}}>
+              Knockout market: settles when the tie is decided — extra time and penalties count.
+              The team that advances settles at 100%.
+            </div>
+          )}
 
           {/* STATS BAR — desktop only */}
           {!isMobile&&<div style={{margin:'0 24px 0',padding:'8px 20px',background:'#0a0a0a',borderRadius:12,border:'1px solid #1a1a1a',display:'grid',gridTemplateColumns:'repeat(5,1fr)'}}>

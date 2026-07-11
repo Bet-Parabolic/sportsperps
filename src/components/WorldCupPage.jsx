@@ -73,8 +73,10 @@ const fmtWhen = (d) => {
   const now = new Date();
   const today = d.toDateString() === now.toDateString();
   const tomorrow = d.toDateString() === new Date(now.getTime() + 86400000).toDateString();
-  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  return today ? `Today, ${time}` : tomorrow ? `Tomorrow, ${time}` : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  // Explicit zone label — times already render device-local, but a global audience needs to SEE that.
+  const tz = (() => { try { return new Intl.DateTimeFormat([], { timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value || ""; } catch { return ""; } })();
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + (tz ? ` ${tz}` : "");
+  return today ? `Today, ${time}` : tomorrow ? `Tomorrow, ${time}` : d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + (tz ? ` ${tz}` : "");
 };
 
 /* ── circular flag: ESPN country pngs carry transparent padding, so scale the image up inside
@@ -534,13 +536,23 @@ export function WorldCupPage() {
           </p>
 
           {meta?.live && (joined
-            ? <div style={{ marginTop: 20, display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-                {standing && [["RANK", `#${standing.rank}`], ["WC CASH", `$${Math.round(wcBalance ?? standing.equity).toLocaleString()}`], ["ROI", `${standing.roiPct >= 0 ? "+" : ""}${standing.roiPct}%`]].map(([k, v]) => (
-                  <div key={k} style={{ padding: "10px 20px", borderRadius: 14, background: "rgba(20,21,25,0.85)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div style={{ fontFamily: fm, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", color: "#8a93a6" }}>{k}</div>
-                    <div style={{ fontFamily: fd, fontWeight: 800, fontSize: 20, color: k === "ROI" ? (standing.roiPct >= 0 ? GREEN : "#ff5247") : "#fff" }}>{v}</div>
+            ? <div style={{ marginTop: 20 }}>
+                <div style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+                  {standing && [["RANK", `#${standing.rank}`], ["WC CASH", `$${Math.round(wcBalance ?? standing.equity).toLocaleString()}`], ["ROI", `${standing.roiPct >= 0 ? "+" : ""}${standing.roiPct}%`]].map(([k, v]) => (
+                    <div key={k} style={{ padding: "10px 20px", borderRadius: 14, background: "rgba(20,21,25,0.85)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div style={{ fontFamily: fm, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em", color: "#8a93a6" }}>{k}</div>
+                      <div style={{ fontFamily: fd, fontWeight: 800, fontSize: 20, color: k === "ROI" ? (standing.roiPct >= 0 ? GREEN : "#ff5247") : "#fff" }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Pregame nudge: the wcup window opens 24h out — between matches, point entrants at it */}
+                {!liveMatch && nextMatch && probs[nextMatch.backendId] != null && new Date(nextMatch.date).getTime() - Date.now() < 24 * 3600e3 && (
+                  <div style={{ marginTop: 14 }}>
+                    <button onClick={() => openMatch(nextMatch)} style={{ padding: "11px 20px", borderRadius: 999, border: `1px solid ${GREEN}55`, cursor: "pointer", fontFamily: fb, fontWeight: 700, fontSize: 13.5, background: `${GREEN}18`, color: GREEN, backdropFilter: "blur(6px)" }}>
+                      ⚡ {nextMatch.home.name} vs {nextMatch.away.name} is open — set a pregame position
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
             : <div style={{ marginTop: 20 }}>
                 <button onClick={join} style={{ padding: "13px 22px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: fb, fontWeight: 700, fontSize: 15, background: "#fff", color: "#0a0a0a", boxShadow: "0 10px 34px rgba(255,255,255,0.15)" }}>

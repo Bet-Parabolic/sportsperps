@@ -6,6 +6,7 @@ import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "
 import { CardShareModal } from "./CardShareModal.jsx";
 import { MemberCard, AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { loadCard, referralCodeFor, syncAvatarToBackend } from "../lib/onboarding.js";
+import { webNotifyState, enableWebNotify, disableWebNotify } from "../lib/webNotify.js";
 
 // League metadata for bet cards + the favorite-discipline card (league comes from gameId prefix).
 const LEAGUE_META = {
@@ -47,16 +48,21 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
 
   const load = useCallback(async () => {
     try {
+      // World Cup surface → this profile's money data comes from the EVENT ledger (WC Cash,
+      // wc:-prefixed trades); the main endpoints legitimately know nothing about it.
+      const balUrl = worldcup ? `${API_URL}/event/balance/${userId}` : `${API_URL}/balance/${userId}`;
+      const tradesUrl = worldcup ? `${API_URL}/event/profile/${userId}/trades?limit=100` : `${API_URL}/profile/${userId}/trades?limit=100`;
       const [p, b, t] = await Promise.all([
         fetch(`${API_URL}/profile/${userId}`).then((r) => (r.ok ? r.json() : null)),
-        fetch(`${API_URL}/balance/${userId}`).then((r) => (r.ok ? r.json() : null)),
-        fetch(`${API_URL}/profile/${userId}/trades?limit=50`).then((r) => (r.ok ? r.json() : null)),
+        fetch(balUrl).then((r) => (r.ok ? r.json() : null)),
+        fetch(tradesUrl).then((r) => (r.ok ? r.json() : null)),
       ]);
-      if (p) setProfile(p);
+      if (p) setProfile(worldcup ? { ...p, closedPnl: b?.closedPnl ?? 0 } : p);
       if (b?.openPositions) setPositions(b.openPositions);
+      else if (worldcup) setPositions([]); // not a participant yet
       if (t?.trades) setTrades(t.trades);
     } catch { /* ignore */ } finally { setLoading(false); }
-  }, [userId]);
+  }, [userId, worldcup]);
 
   useEffect(() => { load(); }, [load]);
   // One-shot: push the device-local avatar to the account so leaderboards/feeds can show it.
@@ -125,6 +131,11 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
           <PrivacyRow userId={userId} profile={profile} onSaved={load} />
         </Group>
 
+        <SectionTitle>Notifications</SectionTitle>
+        <Group>
+          <WebNotifyRow last />
+        </Group>
+
         <SectionTitle>Developer</SectionTitle>
         <Group>
           <Row label="API" value="Coming soon" onClick={() => setView("api")} last />
@@ -186,11 +197,13 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
 
           {/* Stat grid — All-time P&L / ROI / Win rate / Volume (matches the design's 2x2) */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-            <StatBox label="All-time P&L" value={`${(profile?.closedPnl ?? 0) >= 0 ? "+" : ""}${fmtUsd(profile?.closedPnl ?? 0)}`} color={(profile?.closedPnl ?? 0) >= 0 ? B.primary : B.red} />
+            <StatBox label={worldcup ? "Competition P&L" : "All-time P&L"} value={`${(profile?.closedPnl ?? 0) >= 0 ? "+" : ""}${fmtUsd(profile?.closedPnl ?? 0)}`} color={(profile?.closedPnl ?? 0) >= 0 ? B.primary : B.red} />
             <StatBox label="ROI" value={fmtPct(returnPct)} color={returnPct >= 0 ? B.primary : B.red} />
             <StatBox label="Win rate" value={`${winRate}%`} />
             <StatBox label="Volume" value={fmtUsd(profile?.totalVolume ?? 0)} />
           </div>
+
+          <PnlSparkline trades={trades} />
 
           {/* Open positions */}
           <SectionTitle>Open positions</SectionTitle>
@@ -213,6 +226,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
             <Group>
               <Row label="Account details" onClick={() => setView("account")} />
               <PrivacyRow userId={userId} profile={profile} onSaved={load} />
+              <WebNotifyRow last />
             </Group>
             <button onClick={handleLogout} style={logoutBtn}>Log out</button>
           </div>
@@ -263,7 +277,17 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontFamily: fm, fontWeight: 700, color: win ? B.primary : B.red }}>{win ? "+" : ""}{fmtUsd(t.pnl)}</div>
-                      <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "2px 7px", borderRadius: 5, background: win ? "rgba(31,209,130,0.15)" : "rgba(255,82,71,0.15)", color: win ? B.primary : B.red }}>{win ? "WIN" : "LOSE"}</span>
+                      <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                        {/* HOW it closed — LIQ/TP/SL/SETTLED tell very different stories than a manual close */}
+                        {t.closeType && t.closeType !== "CLOSED" && (
+                          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "2px 7px", borderRadius: 5,
+                            background: t.closeType === "LIQ" ? "rgba(255,82,71,0.15)" : t.closeType === "TP" ? "rgba(31,209,130,0.15)" : t.closeType === "SL" ? "rgba(255,159,28,0.15)" : "rgba(138,147,166,0.15)",
+                            color: t.closeType === "LIQ" ? B.red : t.closeType === "TP" ? B.primary : t.closeType === "SL" ? "#ff9f1c" : B.dim }}>
+                            {t.closeType === "LIQ" ? "☠ LIQ" : t.closeType}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "2px 7px", borderRadius: 5, background: win ? "rgba(31,209,130,0.15)" : "rgba(255,82,71,0.15)", color: win ? B.primary : B.red }}>{win ? "WIN" : "LOSE"}</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -432,6 +456,38 @@ function Referrals() {
   );
 }
 
+// ── Realized-PnL sparkline — cumulative closed PnL across the trader's bets, oldest → newest.
+// Answers "am I up?" at a glance; pure client-side math over the trades already fetched. ──────
+function PnlSparkline({ trades }) {
+  if (!trades || trades.length < 2) return null;
+  const sorted = [...trades].sort((a, b) => (a.closedAt || 0) - (b.closedAt || 0));
+  let run = 0;
+  const pts = [0, ...sorted.map((t) => (run += t.pnl || 0))];
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const span = Math.max(max - min, 1e-9);
+  const W = 320, H = 64, PAD = 4;
+  const x = (i) => PAD + (i / (pts.length - 1)) * (W - PAD * 2);
+  const y = (v) => PAD + (1 - (v - min) / span) * (H - PAD * 2);
+  const line = pts.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const up = pts[pts.length - 1] >= 0;
+  const col = up ? B.primary : B.red;
+  const zeroY = min < 0 && max > 0 ? y(0) : null;
+  return (
+    <div style={{ ...card, padding: "12px 14px", marginTop: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+        <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: fm, letterSpacing: "0.1em", color: B.dim }}>P&L HISTORY</span>
+        <span style={{ fontSize: 12, fontWeight: 700, fontFamily: fm, color: col }}>{up ? "+" : ""}{fmtUsd(pts[pts.length - 1])}</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} preserveAspectRatio="none">
+        {zeroY != null && <line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="#ffffff18" strokeWidth="1" strokeDasharray="3 3" />}
+        <polyline points={line} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        <polygon points={`${x(0)},${H - PAD} ${line} ${x(pts.length - 1)},${H - PAD}`} fill={col + "14"} stroke="none" />
+      </svg>
+      <div style={{ fontSize: 10, color: B.dim, marginTop: 4, textAlign: "right" }}>last {sorted.length} settled bets</div>
+    </div>
+  );
+}
+
 // ── API sub-screen (coming soon) ───────────────────────────────────────────
 function ApiComingSoon() {
   return (
@@ -479,6 +535,21 @@ function TopBar({ title, onClose, onBack }) {
 function Group({ children }) {
   return <div style={{ background: B.card, border: `1px solid ${B.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 4 }}>{children}</div>;
 }
+// Browser-alert opt-in — liquidation/TP-SL/settlement notifications while the tab is hidden.
+function WebNotifyRow({ last }) {
+  const [state, setState] = useState(() => webNotifyState());
+  if (state === "unsupported") return null;
+  const value = state === "on" ? "On" : state === "blocked" ? "Blocked in browser" : "Off";
+  const toggle = async () => {
+    if (state === "blocked") return; // user must unblock in browser settings
+    setState(state === "on" ? disableWebNotify() : await enableWebNotify());
+  };
+  return (
+    <Row label="Browser alerts" sub="Liquidations, TP/SL fills and settlements while you're in another tab"
+      value={value} onClick={state === "blocked" ? undefined : toggle} last={last} />
+  );
+}
+
 function Row({ label, sub, value, onClick, last }) {
   return (
     <div onClick={onClick} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px", cursor: onClick ? "pointer" : "default", borderBottom: last ? "none" : `1px solid ${B.border}` }}>

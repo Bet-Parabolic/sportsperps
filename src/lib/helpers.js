@@ -85,7 +85,16 @@ export function periodLabel(league, period, clock, statusDetail){
   return "Q"+period+(clock?" "+clock:"");
 }
 
-/* Format a game start time as "Today 7:30 PM" / "Tomorrow 1:05 PM" / "Sat · 4:10 PM" */
+/* Short local timezone label ("EDT", "CET", "GMT+2") — kickoff times already render in the
+   device's zone; the label makes that explicit for a global (World Cup) audience. */
+export function tzAbbr(d = new Date()) {
+  try {
+    return new Intl.DateTimeFormat([], { timeZoneName: "short" }).formatToParts(d)
+      .find((p) => p.type === "timeZoneName")?.value || "";
+  } catch { return ""; }
+}
+
+/* Format a game start time as "Today 7:30 PM EDT" / "Tomorrow 1:05 PM EDT" / "Sat · 4:10 PM EDT" */
 export function fmtGameTime(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -93,7 +102,8 @@ export function fmtGameTime(iso) {
   const now = new Date();
   const sameDay = (a, b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
   const tomorrow = new Date(now); tomorrow.setDate(now.getDate()+1);
-  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const tz = tzAbbr(d);
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) + (tz ? " " + tz : "");
   if (sameDay(d, now)) return "Today · " + time;
   if (sameDay(d, tomorrow)) return "Tomorrow · " + time;
   const day = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
