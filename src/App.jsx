@@ -53,7 +53,19 @@ export default function App() {
   // surface: same backend + same accounts, WC-only leaderboard, inert until EVENT_ENABLED.
   const isWorldCup = typeof window !== "undefined" && window.location.pathname.startsWith("/worldcup");
 
-  const [page, setPage] = useState(isAppDomain ? "trading" : "landing");
+  // Post-logout: ProfilePage stamps a one-shot flag before its reload so the boot lands on the
+  // sign-in/sign-up screen instead of a fresh guest terminal. (WorldCupPage reads it too.)
+  const [postLogoutAuth] = useState(() => {
+    try { return sessionStorage.getItem("parabolic_post_logout_auth") === "1"; } catch { return false; }
+  });
+  // /worldcup consumes + clears the flag itself — its page component is lazy-loaded, so clearing
+  // here would race its mount and it would never see the flag.
+  useEffect(() => {
+    if (window.location.pathname.startsWith("/worldcup")) return;
+    try { sessionStorage.removeItem("parabolic_post_logout_auth"); } catch { /* noop */ }
+  }, []);
+
+  const [page, setPage] = useState(postLogoutAuth ? "onboarding" : isAppDomain ? "trading" : "landing");
   const [liveGame, setLiveGame] = useState(null);
   const [tradingTab, setTradingTab] = useState("home");
   const tradeLive = (g) => { setLiveGame(g); setPage("live-trading"); };

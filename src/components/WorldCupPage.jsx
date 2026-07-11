@@ -359,7 +359,12 @@ export function WorldCupPage() {
   const [joined, setJoined] = useState(null);
   const [wcBalance, setWcBalance] = useState(null);
   const [standing, setStanding] = useState(null);
-  const [showOnboard, setShowOnboard] = useState(false);
+  // Post-logout reload lands on the sign-in/sign-up screen (flag stamped by ProfilePage's logout;
+  // this page is lazy-loaded, so it owns clearing the flag — App.jsx leaves it alone on /worldcup).
+  const [showOnboard, setShowOnboard] = useState(() => {
+    try { return sessionStorage.getItem("parabolic_post_logout_auth") === "1"; } catch { return false; }
+  });
+  useEffect(() => { try { sessionStorage.removeItem("parabolic_post_logout_auth"); } catch { /* noop */ } }, []);
   const [showVerify, setShowVerify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showShareCard, setShowShareCard] = useState(false);

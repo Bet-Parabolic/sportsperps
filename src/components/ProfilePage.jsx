@@ -85,7 +85,13 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
 
   // Full reload after logout: every mounted component holds the old account's state (balance,
   // positions, chat identity, WS subscription) — clearing storage alone leaves that on screen.
-  const handleLogout = () => { doLogout(); onLoggedOut?.(); window.location.reload(); };
+  // The one-shot flag makes the reload land on the sign-in/sign-up screen instead of a guest view.
+  const handleLogout = () => {
+    doLogout();
+    try { sessionStorage.setItem("parabolic_post_logout_auth", "1"); } catch { /* private mode */ }
+    onLoggedOut?.();
+    window.location.reload();
+  };
 
   const wrap = { position: "fixed", inset: 0, zIndex: 900, background: B.bg, overflowY: "auto", fontFamily: fb };
   const inner = { maxWidth: 640, margin: "0 auto", padding: "16px 16px 70px" };
