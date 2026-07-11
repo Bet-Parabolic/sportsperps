@@ -14,7 +14,7 @@ import { loadCard, parseAvatar, syncAvatarToBackend } from "../lib/onboarding.js
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { PublicProfilePage } from "./PublicProfilePage.jsx";
 import stadiumBg from "../assets/worldcup/stadium.webp"; // 218KB webp (was a 418KB jpg) — first paint of the WC funnel
-import stadiumLbBg from "../assets/worldcup/stadium-leaderboard.webp"; // Figma 142-17157 export (40KB, darkening baked in) — leaderboard backdrop
+import stadiumLbBg from "../assets/worldcup/stadium-leaderboard.webp"; // Figma 142-17157 rebuilt from the raw 4K source (the node export was palette-dithered = grainy): retina 2432px, design darkening baked in
 import fifa26 from "../assets/worldcup/fifa26.png";
 import laurelImg from "../assets/worldcup/laurel.svg";
 import laurelPodium from "../assets/worldcup/laurel-podium.svg";
