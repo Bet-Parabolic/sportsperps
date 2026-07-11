@@ -701,7 +701,9 @@ export function WorldCupPage() {
         <main style={{ flex: 1, overflowY: "auto", paddingBottom: isMobile ? 68 : 0, position: "relative" }}>
           {/* header overlays the tab content (Figma: wordmark + auth pills float on the stadium hero) */}
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 64, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: isMobile ? "0 16px" : "0 40px" }}>
-            <img src={LOGO_WORDMARK} alt="Parabolic" style={{ height: 22 }} />
+            <button aria-label="Home" onClick={() => setTab("home")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center" }}>
+              <img src={LOGO_WORDMARK} alt="Parabolic" style={{ height: 22 }} />
+            </button>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {joined && wcBalance != null && (
                 <div style={{ padding: "6px 14px", borderRadius: 999, background: "rgba(94,216,126,0.1)", border: `1px solid ${GREEN}44`, backdropFilter: "blur(6px)" }}>

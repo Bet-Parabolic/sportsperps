@@ -1092,11 +1092,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           <button onClick={onBack} style={{background:'none',border:'none',cursor:'pointer',color:'#666',display:'flex',alignItems:'center',gap:4,fontSize:13,fontWeight:600,fontFamily:fb,padding:0}}>
             <span style={{fontSize:18,lineHeight:1}}>‹</span>
           </button>
-          <div style={{display:'flex',alignItems:'center'}}>
+          <button aria-label="Home" onClick={()=>onNavTo?onNavTo('home'):onBack&&onBack()} style={{display:'flex',alignItems:'center',background:'none',border:'none',cursor:'pointer',padding:0}}>
             {isMobile
               ? <img src={LOGO_NAV} style={{height:28,width:'auto'}} alt="Parabolic"/>
               : <img src={LOGO_WORDMARK} style={{height:30,width:'auto'}} alt="Parabolic"/>}
-          </div>
+          </button>
         </div>
         {/* CENTER — sport tabs (hidden on the World Cup surface: single-sport event) */}
         {worldcup ? <div /> : <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>

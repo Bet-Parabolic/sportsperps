@@ -90,7 +90,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
 
   // ── Sub-screens ──────────────────────────────────────────────────────────
   if (view !== "main" && view !== "settings") {
-    const titles = { account: "Account details", transactions: "Payment & deposits", referrals: "Invite your friends", help: "Help & support" };
+    const titles = { account: "Account details", transactions: "Payment & deposits", referrals: "Invite your friends", help: "Help & support", api: "API" };
     return (
       <div style={wrap}><div style={inner}>
         <TopBar title={titles[view]} onBack={() => setView(worldcup ? "main" : "settings")} />
@@ -98,6 +98,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
         {view === "transactions" && <Transactions profile={profile} onLinkWallet={() => setView("account")} />}
         {view === "referrals" && <Referrals username={username} />}
         {view === "help" && <HelpSupport />}
+        {view === "api" && <ApiComingSoon />}
       </div></div>
     );
   }
@@ -122,6 +123,11 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
         <SectionTitle>Security</SectionTitle>
         <Group>
           <PrivacyRow userId={userId} profile={profile} onSaved={load} />
+        </Group>
+
+        <SectionTitle>Developer</SectionTitle>
+        <Group>
+          <Row label="API" value="Coming soon" onClick={() => setView("api")} last />
         </Group>
 
         <SectionTitle>About</SectionTitle>
@@ -421,6 +427,20 @@ function Referrals() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <StatBox label="Friends joined" value="0" />
         <StatBox label="Rewards earned" value={fmtUsd(0)} />
+      </div>
+    </div>
+  );
+}
+
+// ── API sub-screen (coming soon) ───────────────────────────────────────────
+function ApiComingSoon() {
+  return (
+    <div style={{ ...card, textAlign: "center", padding: "34px 20px" }}>
+      <div style={{ fontSize: 28, marginBottom: 10 }}>🔌</div>
+      <div style={{ fontFamily: fd, fontSize: 18, fontWeight: 700, color: B.white, marginBottom: 6 }}>API coming soon</div>
+      <div style={{ color: B.dim, fontSize: 13, lineHeight: 1.6, maxWidth: 380, margin: "0 auto" }}>
+        Programmatic access to markets, prices, and order placement is on the way.
+        Keep an eye on <span style={{ color: B.white, fontWeight: 600 }}>@betparabolic</span> for the launch.
       </div>
     </div>
   );
