@@ -3,6 +3,8 @@ import { B, fb, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { subscribeLive } from "../lib/liveSocket.js";
 import { isLoggedIn, authToken, currentUserId } from "../lib/auth.js";
+import { parseAvatar } from "../lib/onboarding.js";
+import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 
 // Per-event chat + bettors feed. Loads recent messages over REST, then appends live ones from the
 // shared WebSocket (bet messages are auto-posted by the backend on open/close). Only logged-in
@@ -81,12 +83,24 @@ export function ChatPanel({ gameId, userId, homeShort = "Home", awayShort = "Awa
   );
 }
 
+// Small avatar circle for chat rows — the poster's profile picture, falling back to their initial.
+function ChatAvatar({ m, size = 22 }) {
+  const av = parseAvatar(m.avatar);
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", overflow: "hidden", background: "#1d2026", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      {av
+        ? <AvatarCircle avatar={av} size={size} />
+        : <span style={{ fontFamily: fb, fontWeight: 800, fontSize: size * 0.45, color: "#cfd4dc" }}>{(m.username || "?").charAt(0).toUpperCase()}</span>}
+    </div>
+  );
+}
+
 // Automated bet-feed message (open / close).
 function BetRow({ m, teamOf, teamColor }) {
   const team = teamOf(m.side), color = teamColor(m.side);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", background: "#0c0e12", borderRadius: 10, border: "1px solid #15171c" }}>
-      <span style={{ fontSize: 13 }}>{m.action === "open" ? "⚡" : "✓"}</span>
+      <ChatAvatar m={m} />
       <div style={{ fontSize: 12.5, color: "#bbb", fontFamily: fb, lineHeight: 1.4 }}>
         <b style={{ color: "#fff" }}>{m.username}</b>{" "}
         {m.action === "open" ? (
@@ -104,6 +118,7 @@ function UserRow({ m, mine, teamOf, teamColor }) {
   return (
     <div style={{ padding: "2px 4px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2, flexWrap: "wrap" }}>
+        <ChatAvatar m={m} size={20} />
         <span style={{ fontSize: 12.5, fontWeight: 700, color: mine ? B.primary : "#dcdfe5", fontFamily: fb }}>{m.username}{mine && " (you)"}</span>
         {m.pos && (
           <span style={{ fontSize: 10, fontFamily: fm, fontWeight: 700, color: teamColor(m.pos.side), background: teamColor(m.pos.side) + "18", padding: "1px 7px", borderRadius: 999 }}>

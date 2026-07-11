@@ -189,8 +189,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [reduceOnly, setReduceOnly] = useState(false);
   const [rightTab,   setRightTab]   = useState('order');
   const [bottomTab,  setBottomTab]  = useState('gamecast');
-  // Wager Activity has MEMORY: the tray persists per account so a refresh (or coming back
-  // later) still shows every fill/close/risk event. Capped at 40, account-keyed.
+  // Wager Activity: SERVER-BACKED history of every wager across the whole platform (opens,
+  // cash-outs, TP/SL fires, liquidations, settlements — both ledgers), so refreshes and
+  // late-joiners always see the full record. Toasts below stay the in-the-moment channel.
+  const [activity, setActivity] = useState([]);
+  // Local notif tray persists per account too (feeds the floating toasts).
   const notifsKey = `parabolic_activity_${userId}`;
   const [notifs,     setNotifs]     = useState(() => {
     try { const s = JSON.parse(localStorage.getItem(notifsKey) || "[]"); return Array.isArray(s) ? s.slice(0, 40) : []; }
@@ -611,6 +614,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             }
           } catch (e) { /* event endpoints unavailable — keep local state */ }
         }
+
+        // Own wager history (ALL games, both ledgers) — powers the Wager Activity tab.
+        try {
+          const actRes = await fetch(`${API_URL}/activity/${userId}?limit=100&token=${encodeURIComponent(authToken() || '')}`);
+          if (actRes.ok) { const ad = await actRes.json(); if (Array.isArray(ad.events)) setActivity(ad.events); }
+        } catch (e) { /* keep last known history */ }
 
         // Reconcile resting limit orders with the backend — a filled or cancelled order drops
         // off here, which clears its green dotted line on the chart + its Pending entry.
@@ -1516,7 +1525,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           {/* GAMECAST */}
           <div data-mob="gamecast" style={{margin:isMobile?'8px 12px 0':'12px 24px 0',background:'#111',borderRadius:16,border:'1px solid #1f1f1f',overflow:'hidden'}}>
             <div style={{display:'flex',borderBottom:'1px solid #1f1f1f'}}>
-              {[['activity','Wager Activity',notifs.length],['gamecast','Gamecast',playLog.length],['boxscore','Box Score',0],['chat','Chat',0]].map(([id,label,count])=>(
+              {[['activity','Wager Activity',activity.length],['gamecast','Gamecast',playLog.length],['boxscore','Box Score',0],['chat','Chat',0]].map(([id,label,count])=>(
                 <button key={id} onClick={()=>setBottomTab(id)} style={{padding:'10px 20px',fontSize:13,fontWeight:600,border:'none',cursor:'pointer',fontFamily:fb,
                   background:'transparent',color:bottomTab===id?'#fff':'#666',borderBottom:bottomTab===id?'2px solid '+B.primary:'2px solid transparent'}}>
                   {label}{(id==='gamecast'||id==='activity')&&count>0&&<span style={{color:B.primary,marginLeft:4,fontSize:11}}>{count}</span>}
@@ -1525,27 +1534,39 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
             <div style={{minHeight:200,padding:'10px 16px',maxHeight:320,overflow:'auto'}}>
               {bottomTab==='activity' && (
-                <div>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',marginBottom:6}}>
-                    {notifs.length>0&&(
-                      <button onClick={clearNotifs} style={{background:'transparent',border:'none',color:'#666',fontSize:10,fontWeight:600,cursor:'pointer',padding:0,fontFamily:fb}}>Clear</button>
-                    )}
-                  </div>
-                  {notifs.length===0?(
-                    <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>No wagers yet — your fills, closes and risk events land here</div>
-                  ):(
-                    <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                      {notifs.map(n=>(
-                        <div key={n.id} style={{padding:'8px 10px',borderRadius:9,fontWeight:600,fontSize:11.5,lineHeight:1.35,
-                          background:n.type==='green'?B.green+'18':n.type==='red'?B.red+'18':n.type==='yellow'?'#f5a62318':'#161616',
-                          border:`1px solid ${n.type==='green'?B.green+'40':n.type==='red'?B.red+'40':n.type==='yellow'?'#f5a62340':'#262626'}`,
-                          color:n.type==='green'?B.green:n.type==='red'?B.red:n.type==='yellow'?'#f5a623':'#bbb'}}>
-                          {n.msg}
+                activity.length===0?(
+                  <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>No wagers yet — every bet, cash-out, TP/SL and liquidation lands here</div>
+                ):(
+                  <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                    {activity.map((e,i)=>{
+                      const A={open:['BET',B.primary],close:['CASH OUT','#8ab8ff'],tp:['TP HIT',B.primary],sl:['SL HIT','#ff9f1c'],liquidation:['☠ LIQ',B.red],settlement:['SETTLED','#8a93a6']}[e.type]||[e.type?.toUpperCase?.()||'?','#8a93a6'];
+                      const margin=e.notional&&e.leverage?e.notional/e.leverage:null;
+                      const agoS=Math.max(1,Math.round((Date.now()-e.at)/1000));
+                      const agoTxt=agoS<60?agoS+'s':agoS<3600?Math.round(agoS/60)+'m':agoS<86400?Math.round(agoS/3600)+'h':Math.round(agoS/86400)+'d';
+                      return(
+                        <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'8px 10px',borderRadius:9,background:'#0c0e12',border:'1px solid #15171c'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                            <span style={{fontSize:9.5,fontWeight:700,fontFamily:fm,padding:'2px 7px',borderRadius:5,background:A[1]+'22',color:A[1],flexShrink:0,whiteSpace:'nowrap'}}>{A[0]}</span>
+                            <div style={{minWidth:0}}>
+                              <div style={{fontSize:12.5,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                                {e.teamName||e.side||'—'}{e.leverage?<span style={{color:'#8a93a6',fontWeight:600}}> · {e.leverage}x</span>:null}
+                              </div>
+                              <div style={{fontSize:10.5,color:'#666',fontFamily:fm,marginTop:1}}>
+                                {[margin!=null&&('margin '+fmtUsd(margin)),e.notional!=null&&('notional '+fmtUsd(e.notional)),e.game].filter(Boolean).join(' · ')}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{textAlign:'right',flexShrink:0}}>
+                            {e.pnl!=null&&e.type!=='open'&&(
+                              <div style={{fontFamily:fm,fontWeight:800,fontSize:12.5,color:e.pnl>=0?B.green:B.red}}>{e.pnl>=0?'+':''}{fmtUsd(e.pnl)}</div>
+                            )}
+                            <div style={{fontSize:9.5,color:'#555',fontFamily:fm}}>{agoTxt} ago</div>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                      );
+                    })}
+                  </div>
+                )
               )}
               {bottomTab==='gamecast' && (playLog.length===0 ? (
                 <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>🏀 Waiting for plays…</div>
