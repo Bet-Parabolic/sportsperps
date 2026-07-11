@@ -244,6 +244,10 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
             <button onClick={handleLogout} style={logoutBtn}>Log out</button>
           </div>
         )}
+
+        <div style={{ marginTop: 18 }}>
+          <FeedbackWidget userId={userId} worldcup={worldcup} />
+        </div>
         </div>
 
         {/* RIGHT column — Bets | Badges */}
@@ -324,8 +328,52 @@ function AccountDetails({ userId, profile, onSaved }) {
 
       <WalletField userId={userId} initial={profile?.walletAddress || ""} onResult={flash} onSaved={onSaved} />
 
+      <EditableField label="X account" initial={profile?.xHandle ? `@${profile.xHandle}` : ""} placeholder="@yourhandle" cta="Save"
+        onSave={async (v) => { await putProfile({ xHandle: v.trim().replace(/^@/, "") }); flash(true, "X account saved."); onSaved?.(); }} onError={(e) => flash(false, e)} />
+
       {msg && <div style={{ color: B.primary, fontSize: 13, marginTop: 6 }}>{msg}</div>}
       {err && <div style={{ color: B.red, fontSize: 13, marginTop: 6 }}>{err}</div>}
+    </div>
+  );
+}
+
+// ── In-product feedback (POST /api/feedback) — shown on the main profile view ──
+function FeedbackWidget({ userId, worldcup }) {
+  const [text, setText] = useState("");
+  const [state, setState] = useState("idle"); // idle | busy | sent | error
+  const [err, setErr] = useState("");
+  const send = async () => {
+    if (state === "busy" || text.trim().length < 3) return;
+    setState("busy"); setErr("");
+    try {
+      const res = await fetch(`${API_URL}/feedback`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, token: authToken(), message: text.trim(), context: worldcup ? "worldcup" : "app" }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Couldn't send — try again");
+      setState("sent"); setText("");
+    } catch (e) { setState("error"); setErr(e.message); }
+  };
+  if (state === "sent") {
+    return (
+      <div style={{ ...card, textAlign: "center", padding: "18px 16px" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: B.white }}>Thanks — we read every one. 🙏</div>
+        <div style={{ fontSize: 12.5, color: B.dim, marginTop: 4 }}>Your feedback shapes what we build next.</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ ...card, padding: "14px 16px" }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: B.white, marginBottom: 4 }}>Feedback</div>
+      <div style={{ fontSize: 12, color: B.dim, marginBottom: 8 }}>Spotted a bug? Want a feature? Tell us — it goes straight to the team.</div>
+      <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 2000))} rows={3} placeholder="What should we know?"
+        style={{ width: "100%", boxSizing: "border-box", background: B.bg, border: `1px solid ${B.border2}`, borderRadius: 12, padding: "10px 12px", color: B.white, fontSize: 16, fontFamily: fb, outline: "none", resize: "vertical" }} />
+      {err && <div style={{ color: B.red, fontSize: 12.5, marginTop: 6 }}>{err}</div>}
+      <button onClick={send} disabled={state === "busy" || text.trim().length < 3}
+        style={{ ...saveBtn, marginTop: 8, opacity: state === "busy" || text.trim().length < 3 ? 0.5 : 1 }}>
+        {state === "busy" ? "Sending…" : "Send feedback"}
+      </button>
     </div>
   );
 }
