@@ -14,6 +14,7 @@ import { loadCard, parseAvatar, syncAvatarToBackend } from "../lib/onboarding.js
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { PublicProfilePage } from "./PublicProfilePage.jsx";
 import stadiumBg from "../assets/worldcup/stadium.webp"; // 218KB webp (was a 418KB jpg) — first paint of the WC funnel
+import stadiumLbBg from "../assets/worldcup/stadium-leaderboard.webp"; // Figma 142-17157 export (40KB, darkening baked in) — leaderboard backdrop
 import fifa26 from "../assets/worldcup/fifa26.png";
 import laurelImg from "../assets/worldcup/laurel.svg";
 import laurelPodium from "../assets/worldcup/laurel-podium.svg";
@@ -578,12 +579,12 @@ export function WorldCupPage() {
 
     return (
       <div style={{ position: "relative", minHeight: "100%", background: "#050506" }}>
-        {/* stadium backdrop — Figma 142-17156: the full leaderboard sits over the dimmed stadium,
-            vignetted at the edges and fading to solid black so the lower rows stay readable */}
+        {/* stadium backdrop — Figma 142-17157: the exported design layer (its dark treatment is
+            baked into the image), pitch centered behind the podium; a slim bottom fade blends the
+            band into the page so the lower rows sit on solid black */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: isMobile ? 640 : 900, overflow: "hidden", pointerEvents: "none" }}>
-          <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 35%" }} />
-          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(80% 65% at 50% 30%, rgba(4,5,7,0.30) 0%, rgba(4,5,7,0.62) 55%, rgba(5,5,6,0.92) 100%)" }} />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(4,5,7,0.50) 0%, rgba(4,5,7,0.22) 20%, rgba(4,5,7,0.40) 55%, rgba(5,5,6,0.92) 85%, #050506 100%)" }} />
+          <img src={stadiumLbBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 0%" }} />
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 140, background: "linear-gradient(180deg, rgba(5,5,6,0) 0%, #050506 100%)" }} />
         </div>
         <div style={{ position: "relative", padding: isMobile ? "0 14px 60px" : "0 24px 70px" }}>
           {me && (
