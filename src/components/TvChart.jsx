@@ -213,7 +213,9 @@ export const TvChart = forwardRef(function TvChart(
     // horizontal dotted price line (that duplicated the current-price tag and cluttered the axis).
     const home = chart.addSeries(AreaSeries, { lineColor: homeColor, topColor: homeColor + "30", bottomColor: homeColor + "04", lineWidth: 2, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
       crosshairMarkerVisible: true, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2, crosshairMarkerBorderColor: homeColor, crosshairMarkerBackgroundColor: homeColor, ...yProv });
-    const away = chart.addSeries(LineSeries, { color: awayColor, lineWidth: 1, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
+    // Same lineWidth as home — the old 2px/1px split read as favoring the home side once the
+    // lines took on TEAM colors (July 12). Home keeps the soft area fill; strokes are equal.
+    const away = chart.addSeries(LineSeries, { color: awayColor, lineWidth: 2, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
       crosshairMarkerVisible: true, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2, crosshairMarkerBorderColor: awayColor, crosshairMarkerBackgroundColor: awayColor, ...yProv });
     const markers = createSeriesMarkers(home, []);
 
