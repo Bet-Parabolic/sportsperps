@@ -42,7 +42,7 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
       try {
         // eventOnly (the /worldcup silo): positions come from the EVENT ledger (World Cup Cash);
         // resting orders share the /orders endpoint, filtered to WC games.
-        const balUrl = eventOnly ? `${API_URL}/event/balance/${userId}` : `${API_URL}/balance/${userId}`;
+        const balUrl = eventOnly ? `${API_URL}/event/balance/${userId}?token=${encodeURIComponent(authToken() || "")}` : `${API_URL}/balance/${userId}`;
         const [b, o, g, a] = await Promise.all([
           fetch(balUrl).then((r) => (r.ok ? r.json() : null)),
           fetch(`${API_URL}/orders/${userId}`).then((r) => (r.ok ? r.json() : null)),

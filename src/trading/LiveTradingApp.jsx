@@ -576,9 +576,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         // 404 on /event/balance = not a participant yet → the Buy button becomes Join.
         if (evGameR.current) {
           try {
+            const evTk = `token=${encodeURIComponent(authToken() || "")}`; // owner-only reads (audit P1-1)
             const [ebRes, epRes] = await Promise.all([
-              fetch(`${API_URL}/event/balance/${userId}`),
-              fetch(`${API_URL}/event/positions/${userId}`),
+              fetch(`${API_URL}/event/balance/${userId}?${evTk}`),
+              fetch(`${API_URL}/event/positions/${userId}?${evTk}`),
             ]);
             if (ebRes.status === 404) { setWcJoined(false); setWcBalance(null); }
             else if (ebRes.ok) {

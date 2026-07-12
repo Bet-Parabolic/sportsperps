@@ -51,8 +51,8 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
     try {
       // World Cup surface → this profile's money data comes from the EVENT ledger (WC Cash,
       // wc:-prefixed trades); the main endpoints legitimately know nothing about it.
-      const balUrl = worldcup ? `${API_URL}/event/balance/${userId}` : `${API_URL}/balance/${userId}`;
       const tk = `token=${encodeURIComponent(authToken() || "")}`; // own-profile reads are token-gated
+      const balUrl = worldcup ? `${API_URL}/event/balance/${userId}?${tk}` : `${API_URL}/balance/${userId}`;
       const tradesUrl = worldcup ? `${API_URL}/event/profile/${userId}/trades?limit=100&${tk}` : `${API_URL}/profile/${userId}/trades?limit=100&${tk}`;
       const [p, b, t] = await Promise.all([
         fetch(`${API_URL}/profile/${userId}?${tk}`).then((r) => (r.ok ? r.json() : null)),

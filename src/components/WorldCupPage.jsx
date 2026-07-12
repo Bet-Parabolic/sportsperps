@@ -437,7 +437,7 @@ export function WorldCupPage({ lockedOut = false }) {
       }
       setProbs(p);
       if (auth?.userId) {
-        const eb = await fetch(`${API_URL}/event/balance/${auth.userId}`);
+        const eb = await fetch(`${API_URL}/event/balance/${auth.userId}?token=${encodeURIComponent(authToken() || "")}`);
         if (eb.status === 404) { setJoined(false); setWcBalance(null); setStanding(null); }
         else if (eb.ok) {
           const d = await eb.json();
