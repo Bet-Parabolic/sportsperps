@@ -10,7 +10,7 @@ import { ProfilePage } from "./ProfilePage.jsx";
 import { ActiveBetsPage } from "./ActiveBetsPage.jsx";
 import { NewsPage } from "./NewsPage.jsx";
 import { useLiveGames } from "../lib/useLiveGames.js";
-import { loadCard, parseAvatar, syncAvatarToBackend, hydrateAvatarFromBackend } from "../lib/onboarding.js";
+import { loadCard, parseAvatar, reconcileAvatarWithAccount } from "../lib/onboarding.js";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { PublicProfilePage } from "./PublicProfilePage.jsx";
 // Stadium hero: served from public/ at a STABLE url (not a hashed JS import) so worldcup.html
@@ -488,14 +488,12 @@ export function WorldCupPage({ lockedOut = false }) {
 
   useEffect(() => { refresh(); const iv = setInterval(refresh, 30_000); return () => clearInterval(iv); }, [refresh]);
   useEffect(() => { document.title = "Parabolic · World Cup Trading Competition"; }, []);
-  // One-shot: push the device-local avatar to the account so leaderboards/feeds can show it —
-  // and the reverse: if THIS device has no local card (account created elsewhere), pull the
-  // account avatar down so the member card / own-row surfaces render it here too.
+  // Reconcile the device-local avatar with the account (account wins over stale/foreign local
+  // cards; the authoring device re-uploads) — then re-read the card so own-avatar surfaces update.
   useEffect(() => {
     if (!auth?.userId) return;
-    syncAvatarToBackend({ apiUrl: API_URL, userId: auth.userId, token: authToken() });
-    hydrateAvatarFromBackend({ apiUrl: API_URL, userId: auth.userId, token: authToken() })
-      .then((av) => { if (av) setMemberCard(loadCard()); });
+    reconcileAvatarWithAccount({ apiUrl: API_URL, userId: auth.userId, token: authToken() })
+      .then(() => setMemberCard(loadCard()));
   }, [auth?.userId]);
 
   const join = useCallback(async () => {

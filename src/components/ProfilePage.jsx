@@ -6,7 +6,7 @@ import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "
 import { CardShareModal } from "./CardShareModal.jsx";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { StatCard } from "./CardShareModal.jsx";
-import { loadCard, referralCodeFor, syncAvatarToBackend, hydrateAvatarFromBackend } from "../lib/onboarding.js";
+import { loadCard, referralCodeFor, reconcileAvatarWithAccount } from "../lib/onboarding.js";
 import { webNotifyState, enableWebNotify, disableWebNotify } from "../lib/webNotify.js";
 
 // League metadata for bet cards + the favorite-discipline card (league comes from gameId prefix).
@@ -81,12 +81,11 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
   }, [userId, worldcup]);
 
   useEffect(() => { load(); }, [load]);
-  // One-shot: push the device-local avatar to the account so leaderboards/feeds can show it —
-  // and pull the account avatar down when this device has no local card (created elsewhere).
+  // Reconcile the device-local avatar with the account (account wins over stale/foreign local
+  // cards; the authoring device re-uploads) — then re-read the card so the member card updates.
   useEffect(() => {
-    syncAvatarToBackend({ apiUrl: API_URL, userId, token: authToken() });
-    hydrateAvatarFromBackend({ apiUrl: API_URL, userId, token: authToken() })
-      .then((av) => { if (av) setMemberCard(loadCard()); });
+    reconcileAvatarWithAccount({ apiUrl: API_URL, userId, token: authToken() })
+      .then(() => setMemberCard(loadCard()));
   }, [userId]);
 
   const username = profile?.username || "trader";

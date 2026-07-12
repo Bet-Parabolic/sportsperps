@@ -108,49 +108,65 @@ export function resizeAvatar(dataUrl, px = 128) {
   });
 }
 
-/** Best-effort one-shot upload of the device-local avatar to the account (so leaderboards can
-    show it). Safe to call on every mount - a localStorage flag stops repeats per avatar. */
-export async function syncAvatarToBackend({ apiUrl, userId, token }) {
-  try {
-    if (!userId) return;
-    const card = loadCard();
-    const ser = serializeAvatar(card.avatar);
-    if (!ser) return;
-    const KEY = 'parabolic_avatar_synced';
-    const sig = `${userId}:${ser.length}:${ser.slice(0, 40)}`;
-    if (localStorage.getItem(KEY) === sig) return;
-    // photos saved before resizing existed can be huge — shrink before upload
-    let payload = ser;
-    if (ser.startsWith('data:') && ser.length > 80_000) {
-      payload = await resizeAvatar(ser);
-      if (payload.length > 80_000) return; // still too big — skip, never block
-      card.avatar = { kind: 'photo', uri: payload };
-      try { localStorage.setItem('parabolic_card', JSON.stringify(card)); } catch { /* ignore */ }
-    }
-    const res = await fetch(`${apiUrl}/profile/${userId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ avatar: payload, token }),
-    });
-    if (res.ok) localStorage.setItem(KEY, sig);
-  } catch { /* offline - retry next visit */ }
-}
+const SYNC_KEY = 'parabolic_avatar_synced';
+const syncSig = (userId, ser) => `${userId}:${ser.length}:${ser.slice(0, 40)}`;
 
-/** The reverse of syncAvatarToBackend: when THIS device has no local card avatar (account was
-    created on another device), pull the account avatar down from the profile and store it in the
-    local card so every own-avatar surface (member card, header pfp, profile) renders it.
-    Returns the hydrated {kind,...} avatar or null. */
-export async function hydrateAvatarFromBackend({ apiUrl, userId, token }) {
+/**
+ * Two-way avatar reconcile between the device-local member card and the account.
+ * The ACCOUNT is the source of truth, with one exception: if THIS device previously uploaded
+ * exactly this avatar for exactly this account (the synced-flag signature matches), the device
+ * is the author — it re-uploads when the server differs, which self-heals a server value that
+ * was overwritten by a stale device.
+ *
+ * Any other local card (no flag, or a flag from a different userId — e.g. a card left over from
+ * a pre-wipe account on this machine) NEVER uploads; the account avatar replaces it locally.
+ * Returns the resolved {kind,...} avatar (or null), already saved into the local card.
+ */
+export async function reconcileAvatarWithAccount({ apiUrl, userId, token }) {
   try {
     if (!userId || !token) return null;
     const card = loadCard();
-    if (card.avatar) return null; // local card wins - nothing to hydrate
+    let ser = serializeAvatar(card.avatar);
+    // photos saved before resizing existed can be huge — shrink before any compare/upload
+    if (ser && ser.startsWith('data:') && ser.length > 80_000) {
+      ser = await resizeAvatar(ser);
+      if (ser.length > 80_000) ser = null; // still too big — treat as no local avatar
+      else { card.avatar = { kind: 'photo', uri: ser }; try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* ignore */ } }
+    }
+    const authored = !!ser && localStorage.getItem(SYNC_KEY) === syncSig(userId, ser);
+
     const res = await fetch(`${apiUrl}/profile/${userId}?token=${encodeURIComponent(token)}`);
-    if (!res.ok) return null;
-    const p = await res.json();
-    const avatar = parseAvatar(p?.avatar);
-    if (!avatar) return null;
-    card.avatar = avatar;
-    try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* cosmetic */ }
-    return avatar;
+    if (!res.ok) return card.avatar || null; // offline/authfail - change nothing
+    const server = (await res.json())?.avatar || null;
+
+    const upload = async () => {
+      const r = await fetch(`${apiUrl}/profile/${userId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar: ser, token }),
+      });
+      if (r.ok) localStorage.setItem(SYNC_KEY, syncSig(userId, ser));
+    };
+
+    if (authored) {           // this device set the account avatar — keep the account in sync
+      if (server !== ser) await upload();
+      return card.avatar;
+    }
+    if (server) {             // account wins over any un-authored local card
+      const avatar = parseAvatar(server);
+      if (avatar) {
+        card.avatar = avatar;
+        try {
+          localStorage.setItem(CARD_KEY, JSON.stringify(card));
+          localStorage.setItem(SYNC_KEY, syncSig(userId, server)); // this device now mirrors the account
+        } catch { /* cosmetic */ }
+      }
+      return avatar;
+    }
+    if (ser) { await upload(); return card.avatar; } // fresh onboarding device, empty account
+    return null;
   } catch { return null; }
 }
+
+/** Back-compat wrappers — both halves now route through the single reconcile. */
+export async function syncAvatarToBackend(opts) { return reconcileAvatarWithAccount(opts); }
+export async function hydrateAvatarFromBackend(opts) { return reconcileAvatarWithAccount(opts); }
