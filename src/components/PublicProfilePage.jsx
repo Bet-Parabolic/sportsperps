@@ -154,7 +154,7 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
 
               {/* Stat grid — mirrors the own-profile 2x2 */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-                <StatBox label="All-time P&L" value={`${(p.closedPnl ?? 0) >= 0 ? "+" : ""}${fmtUsd(p.closedPnl ?? 0)}`} color={(p.closedPnl ?? 0) >= 0 ? B.primary : B.red} />
+                <StatBox label={worldcup ? "Competition P&L" : "All-time P&L"} value={`${(p.closedPnl ?? 0) >= 0 ? "+" : ""}${fmtUsd(p.closedPnl ?? 0)}`} color={(p.closedPnl ?? 0) >= 0 ? B.primary : B.red} />
                 <StatBox label="ROI" value={fmtPct(p.returnPct ?? 0)} color={(p.returnPct ?? 0) >= 0 ? B.primary : B.red} />
                 <StatBox label="Win rate" value={`${winRate}%`} />
                 <StatBox label="Volume" value={fmtUsd(p.totalVolume ?? 0)} />

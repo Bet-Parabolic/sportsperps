@@ -984,6 +984,19 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // On an eligible game before joining, the Buy button IS the Join CTA — it must stay clickable
   // even though the (not-yet-granted) WC balance is 0.
   const joinNeeded = isEventGame && wcJoined === false;
+  // Scheduled game OUTSIDE the pregame wager window (backend pregame:false): every order would
+  // reject `marketClosed`, so the CTA must say so instead of showing an enabled Buy (July 11 UI
+  // audit P1-4 — everyone arriving from the signup push pre-window hit a dead-looking rejection).
+  const marketNotOpen = !settled && g.status !== 'live' && g.status !== 'halftime' && !g.pregame
+    && (new Date(g.startTime).getTime() - Date.now()) > 0;
+  const opensLabel = (() => {
+    if (!marketNotOpen) return '';
+    const win = g.league === 'wcup' ? 24 * 3600e3 : 6 * 3600e3;
+    const openMs = new Date(g.startTime).getTime() - Date.now() - win;
+    if (openMs <= 0) return 'Market opens soon';
+    const h = Math.floor(openMs / 3600e3), m = Math.floor(openMs / 60000) % 60;
+    return `Market opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`}`;
+  })();
   const eL = Math.min(orderLev,ml), eM = Math.min(orderMargin,ledgerBal);
   // If the cap drops below the chosen leverage (late-game tightening, side switch), pull the REAL
   // state down too — otherwise the stepper reads the clamped display (e.g. "1x", − disabled) while
@@ -1289,7 +1302,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <div style={{width:'100%',background:'#111',borderRadius:14,border:'1px solid #1f1f1f',padding:'12px 14px'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0}}>
-                    {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>🏀</span>}
+                    {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>⚽</span>}
                     <div style={{minWidth:0}}>
                       <div style={{fontSize:14,fontWeight:800,color:'#fff',fontFamily:fm}}>{HOME.short}</div>
                       <div style={{fontSize:9,color:'#555',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{HOME.name}</div>
@@ -1311,7 +1324,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       <div style={{fontSize:14,fontWeight:800,color:'#fff',fontFamily:fm}}>{AWAY.short}</div>
                       <div style={{fontSize:9,color:'#555',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{AWAY.name}</div>
                     </div>
-                    {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>🏀</span>}
+                    {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>⚽</span>}
                   </div>
                 </div>
                 <div style={{marginTop:8,height:3,background:'#1a1a1a',borderRadius:3,overflow:'hidden'}}>
@@ -1325,7 +1338,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             ) : (
               <div style={{display:'flex',alignItems:'center',gap:32,padding:'20px 40px',background:'#111',borderRadius:16,border:'1px solid #1f1f1f'}}>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>🏀</span>}
+                  {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>⚽</span>}
                   <div style={{textAlign:'right'}}>
                     <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{HOME.name}</div>
                     <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{HOME.short}</div>
@@ -1351,7 +1364,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{AWAY.name}</div>
                     <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{AWAY.short}</div>
                   </div>
-                  {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>🏀</span>}
+                  {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>⚽</span>}
                 </div>
               </div>
             )}
@@ -1627,7 +1640,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 )
               )}
               {bottomTab==='gamecast' && (playLog.length===0 ? (
-                <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>🏀 Waiting for plays…</div>
+                <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>⚽ Waiting for plays…</div>
               ) : (
                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
                   {playLog.map((play,i)=>(
@@ -1820,14 +1833,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             {/* Submit — always the brand-green CTA (like Launch App); team identity = the logo
                 on the button. Team KIT colors stay on the side selectors/accents only, so no
                 team's color data can ever make this button illegible. */}
-            <button onClick={placeOrder} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
-              border:settled?'2px solid #333':'2px solid '+B.green,
-              cursor:settled||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
-              background:settled?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,
-              color:settled?'#fff':'#000',opacity:settled||eM<10?0.4:1,
+            <button onClick={placeOrder} disabled={settled||marketNotOpen||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
+              border:settled||marketNotOpen?'2px solid #333':'2px solid '+B.green,
+              cursor:settled||marketNotOpen||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
+              background:settled||marketNotOpen?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,
+              color:settled||marketNotOpen?'#fff':'#000',opacity:settled||marketNotOpen||eM<10?0.4:1,
               display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-              {!settled&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:24,height:24,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
-              {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
+              {!settled&&!marketNotOpen&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:24,height:24,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
+              {settled?'Game Settled':marketNotOpen?opensLabel:isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
             {/* Account */}
             <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid #1f1f1f',display:'flex',justifyContent:'space-between',fontSize:11}}>
@@ -2031,12 +2044,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                         </div>
                       );})()}
                     </div>
-                    <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
-                      border:settled?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
-                      background:settled?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,color:settled?'#fff':'#000',opacity:settled||eM<10?0.4:1,
+                    <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||marketNotOpen||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
+                      border:settled||marketNotOpen?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
+                      background:settled||marketNotOpen?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,color:settled||marketNotOpen?'#fff':'#000',opacity:settled||marketNotOpen||eM<10?0.4:1,
                       display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                      {!settled&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:26,height:26,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
-                      {settled?'Game Settled':isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
+                      {!settled&&!marketNotOpen&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:26,height:26,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
+                      {settled?'Game Settled':marketNotOpen?opensLabel:isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>
                       <span>Balance <span style={{color:'#fff',fontFamily:fm,fontWeight:700}}>{fmtUsd(balance)}</span></span>

@@ -76,10 +76,23 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
 
   const card = { background: "#101114", border: "1px solid #1c1e24", borderRadius: 14, padding: "14px 16px", marginBottom: 8 };
 
-  // Games in scope (eventOnly → WC only), split LIVE NOW vs PREGAME. Bets render above these.
+  // Games in scope (eventOnly → WC only), split LIVE NOW vs PREGAME vs UPCOMING. Between matches
+  // (most of the competition's wall-clock) live+pregame are BOTH empty — without the upcoming
+  // section this tab offered no path to the next market (July 11 UI audit P1-5).
   const scoped = [...games.values()].filter((g) => !eventOnly || g.id.startsWith("wcup_"));
   const liveNow = scoped.filter((g) => g.status === "live" || g.status === "halftime");
-  const pregame = scoped.filter((g) => g.status !== "live" && g.status !== "halftime" && g.pregame);
+  const pregame = scoped.filter((g) => g.status !== "live" && g.status !== "halftime" && g.status !== "final" && g.pregame);
+  const upcoming = scoped
+    .filter((g) => g.status !== "live" && g.status !== "halftime" && g.status !== "final" && !g.pregame && new Date(g.startTime).getTime() > Date.now())
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+    .slice(0, 3);
+  const opensIn = (g) => {
+    const win = (g.league === "wcup" ? 24 : 6) * 3600e3;
+    const ms = new Date(g.startTime).getTime() - Date.now() - win;
+    if (ms <= 0) return "Market opens soon";
+    const h = Math.floor(ms / 3600e3), m = Math.floor(ms / 60000) % 60;
+    return `Market opens in ${h > 0 ? `${h}h ${m}m` : `${m}m`}`;
+  };
   const hasBets = positions.length > 0 || orders.length > 0;
 
   const sectionHead = (label, count, topGap) => (
@@ -88,6 +101,7 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
 
   const gameRow = (g) => {
     const isLive = g.status === "live" || g.status === "halftime";
+    const isUpcoming = !isLive && !g.pregame; // outside the wager window — market not open yet
     const px = g.oracle?.indexPrice;
     return (
       <div key={g.id} onClick={() => onTrade && onTrade(g)} style={{ ...card, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -98,10 +112,12 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
               {g.home?.name ?? "Home"} vs {g.away?.name ?? "Away"}
               {isLive
                 ? <span style={{ fontSize: 9, fontWeight: 800, color: B.green, background: B.green + "18", padding: "2px 7px", borderRadius: 999, fontFamily: fm }}>● LIVE</span>
+                : isUpcoming
+                ? <span style={{ fontSize: 9, fontWeight: 800, color: "#8b93a5", background: "#8b93a518", padding: "2px 7px", borderRadius: 999, fontFamily: fm }}>UPCOMING</span>
                 : <span style={{ fontSize: 9, fontWeight: 800, color: "#8b93a5", background: "#8b93a518", padding: "2px 7px", borderRadius: 999, fontFamily: fm }}>PREGAME</span>}
             </div>
             <div style={{ fontSize: 11.5, color: "#666", fontFamily: fm, marginTop: 2 }}>
-              {isLive ? `${g.home?.score ?? 0} - ${g.away?.score ?? 0}` : "Market open · trade now"}
+              {isLive ? `${g.home?.score ?? 0} - ${g.away?.score ?? 0}` : isUpcoming ? opensIn(g) : "Market open · trade now"}
             </div>
           </div>
         </div>
@@ -115,10 +131,11 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
     );
   };
 
-  const MarketsSection = () => (liveNow.length === 0 && pregame.length === 0) ? null : (
+  const MarketsSection = () => (liveNow.length === 0 && pregame.length === 0 && upcoming.length === 0) ? null : (
     <>
       {liveNow.length > 0 && <>{sectionHead("LIVE NOW", liveNow.length, true)}{liveNow.map(gameRow)}</>}
       {pregame.length > 0 && <>{sectionHead("PREGAME MARKETS", pregame.length, true)}{pregame.map(gameRow)}</>}
+      {upcoming.length > 0 && <>{sectionHead("UPCOMING", upcoming.length, true)}{upcoming.map(gameRow)}</>}
     </>
   );
 
@@ -169,11 +186,15 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: "#555" }}>Loading…</div>
       ) : !hasBets ? (
-        (liveNow.length > 0 || pregame.length > 0 || activity.length > 0) ? (
+        (liveNow.length > 0 || pregame.length > 0 || upcoming.length > 0 || activity.length > 0) ? (
           <>
             <div style={{ ...card, textAlign: "center", padding: "20px 16px", marginBottom: 4 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff", marginBottom: 3 }}>No active bets right now</div>
-              <div style={{ fontSize: 12, color: "#666" }}>Pick a market below to open your next position.</div>
+              <div style={{ fontSize: 12, color: "#666" }}>
+                {liveNow.length > 0 || pregame.length > 0
+                  ? "Pick a market below to open your next position."
+                  : upcoming.length > 0 ? opensIn(upcoming[0]) + " — see the schedule below." : "Your wager history is below."}
+              </div>
             </div>
             {MarketsSection()}
             {ActivitySection()}
@@ -223,7 +244,7 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
               {orders.map((o, i) => (
                 <div key={o.oid ?? i} onClick={() => open(o.gameId)} style={{ ...card, cursor: gameOf(o.gameId) ? "pointer" : "default", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff", textTransform: "capitalize" }}>{o.side} · limit {(o.limitPx * 100).toFixed(1)}¢</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff" }}>{teamOf(o.gameId, o.side)} · limit {(o.limitPx * 100).toFixed(1)}¢</div>
                     <div style={{ fontSize: 11.5, color: "#666", fontFamily: fm, marginTop: 2 }}>{nameOf(o.gameId)} · {o.restingSize ?? o.size} contracts</div>
                   </div>
                   <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, color: "#ff9f1c", background: "#ff9f1c15", padding: "3px 9px", borderRadius: 999 }}>RESTING</span>

@@ -119,7 +119,7 @@ export function StatCard({ width = 336, username, avatar, rank = null, roiPct = 
           {roiPct != null ? (
             <div style={{ position: "absolute", right: 22 * k, bottom: 22 * k, textAlign: "right" }}>
               <div style={{ fontFamily: fb, fontWeight: 700, fontSize: 17 * k, color: roiPct >= 0 ? GREEN : "#ff5247" }}>{fmtRoi(roiPct)}</div>
-              {trades != null && <div style={{ fontFamily: fb, fontSize: 13 * k, color: "#a7abb3", marginTop: 2 * k }}>{trades} trades</div>}
+              {trades != null && <div style={{ fontFamily: fb, fontSize: 13 * k, color: "#a7abb3", marginTop: 2 * k }}>{trades} trade{trades === 1 ? "" : "s"}</div>}
             </div>
           ) : signature?.d ? (
             <div style={{ position: "absolute", right: 14 * k, bottom: 14 * k, opacity: 0.95, pointerEvents: "none" }}>

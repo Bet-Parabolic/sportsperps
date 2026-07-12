@@ -593,7 +593,7 @@ export function WorldCupPage({ lockedOut = false }) {
   const LeaderboardTab = () => {
     const me = lb.find((e) => e.userId === userId);
     const top3 = lb.slice(0, 3);
-    const rest = lb.slice(3, 15);
+    const rest = lb.slice(3, 50);
     const roi = (v) => `${v >= 0 ? "+" : ""}${Number(v ?? 0).toFixed(2)}%`;
     const medal = (rank) => rank === 1
       ? "linear-gradient(180deg,#cf7b0e,#9f5a00)" : rank === 2
@@ -625,7 +625,7 @@ export function WorldCupPage({ lockedOut = false }) {
           <span style={{ fontFamily: fb, fontWeight: 600, fontSize: 15, color: "#fff" }}>{e.username || e.userId.slice(0, 8)}</span>
           <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
             <span style={{ fontFamily: fb, fontWeight: 700, fontSize: big ? 16 : 15, color: e.roiPct >= 0 ? GREEN : "#ff5247" }}>{roi(e.roiPct)}</span>
-            <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 12, color: "#9aa0a8" }}>{e.trades} trades</span>
+            <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 12, color: "#9aa0a8" }}>{e.trades} trade{e.trades === 1 ? "" : "s"}</span>
           </div>
         </div>
       );
@@ -734,7 +734,7 @@ export function WorldCupPage({ lockedOut = false }) {
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {joined && wcBalance != null && (
                 <div style={{ padding: "6px 14px", borderRadius: 999, background: "rgba(94,216,126,0.1)", border: `1px solid ${GREEN}44`, backdropFilter: "blur(6px)" }}>
-                  <span style={{ fontFamily: fm, fontWeight: 800, fontSize: 13, color: "#fff" }}>${wcBalance.toLocaleString(undefined, { minimumFractionDigits: isMobile ? 0 : 2 })}</span>
+                  <span style={{ fontFamily: fm, fontWeight: 800, fontSize: 13, color: "#fff" }}>${wcBalance.toLocaleString(undefined, { minimumFractionDigits: isMobile ? 0 : 2, maximumFractionDigits: isMobile ? 0 : 2 })}</span>
                 </div>
               )}
               {auth

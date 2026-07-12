@@ -59,7 +59,21 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
         fetch(balUrl).then((r) => (r.ok ? r.json() : null)),
         fetch(tradesUrl).then((r) => (r.ok ? r.json() : null)),
       ]);
-      if (p) setProfile(worldcup ? { ...p, closedPnl: b?.closedPnl ?? 0 } : p);
+      if (p) {
+        if (worldcup) {
+          // WC surface: EVERY money stat comes from the event ledger — mixing main-ledger ROI/volume
+          // with event PnL showed contradictory numbers (+P&L, 0% ROI, $0 volume — July 11 UI audit
+          // P0-1). ROI = (equity − $10k grant) / grant, the same definition the leaderboard uses.
+          const margins = (b?.openPositions || []).reduce((s, x) => s + (x.margin || 0), 0);
+          const equity = (b?.balance ?? 0) + margins + (b?.unrealizedPnl ?? 0);
+          setProfile({
+            ...p,
+            closedPnl: b?.closedPnl ?? 0,
+            totalVolume: b?.totalVolume ?? 0,
+            returnPct: b ? ((equity - 10000) / 10000) * 100 : 0,
+          });
+        } else setProfile(p);
+      }
       if (b?.openPositions) setPositions(b.openPositions);
       else if (worldcup) setPositions([]); // not a participant yet
       if (t?.trades) setTrades(t.trades);
