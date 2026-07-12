@@ -19,6 +19,10 @@ const adminFetch = (path) =>
   fetch(`${API_URL}${path}`, { headers: { "x-admin-token": localStorage.getItem(TOK) || "" } })
     .then((r) => { if (r.status === 401) throw new Error("401"); return r.json(); });
 
+const adminPost = (path, body) =>
+  fetch(`${API_URL}${path}`, { method: "POST", headers: { "x-admin-token": localStorage.getItem(TOK) || "", "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
+    .then((r) => { if (r.status === 401) throw new Error("401"); return r.json(); });
+
 const fmt = (v, d = 4) => (v == null ? "—" : (+v).toFixed(d));
 const fmtUsd = (v) => (v == null ? "—" : "$" + (+v).toLocaleString(undefined, { maximumFractionDigits: 0 }));
 const fmtSigned = (v) => (v == null ? "—" : (v >= 0 ? "+$" : "−$") + Math.abs(+v).toFixed(0));
@@ -1088,7 +1092,98 @@ function WCEconTab({ data }) {
       </div>
 
       <ShadowMMPanel />
+      <FinalSnapshotPanel />
     </>
+  );
+}
+
+// ─── Final standings snapshot + winner review (WC-readiness #11) — freeze the payout record at the
+// final whistle and cross-check top finishers against identity/anti-Sybil signals. Payout & tax are
+// handled manually off this. ──────────────────────────────────────────────────────────────────────
+function FinalSnapshotPanel() {
+  const [snap, setSnap] = useState(undefined); // undefined = loading, null = none captured yet
+  const [winners, setWinners] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const load = async () => {
+    try {
+      const s = await adminFetch("/admin/event/snapshot");
+      const has = s && s.ts;
+      setSnap(has ? s : null);
+      // Review the FROZEN snapshot when one exists (payout basis), else the live standings.
+      const w = await adminFetch(`/admin/event/winners?top=8${has ? `&ts=${s.ts}` : ""}`);
+      setWinners(w);
+    } catch { /* leave prior state */ }
+  };
+  useEffect(() => { load(); }, []);
+
+  const capture = async () => {
+    if (busy) return;
+    if (!window.confirm("Capture a FINAL snapshot of the current standings? This freezes the payout record (append-only).")) return;
+    setBusy(true); setMsg("");
+    try {
+      const r = await adminPost("/admin/event/snapshot", { kind: "final" });
+      setMsg(r?.ok ? `✓ Snapshot captured — ${r.snapshot.participants} entrants frozen` : "Capture failed");
+      await load();
+    } catch { setMsg("Capture failed"); }
+    setBusy(false);
+  };
+
+  const meta = snap?.meta || {};
+  const driftBig = Math.abs(meta.conservationDrift || 0) > 0.01;
+  const captureBtn = (
+    <button onClick={capture} disabled={busy} style={{ padding: "7px 16px", fontSize: 12.5, fontWeight: 700, border: "none", borderRadius: 8, cursor: busy ? "default" : "pointer", background: C.primary, color: "#000", opacity: busy ? 0.6 : 1 }}>
+      {busy ? "Capturing…" : "Capture final snapshot"}
+    </button>
+  );
+
+  return (
+    <Panel title={<span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <span>Final standings snapshot &amp; winner review</span>{captureBtn}</span>}>
+      {msg && <div style={{ color: C.primaryLt, fontSize: 12.5, marginBottom: 10 }}>{msg}</div>}
+      {snap === undefined ? <div style={{ color: C.mut, fontSize: 13 }}>Loading…</div> : (
+        <>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+            <Stat label="Frozen snapshot" value={snap ? new Date(snap.ts).toLocaleString() : "None yet"}
+              sub={snap ? `${snap.kind} · ${snap.participants} entrants` : "capture at the final whistle"} color={snap ? C.text : C.mut} />
+            {snap && <Stat label="Conservation at capture" value={fmtSigned(meta.conservationDrift)} color={driftBig ? C.red : C.mut}
+              sub={driftBig ? "⚠ ledger not balanced" : "balanced"} />}
+            <Stat label="Reviewing" value={!snap ? "LIVE standings" : "frozen snapshot"} sub="winner identity check" />
+          </div>
+          {!winners?.winners?.length ? <div style={{ color: C.mut, fontSize: 13 }}>No entrants yet.</div> : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead><tr>
+                  {["#", "Trader", "ROI", "Equity", "Trades", "Email", "Phone", "IP shared", "Device shared", "Review"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", color: C.mut, fontWeight: 600, padding: "6px 8px", borderBottom: "1px solid " + C.border, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {winners.winners.map((w) => (
+                    <tr key={w.userId} style={{ background: w.flag ? "rgba(255,82,71,0.06)" : "transparent" }}>
+                      <td style={{ padding: "6px 8px", color: C.text, fontWeight: 700 }}>{w.rank}</td>
+                      <td style={{ padding: "6px 8px", color: C.text }}>{w.username || w.userId.slice(0, 8)}</td>
+                      <td style={{ padding: "6px 8px", color: (w.roiPct || 0) >= 0 ? C.primaryLt : C.red, fontWeight: 700 }}>{(w.roiPct >= 0 ? "+" : "") + (w.roiPct ?? 0).toFixed(1)}%</td>
+                      <td style={{ padding: "6px 8px", color: C.text }}>{fmtUsd(w.equity)}</td>
+                      <td style={{ padding: "6px 8px", color: C.mut }}>{w.trades}</td>
+                      <td style={{ padding: "6px 8px" }}>{w.emailVerified ? <span style={{ color: C.primaryLt }}>✓</span> : <span style={{ color: C.red }}>✗</span>}</td>
+                      <td style={{ padding: "6px 8px" }}>{w.phoneVerified ? <span style={{ color: C.primaryLt }}>✓</span> : <span style={{ color: C.red }}>✗</span>}</td>
+                      <td style={{ padding: "6px 8px", color: w.ipShared > 0 ? C.red : C.mut, fontWeight: w.ipShared > 0 ? 700 : 400 }}>{w.ipShared > 0 ? `⚠ ${w.ipShared}` : "0"}</td>
+                      <td style={{ padding: "6px 8px", color: w.deviceShared > 0 ? C.red : C.mut, fontWeight: w.deviceShared > 0 ? 700 : 400 }}>{w.deviceShared > 0 ? `⚠ ${w.deviceShared}` : "0"}</td>
+                      <td style={{ padding: "6px 8px", color: w.flag ? C.red : C.primaryLt, fontWeight: 700, whiteSpace: "nowrap" }}>{w.flag ? "REVIEW" : "clear"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ color: C.mut, fontSize: 11.5, marginTop: 10, lineHeight: 1.5 }}>
+            Flags any top finisher who is unverified (email/phone) or shares a signup IP / device with another account. Cross-check flagged rows against the Users &amp; identity clusters before paying. Payout &amp; tax are handled manually.
+          </div>
+        </>
+      )}
+    </Panel>
   );
 }
 
