@@ -16,7 +16,7 @@ const fromT = (tm) => (tm - TIME_BASE) / DAY;
 // home (green area) + away (red line), current-price/0.5/liq/limit price lines,
 // entry + score markers, crosshair tooltip, Y locked 0–100% (still zoomable).
 export const TvChart = forwardRef(function TvChart(
-  { data, oPrice, liqLines = [], limitOrders = [], entryLines = [], tpLines = [], slLines = [], scoringPlays = [], xTicks = [], homeLabel = "Home", awayLabel = "Away", xFmt, height = 240 },
+  { data, oPrice, liqLines = [], limitOrders = [], entryLines = [], tpLines = [], slLines = [], scoringPlays = [], xTicks = [], homeLabel = "Home", awayLabel = "Away", homeColor = B.green, awayColor = B.red, xFmt, height = 240 },
   ref
 ) {
   const X_AXIS_H = 18;               // height of our custom evenly-spaced x-axis strip
@@ -61,7 +61,7 @@ export const TvChart = forwardRef(function TvChart(
       const x = ts.timeToCoordinate(snapped);
       const y = home.priceToCoordinate(m.price);
       if (x == null || y == null) continue;
-      const col = m.side === "away" ? B.red : B.green;
+      const col = m.side === "away" ? awayColor : homeColor;
       const dot = document.createElement("div");
       dot.style.cssText =
         "position:absolute;left:" + x + "px;top:" + y + "px;transform:translate(-50%,-50%);" +
@@ -211,10 +211,10 @@ export const TvChart = forwardRef(function TvChart(
 
     // Both series show only their last-value axis label (home green %, away red %) — no
     // horizontal dotted price line (that duplicated the current-price tag and cluttered the axis).
-    const home = chart.addSeries(AreaSeries, { lineColor: B.green, topColor: B.green + "30", bottomColor: B.green + "04", lineWidth: 2, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
-      crosshairMarkerVisible: true, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2, crosshairMarkerBorderColor: B.green, crosshairMarkerBackgroundColor: B.green, ...yProv });
-    const away = chart.addSeries(LineSeries, { color: B.red, lineWidth: 1, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
-      crosshairMarkerVisible: true, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2, crosshairMarkerBorderColor: B.red, crosshairMarkerBackgroundColor: B.red, ...yProv });
+    const home = chart.addSeries(AreaSeries, { lineColor: homeColor, topColor: homeColor + "30", bottomColor: homeColor + "04", lineWidth: 2, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
+      crosshairMarkerVisible: true, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2, crosshairMarkerBorderColor: homeColor, crosshairMarkerBackgroundColor: homeColor, ...yProv });
+    const away = chart.addSeries(LineSeries, { color: awayColor, lineWidth: 1, priceFormat: pf, priceLineVisible: false, lastValueVisible: true,
+      crosshairMarkerVisible: true, crosshairMarkerRadius: 5, crosshairMarkerBorderWidth: 2, crosshairMarkerBorderColor: awayColor, crosshairMarkerBackgroundColor: awayColor, ...yProv });
     const markers = createSeriesMarkers(home, []);
 
     const tip = document.createElement("div");
@@ -242,8 +242,8 @@ export const TvChart = forwardRef(function TvChart(
       const { homeLabel, awayLabel } = labelsRef.current;
       tip.innerHTML =
         '<div style="color:#666;margin-bottom:3px">' + (xFmtRef.current ? xFmtRef.current(fromT(p.time)) : "") + "</div>" +
-        '<div style="color:' + B.green + ';font-weight:700">' + homeLabel + " " + (v * 100).toFixed(1) + "%</div>" +
-        '<div style="color:' + B.red + ';font-weight:700">' + awayLabel + " " + ((1 - v) * 100).toFixed(1) + "%</div>";
+        '<div style="color:' + homeColor + ';font-weight:700">' + homeLabel + " " + (v * 100).toFixed(1) + "%</div>" +
+        '<div style="color:' + awayColor + ';font-weight:700">' + awayLabel + " " + ((1 - v) * 100).toFixed(1) + "%</div>";
       tip.style.display = "block";
       const w = tip.offsetWidth, cw = el.clientWidth;
       tip.style.left = Math.min(Math.max(0, p.point.x + 14), cw - w - 4) + "px";
@@ -392,8 +392,8 @@ export const TvChart = forwardRef(function TvChart(
       ad.push({ time: tm, value: d.pa != null ? d.pa : 1 - d.ph });
       // Entry is drawn as a horizontal "Entry Price" line (see price-lines effect), not an
       // arrow — only exit markers remain as arrows.
-      if (d.mh_marker && d.mh_marker !== "entry") mk.push({ time: tm, position: "belowBar", color: B.green, shape: "arrowUp" });
-      else if (d.ma_marker && d.ma_marker !== "entry") mk.push({ time: tm, position: "aboveBar", color: B.red, shape: "arrowDown" });
+      if (d.mh_marker && d.mh_marker !== "entry") mk.push({ time: tm, position: "belowBar", color: homeColor, shape: "arrowUp" });
+      else if (d.ma_marker && d.ma_marker !== "entry") mk.push({ time: tm, position: "aboveBar", color: awayColor, shape: "arrowDown" });
     }
     home.setData(hd); away.setData(ad);
     markers?.setMarkers(mk);

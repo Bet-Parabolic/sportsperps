@@ -1021,6 +1021,17 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   };
   // Only style the LIVE Buy CTA — never the disabled (settled/market-closed) or Join states.
   const teamBtn = (!settled && !marketNotOpen && !(isEventGame && wcJoined === false) && WC_TEAM_BTN[team?.name]) || null;
+  // Chart LINES in team colors too (July 12): flag shades, with the two dark flag colors lifted
+  // just enough to read on the near-black chart (#002395/#AA151B are muddy at 1-2px line width);
+  // England = flag white, Argentina = exact celeste. Non-WC games keep green/red.
+  const WC_TEAM_LINE = {
+    France:    '#2F55E0', // tricolore blue, brightness-lifted for dark bg (flag #002395)
+    Spain:     '#D6212A', // rojigualda red, lifted (flag #AA151B)
+    England:   '#FFFFFF', // St George white (exact)
+    Argentina: '#74ACDF', // celeste (exact)
+  };
+  const homeLineColor = (g.league === 'wcup' && WC_TEAM_LINE[HOME?.name]) || B.green;
+  const awayLineColor = (g.league === 'wcup' && WC_TEAM_LINE[AWAY?.name]) || B.red;
   // Event (WC) games run MM=0 — the estimated liq is the BANKRUPTCY price (full buffer), not
   // the main ledger's half-margin maintenance trigger.
   const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL, isEventGame ? 0 : undefined);
@@ -1475,13 +1486,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <div style={{display:'flex',alignItems:'center',gap:14}}>
                 <span style={{fontSize:13,fontWeight:600,color:'#888'}}>Win Probability</span>
                 <span style={{display:'flex',alignItems:'center',gap:5,fontSize:12}}>
-                  <span style={{width:12,height:3,borderRadius:2,background:B.green,display:'inline-block'}}/>
-                  <span style={{color:B.green,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(1)}%</span>
+                  <span style={{width:12,height:3,borderRadius:2,background:homeLineColor,display:'inline-block'}}/>
+                  <span style={{color:homeLineColor,fontWeight:700,fontFamily:fm}}>{(oPrice*100).toFixed(1)}%</span>
                   <span style={{color:'#666'}}>{HOME.short}</span>
                 </span>
                 <span style={{display:'flex',alignItems:'center',gap:5,fontSize:12}}>
-                  <span style={{width:12,height:3,borderRadius:2,background:B.red,display:'inline-block'}}/>
-                  <span style={{color:B.red,fontWeight:700,fontFamily:fm}}>{(awayProb*100).toFixed(1)}%</span>
+                  <span style={{width:12,height:3,borderRadius:2,background:awayLineColor,display:'inline-block'}}/>
+                  <span style={{color:awayLineColor,fontWeight:700,fontFamily:fm}}>{(awayProb*100).toFixed(1)}%</span>
                   <span style={{color:'#666'}}>{AWAY.short}</span>
                 </span>
               </div>
@@ -1498,7 +1509,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
             <div style={{height:240,padding:'4px 8px 0'}}>
               {merged.length > 1 ? (
-                <TvChart key={g.id} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} entryLines={entryLines} tpLines={tpLines} slLines={slLines} scoringPlays={scoreMarks} xTicks={xTicks} homeLabel={HOME.short} awayLabel={AWAY.short} xFmt={xFmt} height={236}/>
+                <TvChart key={g.id+homeLineColor} ref={tvRef} data={merged} oPrice={oPrice} liqLines={liqLines} limitOrders={limitOrders.filter(l=>l.gameId===g.id)} entryLines={entryLines} tpLines={tpLines} slLines={slLines} scoringPlays={scoreMarks} xTicks={xTicks} homeLabel={HOME.short} awayLabel={AWAY.short} homeColor={homeLineColor} awayColor={awayLineColor} xFmt={xFmt} height={236}/>
               ) : (
                 <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'#444',fontSize:13}}>
                   Loading price history…
