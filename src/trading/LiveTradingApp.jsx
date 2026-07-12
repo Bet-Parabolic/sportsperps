@@ -112,28 +112,15 @@ function LevSlider({ eL, ml, onChange, compact = false, liq = null, cap = null }
       {ml<ABS_MAX && showWhy && (
         <div style={{marginTop:8,background:'#101216',border:'1px solid #1c1f24',borderRadius:14,padding:'13px 15px',fontSize:12,color:'#9aa0a8',lineHeight:1.6,textAlign:'left'}}>
           <div style={{marginBottom:9}}>
-            Two safety rules set the ceiling - whichever is <span style={{color:'#fff'}}>lower</span> wins:
-          </div>
-          <div style={{marginBottom:9}}>
-            <span style={{color:priceBinds?B.primary:'#fff',fontWeight:700}}>1 · The price cap{priceBinds?' - binding now':''}.</span>{' '}
+            <span style={{color:B.primary,fontWeight:700}}>The price cap.</span>{' '}
             The closer a price is to 0% or 100%, the less distance there is to liquidation, so the ceiling
             steps down with the favorite's odds: up to 60% → 10x · 75% → 5x · 85% → 3x · 95% → 2x · beyond → 1x.
-            {favPct != null && <> This market's favorite trades at <span style={{color:'#fff'}}>{favPct}%</span>, so the price cap is <span style={{color:'#fff'}}>{priceCap}x</span>.</>}
-          </div>
-          <div style={{marginBottom:9}}>
-            <span style={{color:!priceBinds?B.primary:'#fff',fontWeight:700}}>2 · The one-play rule{!priceBinds?' - binding now':''}.</span>{' '}
-            This cap keeps the EXCHANGE solvent through a sudden move - it is not a promise your position
-            survives one. In soccer a single goal can move a close match 15+ points, so be clear-eyed: at
-            high leverage, one goal against you can liquidate your entire stake. The cap sizes your buffer
-            so that when a goal lands, the move is contained at your bankruptcy price instead of gapping
-            past it - your loss is always capped at exactly what you put in, never more. Tight games carry
-            lower ceilings than lopsided ones, and the ceiling drops further late in a close match, when
-            one goal decides everything.
-            {!priceBinds && <> Right now this rule sets the ceiling at <span style={{color:'#fff',fontWeight:700}}>{ml}x</span>{priceCap!=null&&priceCap>ml?<> (the price cap alone would allow {priceCap}x)</>:null}.</>}
+            {favPct != null && <> This market's favorite trades at <span style={{color:'#fff'}}>{favPct}%</span>, so the cap is <span style={{color:'#fff'}}>{priceCap}x</span>.</>}
           </div>
           <div style={{color:'#6a6f77'}}>
-            Backing the favorite keeps a bigger buffer than the underdog, so it's often allowed more leverage at the
-            same price. Caps apply only to opening or adding - <span style={{color:'#9aa0a8'}}>closing is never capped; you can always exit.</span>
+            One heads-up at high leverage: a single goal can move a close soccer match 15+ points - enough to
+            liquidate a max-leverage stake. Your loss is always capped at exactly what you put in, never more.
+            Caps apply only to opening or adding - <span style={{color:'#9aa0a8'}}>closing is never capped; you can always exit.</span>
           </div>
         </div>
       )}
