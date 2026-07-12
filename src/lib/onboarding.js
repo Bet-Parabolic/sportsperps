@@ -134,3 +134,23 @@ export async function syncAvatarToBackend({ apiUrl, userId, token }) {
     if (res.ok) localStorage.setItem(KEY, sig);
   } catch { /* offline - retry next visit */ }
 }
+
+/** The reverse of syncAvatarToBackend: when THIS device has no local card avatar (account was
+    created on another device), pull the account avatar down from the profile and store it in the
+    local card so every own-avatar surface (member card, header pfp, profile) renders it.
+    Returns the hydrated {kind,...} avatar or null. */
+export async function hydrateAvatarFromBackend({ apiUrl, userId, token }) {
+  try {
+    if (!userId || !token) return null;
+    const card = loadCard();
+    if (card.avatar) return null; // local card wins - nothing to hydrate
+    const res = await fetch(`${apiUrl}/profile/${userId}?token=${encodeURIComponent(token)}`);
+    if (!res.ok) return null;
+    const p = await res.json();
+    const avatar = parseAvatar(p?.avatar);
+    if (!avatar) return null;
+    card.avatar = avatar;
+    try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* cosmetic */ }
+    return avatar;
+  } catch { return null; }
+}

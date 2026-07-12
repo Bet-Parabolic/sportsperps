@@ -17,7 +17,7 @@ import { getAuth, currentUserId, authToken, isLoggedIn, handleUnauthorized, setS
 import { track } from "../lib/track.js";
 import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
 import { parseAvatar } from "../lib/onboarding.js";
-import { loadCard } from "../lib/onboarding.js";
+import { loadCard, hydrateAvatarFromBackend } from "../lib/onboarding.js";
 import { DepositModal } from "../components/DepositModal.jsx";
 import { NavRail } from "../components/NavRail.jsx";
 import { FloatingChat } from "../components/FloatingChat.jsx";
@@ -199,9 +199,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [showWager,  setShowWager]  = useState(false);
   const sheetDragY = useRef(null); // touch-start Y of the wager-sheet handle (swipe-down dismiss)
   const [showProfile, setShowProfile] = useState(false);
-  // Account pfp mirrors the member-card avatar (re-read when the profile closes).
+  // Account pfp mirrors the member-card avatar (re-read when the profile closes). If this device
+  // has no local card (account created elsewhere), pull the account avatar down once.
   const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
   useEffect(() => { if (!showProfile) setCardAvatar(loadCard().avatar); }, [showProfile]);
+  useEffect(() => {
+    hydrateAvatarFromBackend({ apiUrl: API_URL, userId, token: authToken() })
+      .then((av) => { if (av) setCardAvatar(av); });
+  }, [userId]);
   const [showDeposit, setShowDeposit] = useState(false); // deposit/withdrawal coming-soon modal
   // Chat popout (draggable window) + unread dot; bookmark is device-local like the mobile app.
   const [showChatPop, setShowChatPop] = useState(false);

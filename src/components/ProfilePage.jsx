@@ -6,7 +6,7 @@ import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "
 import { CardShareModal } from "./CardShareModal.jsx";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { StatCard } from "./CardShareModal.jsx";
-import { loadCard, referralCodeFor, syncAvatarToBackend } from "../lib/onboarding.js";
+import { loadCard, referralCodeFor, syncAvatarToBackend, hydrateAvatarFromBackend } from "../lib/onboarding.js";
 import { webNotifyState, enableWebNotify, disableWebNotify } from "../lib/webNotify.js";
 
 // League metadata for bet cards + the favorite-discipline card (league comes from gameId prefix).
@@ -44,7 +44,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
   const [betFilter, setBetFilter] = useState("all"); // 'all' | 'wins' | 'loses'
   const [view, setView] = useState("main");     // 'main' | 'settings' | 'account' | 'transactions' | 'referrals' | 'help'
   const [showCard, setShowCard] = useState(false); // member-card overlay (front/QR back)
-  const [memberCard] = useState(() => loadCard()); // device-local card (sport/avatar/signature)
+  const [memberCard, setMemberCard] = useState(() => loadCard()); // device-local card (sport/avatar/signature)
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -81,8 +81,13 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
   }, [userId, worldcup]);
 
   useEffect(() => { load(); }, [load]);
-  // One-shot: push the device-local avatar to the account so leaderboards/feeds can show it.
-  useEffect(() => { syncAvatarToBackend({ apiUrl: API_URL, userId, token: authToken() }); }, [userId]);
+  // One-shot: push the device-local avatar to the account so leaderboards/feeds can show it —
+  // and pull the account avatar down when this device has no local card (created elsewhere).
+  useEffect(() => {
+    syncAvatarToBackend({ apiUrl: API_URL, userId, token: authToken() });
+    hydrateAvatarFromBackend({ apiUrl: API_URL, userId, token: authToken() })
+      .then((av) => { if (av) setMemberCard(loadCard()); });
+  }, [userId]);
 
   const username = profile?.username || "trader";
   const joined = profile?.createdAt

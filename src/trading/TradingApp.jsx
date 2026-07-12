@@ -14,9 +14,9 @@ import { SoccerPage } from "../components/sports/SoccerPage.jsx";
 import { MMAPage } from "../components/sports/MMAPage.jsx";
 import { HomePage } from "../components/sports/HomePage.jsx";
 import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
-import { loadCard } from "../lib/onboarding.js";
+import { loadCard, hydrateAvatarFromBackend } from "../lib/onboarding.js";
 import { DepositModal } from "../components/DepositModal.jsx";
-import { currentUserId } from "../lib/auth.js";
+import { currentUserId, authToken } from "../lib/auth.js";
 import { NavRail } from "../components/NavRail.jsx";
 import { ActiveBetsPage } from "../components/ActiveBetsPage.jsx";
 import { NewsPage } from "../components/NewsPage.jsx";
@@ -35,6 +35,10 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
   // card edits may have just changed it).
   const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
   useEffect(() => { if (!showProfile) setCardAvatar(loadCard().avatar); }, [showProfile]);
+  useEffect(() => {
+    hydrateAvatarFromBackend({ apiUrl: API_URL, userId: currentUserId(), token: authToken() })
+      .then((av) => { if (av) setCardAvatar(av); });
+  }, []);
   // Header balance (every account starts with $10,000 paper funds). Refreshes every 30s and
   // when the profile closes (a trade/settlement elsewhere may have moved it).
   const [balance, setBalance] = useState(null);
