@@ -122,11 +122,13 @@ function LevSlider({ eL, ml, onChange, compact = false, liq = null, cap = null }
           </div>
           <div style={{marginBottom:9}}>
             <span style={{color:!priceBinds?B.primary:'#fff',fontWeight:700}}>2 · The one-play rule{!priceBinds?' - binding now':''}.</span>{' '}
-            Your liquidation buffer must survive one decisive play - a goal, a touchdown, a home run - without
-            gapping straight past your bankruptcy price. In soccer the very first goal can move a close match
-            6-7 points, so tight soccer markets are capped below the price table from the moment they open -
-            and the cap tightens further late in a close game, when one goal decides everything. Lopsided
-            games are barely restricted.
+            This cap keeps the EXCHANGE solvent through a sudden move - it is not a promise your position
+            survives one. In soccer a single goal can move a close match 15+ points, so be clear-eyed: at
+            high leverage, one goal against you can liquidate your entire stake. The cap sizes your buffer
+            so that when a goal lands, the move is contained at your bankruptcy price instead of gapping
+            past it - your loss is always capped at exactly what you put in, never more. Tight games carry
+            lower ceilings than lopsided ones, and the ceiling drops further late in a close match, when
+            one goal decides everything.
             {!priceBinds && <> Right now this rule sets the ceiling at <span style={{color:'#fff',fontWeight:700}}>{ml}x</span>{priceCap!=null&&priceCap>ml?<> (the price cap alone would allow {priceCap}x)</>:null}.</>}
           </div>
           <div style={{color:'#6a6f77'}}>
