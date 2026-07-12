@@ -112,58 +112,48 @@ const SYNC_KEY = 'parabolic_avatar_synced';
 const syncSig = (userId, ser) => `${userId}:${ser.length}:${ser.slice(0, 40)}`;
 
 /**
- * Two-way avatar reconcile between the device-local member card and the account.
- * The ACCOUNT is the source of truth, with one exception: if THIS device previously uploaded
- * exactly this avatar for exactly this account (the synced-flag signature matches), the device
- * is the author — it re-uploads when the server differs, which self-heals a server value that
- * was overwritten by a stale device.
- *
- * Any other local card (no flag, or a flag from a different userId — e.g. a card left over from
- * a pre-wipe account on this machine) NEVER uploads; the account avatar replaces it locally.
+ * Avatar reconcile between the device-local member card and the account.
+ * Rule: if the account HAS an avatar, it wins — the local card is overwritten to match, no
+ * device ever auto-uploads over it. A device only uploads when the account has NO avatar yet
+ * (the one legitimate case: this device just finished onboarding). This is deliberately
+ * one-directional — an earlier "authoring device re-uploads" variant let two devices with
+ * different local cards ping-pong the account image forever.
  * Returns the resolved {kind,...} avatar (or null), already saved into the local card.
  */
 export async function reconcileAvatarWithAccount({ apiUrl, userId, token }) {
   try {
     if (!userId || !token) return null;
     const card = loadCard();
-    let ser = serializeAvatar(card.avatar);
-    // photos saved before resizing existed can be huge — shrink before any compare/upload
-    if (ser && ser.startsWith('data:') && ser.length > 80_000) {
-      ser = await resizeAvatar(ser);
-      if (ser.length > 80_000) ser = null; // still too big — treat as no local avatar
-      else { card.avatar = { kind: 'photo', uri: ser }; try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* ignore */ } }
-    }
-    const authored = !!ser && localStorage.getItem(SYNC_KEY) === syncSig(userId, ser);
 
     const res = await fetch(`${apiUrl}/profile/${userId}?token=${encodeURIComponent(token)}`);
     if (!res.ok) return card.avatar || null; // offline/authfail - change nothing
     const server = (await res.json())?.avatar || null;
 
-    const upload = async () => {
-      const r = await fetch(`${apiUrl}/profile/${userId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar: ser, token }),
-      });
-      if (r.ok) localStorage.setItem(SYNC_KEY, syncSig(userId, ser));
-    };
-
-    if (authored) {           // this device set the account avatar — keep the account in sync
-      if (server !== ser) await upload();
-      return card.avatar;
-    }
-    if (server) {             // account wins over any un-authored local card
+    if (server) { // account wins, unconditionally
       const avatar = parseAvatar(server);
-      if (avatar) {
+      if (avatar && serializeAvatar(card.avatar) !== server) {
         card.avatar = avatar;
-        try {
-          localStorage.setItem(CARD_KEY, JSON.stringify(card));
-          localStorage.setItem(SYNC_KEY, syncSig(userId, server)); // this device now mirrors the account
-        } catch { /* cosmetic */ }
+        try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* cosmetic */ }
       }
-      return avatar;
+      try { localStorage.setItem(SYNC_KEY, syncSig(userId, server)); } catch { /* cosmetic */ }
+      return avatar || card.avatar || null;
     }
-    if (ser) { await upload(); return card.avatar; } // fresh onboarding device, empty account
-    return null;
+
+    // account has no avatar — first upload from the device that onboarded
+    let ser = serializeAvatar(card.avatar);
+    if (!ser) return null;
+    if (ser.startsWith('data:') && ser.length > 80_000) { // pre-resize-era photos can be huge
+      ser = await resizeAvatar(ser);
+      if (ser.length > 80_000) return null; // still too big — skip, never block
+      card.avatar = { kind: 'photo', uri: ser };
+      try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* ignore */ }
+    }
+    const r = await fetch(`${apiUrl}/profile/${userId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar: ser, token }),
+    });
+    if (r.ok) { try { localStorage.setItem(SYNC_KEY, syncSig(userId, ser)); } catch { /* ignore */ } }
+    return card.avatar;
   } catch { return null; }
 }
 
