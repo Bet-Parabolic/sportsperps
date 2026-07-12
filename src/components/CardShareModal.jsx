@@ -127,7 +127,18 @@ export function StatCard({ width = 336, username, avatar, rank = null, roiPct = 
                 <path d={signature.d} stroke="#fff" strokeWidth={Math.max(3, signature.w / 55)} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-          ) : null}
+          ) : (
+            // No ROI + no signature (profile/onboarding before a signature is drawn) → the corner would
+            // read as blank, so fall back to the barcode + PARABOLIC MEMBER (as the old member card had).
+            <div style={{ position: "absolute", right: 20 * k, bottom: 20 * k, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 * k, pointerEvents: "none" }}>
+              <div style={{ display: "flex", gap: 1.4 * k, alignItems: "flex-end" }}>
+                {BARCODE_WIDTHS.map((w, i) => (
+                  <div key={i} style={{ width: w * 1.45 * k, height: 12 * k, background: "rgba(255,255,255,0.85)" }} />
+                ))}
+              </div>
+              <span style={{ fontFamily: fm, fontSize: 8.5 * k, letterSpacing: "0.14em", color: "rgba(255,255,255,0.75)" }}>PARABOLIC MEMBER</span>
+            </div>
+          )}
         </>
       )}
     </div>
