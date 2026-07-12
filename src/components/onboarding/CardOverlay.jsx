@@ -8,7 +8,7 @@ import { useState } from "react";
 import { B, fd, fb, fm } from "../../lib/theme.js";
 import { currentUserId, getAuth } from "../../lib/auth.js";
 import { loadCard, referralCodeFor } from "../../lib/onboarding.js";
-import { MemberCard } from "./MemberCard.jsx";
+import { StatCard } from "../CardShareModal.jsx";
 import { Lanyard } from "./Lanyard.jsx";
 
 export function CardOverlay({ onClose }) {
@@ -55,7 +55,7 @@ export function CardOverlay({ onClose }) {
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
               <Lanyard sport={card.sport} width={46} height={190} />
               <div onClick={() => setBack((v) => !v)} style={{ marginTop: -6, cursor: "pointer" }} title="Tap to flip">
-                <MemberCard width={cardW} username={username} avatar={card.avatar} signature={card.signature} back={back} referralCode={code} qrValue={shareUrl} />
+                <StatCard width={cardW} username={username} avatar={card.avatar} signature={card.signature} back={back} referralCode={code} qrValue={shareUrl} />
               </div>
               <div style={{ fontSize: 12, color: "#666", marginTop: 14 }}>Tap the card to flip</div>
             </div>

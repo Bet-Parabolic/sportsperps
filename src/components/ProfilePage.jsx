@@ -4,7 +4,8 @@ import { fmtUsd, fmtPct } from "../lib/helpers.js";
 import { API_URL } from "../lib/constants.js";
 import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "../lib/auth.js";
 import { CardShareModal } from "./CardShareModal.jsx";
-import { MemberCard, AvatarCircle } from "./onboarding/MemberCard.jsx";
+import { AvatarCircle } from "./onboarding/MemberCard.jsx";
+import { StatCard } from "./CardShareModal.jsx";
 import { loadCard, referralCodeFor, syncAvatarToBackend } from "../lib/onboarding.js";
 import { webNotifyState, enableWebNotify, disableWebNotify } from "../lib/webNotify.js";
 
@@ -192,7 +193,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
 
           {/* Member card — always visible; click for the full overlay (flip/QR/share) */}
           <div onClick={() => setShowCard(true)} style={{ cursor: "pointer", marginBottom: 12 }} title="Open my card">
-            <MemberCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={memberCard.avatar} signature={memberCard.signature} referralCode={referralCodeFor(userId)} />
+            <StatCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={memberCard.avatar} signature={memberCard.signature} referralCode={referralCodeFor(userId)} />
             <div style={{ fontSize: 11, color: B.dim, marginTop: 6, textAlign: "center" }}>Tap the card to share</div>
           </div>
 

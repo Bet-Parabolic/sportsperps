@@ -124,13 +124,18 @@ function RoundCard({ m, label, onOpen, gold = false, prob = null }) {
   const live = m?.state === "in";
   const done = m?.state === "post";
   const showProb = prob != null && !done && m && !m.home.tbd && !m.away.tbd;
+  // Tradeable RIGHT NOW = seeded oracle (prob present) on a not-yet-final match with known teams,
+  // AND either live or inside the pregame window (kickoff < 24h — same gate as the pregame nudge).
+  // Future rounds (SF/Final) can carry a seeded advance-market prob days out — those are NOT gold.
+  const withinWindow = m?.date instanceof Date && m.date.getTime() - Date.now() < 24 * 3600e3;
+  const tradeable = showProb && (live || withinWindow);
   return (
     <div onClick={() => m && onOpen?.(m)} style={{
       borderRadius: 20, padding: "14px 12px", cursor: m ? "pointer" : "default", textAlign: "center",
       display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
       background: gold ? "linear-gradient(180deg, rgba(255,229,113,0.10), rgba(30,28,20,0.6)), #232323" : "rgba(28,29,33,0.85)",
-      border: `1px solid ${live ? B.primary + "66" : gold ? "rgba(255,229,113,0.22)" : "rgba(255,255,255,0.05)"}`,
-      boxShadow: gold ? "inset 0 1px 1px rgba(255,255,255,0.12), inset 0 0 18px rgba(255,238,160,0.10), 0 3px 2px -2px rgba(0,0,0,0.25)" : "inset 0 1px 1px rgba(255,255,255,0.05), 0 3px 2px -2px rgba(0,0,0,0.25)",
+      border: `1px solid ${tradeable ? GOLD : gold ? "rgba(255,229,113,0.22)" : "rgba(255,255,255,0.05)"}`,
+      boxShadow: tradeable ? `0 0 0 1px ${GOLD}, 0 0 18px ${GOLD}55, 0 3px 2px -2px rgba(0,0,0,0.25)` : gold ? "inset 0 1px 1px rgba(255,255,255,0.12), inset 0 0 18px rgba(255,238,160,0.10), 0 3px 2px -2px rgba(0,0,0,0.25)" : "inset 0 1px 1px rgba(255,255,255,0.05), 0 3px 2px -2px rgba(0,0,0,0.25)",
     }}>
       <RoundChip gold={gold}>{live ? "● LIVE" : label}</RoundChip>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: gold ? 10 : 16 }}>
@@ -182,10 +187,13 @@ function QfCard({ m, onOpen, prob = null }) {
       {showProb && <Pct p={prob} home={home} />}
     </div>
   );
+  // gold highlight only when actually tradeable now: seeded oracle + (live or kickoff < 24h)
+  const withinWindow = m?.date instanceof Date && m.date.getTime() - Date.now() < 24 * 3600e3;
+  const tradeable = showProb && (live || withinWindow);
   return (
-    <div onClick={() => onOpen?.(m)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 10px", borderRadius: 18, background: "rgba(30,31,36,0.9)", border: `1px solid ${live ? B.primary + "66" : "rgba(255,255,255,0.06)"}`, cursor: "pointer", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.05)" }}>
+    <div onClick={() => onOpen?.(m)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 10px", borderRadius: 18, background: "rgba(30,31,36,0.9)", border: `1px solid ${tradeable ? GOLD : "rgba(255,255,255,0.06)"}`, cursor: "pointer", boxShadow: tradeable ? `0 0 0 1px ${GOLD}, 0 0 16px ${GOLD}55` : "inset 0 1px 1px rgba(255,255,255,0.05)" }}>
       <div style={{ display: "flex", gap: 18 }}><Col t={m.home} home /><Col t={m.away} /></div>
-      <span style={{ fontFamily: fb, fontSize: 11, color: live ? "#ff5247" : "#8a93a6", fontWeight: 600 }}>{live ? "● LIVE — Trade" : done ? "Full time" : fmtWhen(m.date).split(",")[0]}</span>
+      <span style={{ fontFamily: fb, fontSize: 11, color: live ? "#ff5247" : tradeable ? GOLD : "#8a93a6", fontWeight: 600 }}>{live ? "● LIVE — Trade" : tradeable ? "Trade Pre-Game →" : done ? "Full time" : fmtWhen(m.date).split(",")[0]}</span>
     </div>
   );
 }

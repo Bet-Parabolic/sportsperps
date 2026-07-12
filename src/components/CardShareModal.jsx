@@ -6,6 +6,7 @@
  * then Share on X / download PNG / copy link.
  */
 import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { fd, fb, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { LOGO_WORDMARK } from "../lib/logos.js";
@@ -28,10 +29,30 @@ export function LanyardStrap({ strapH = 96, width = 34 }) {
   );
 }
 
-/* ── glossy black stat card. variant "wordmark" (leaderboard) | "barcode" (share modal) ── */
-export function StatCard({ width = 336, username, avatar, rank = null, roiPct = null, trades = null, variant = "wordmark" }) {
+/* QR generator for the referral back face (ported from MemberCard so StatCard is fully self-contained). */
+function useQrDataUrl(value, sizePx) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    if (!value) { setUrl(null); return undefined; }
+    let live = true;
+    QRCode.toDataURL(value, { errorCorrectionLevel: "M", margin: 0, width: Math.max(64, Math.round(sizePx * 2)), color: { dark: "#0a0a0a", light: "#ffffff" } })
+      .then((u) => { if (live) setUrl(u); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [value, sizePx]);
+  return url;
+}
+
+/* ── glossy black member card — the ONE canonical card used everywhere (leaderboard, share modal,
+   profile, onboarding). variant "wordmark" (default) | "barcode" (share modal only). The bottom-
+   right corner is context-swapped: rank/ROI/trades on the leaderboard + share; the drawn signature
+   on profile + onboarding. `back` renders the QR + referral rail (onboarding flip). ── */
+export function StatCard({ width = 336, username, avatar, rank = null, roiPct = null, trades = null, variant = "wordmark",
+  signature = null, back = false, referralCode = "000000", qrValue = "https://parabolic.gg", placeholder = false }) {
   const k = width / 336;
   const h = 190 * k;
+  const qrSize = 128 * k;
+  const qrUrl = useQrDataUrl(back ? qrValue : null, qrSize);
   return (
     <div style={{ position: "relative", width, height: h, borderRadius: 22 * k, overflow: "hidden", flexShrink: 0,
       background: "linear-gradient(135deg, #1d1d20 0%, #121214 45%, #18181b 70%, #0e0e10 100%)",
@@ -46,37 +67,68 @@ export function StatCard({ width = 336, username, avatar, rank = null, roiPct = 
       {/* lanyard notch slot */}
       <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: 9 * k, width: 51 * k, height: 8 * k, borderRadius: 4 * k, background: "#050505" }} />
 
-      {variant === "wordmark" ? (
-        <img src={LOGO_WORDMARK} alt="Parabolic" style={{ position: "absolute", left: 22 * k, top: 22 * k, height: 15 * k }} />
-      ) : (
-        <div style={{ position: "absolute", left: 24 * k, top: 22 * k, display: "flex", flexDirection: "column", gap: 4 * k }}>
-          <div style={{ display: "flex", gap: 1.4 * k, alignItems: "flex-end" }}>
-            {BARCODE_WIDTHS.map((w, i) => (
-              <div key={i} style={{ width: w * 1.45 * k, height: 12 * k, background: "rgba(255,255,255,0.85)" }} />
-            ))}
+      {back ? (
+        <>
+          {/* QR plate */}
+          <div style={{ position: "absolute", left: 26 * k, top: 24 * k, width: 143 * k, height: 143 * k, borderRadius: 14 * k, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {qrUrl && <img src={qrUrl} alt="QR" style={{ width: qrSize, height: qrSize }} />}
+            {avatar && <div style={{ position: "absolute" }}><AvatarCircle avatar={avatar} size={34 * k} /></div>}
           </div>
-          <span style={{ fontFamily: fm, fontSize: 8.5 * k, letterSpacing: "0.14em", color: "rgba(255,255,255,0.75)" }}>PARABOLIC MEMBER</span>
-        </div>
-      )}
+          {/* referral-code rail */}
+          <div style={{ position: "absolute", right: 12 * k, top: 10 * k, bottom: 10 * k, width: 96 * k, display: "flex", alignItems: "center" }}>
+            <div style={{ width: 26 * k, alignSelf: "stretch", background: "rgba(255,255,255,0.08)", borderRadius: 6 * k, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ writingMode: "vertical-rl", fontFamily: fm, fontSize: 9 * k, letterSpacing: 2 * k, color: "rgba(255,255,255,0.7)" }}>REFERRAL CODE</span>
+            </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between", padding: `${4 * k}px 0`, alignSelf: "stretch" }}>
+              {referralCode.split("").map((c, i) => (
+                <span key={i} style={{ transform: "rotate(90deg)", fontWeight: 600, fontSize: 20 * k, color: "#fff" }}>{c}</span>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {variant === "wordmark" ? (
+            <img src={LOGO_WORDMARK} alt="Parabolic" style={{ position: "absolute", left: 22 * k, top: 22 * k, height: 15 * k }} />
+          ) : (
+            <div style={{ position: "absolute", left: 24 * k, top: 22 * k, display: "flex", flexDirection: "column", gap: 4 * k }}>
+              <div style={{ display: "flex", gap: 1.4 * k, alignItems: "flex-end" }}>
+                {BARCODE_WIDTHS.map((w, i) => (
+                  <div key={i} style={{ width: w * 1.45 * k, height: 12 * k, background: "rgba(255,255,255,0.85)" }} />
+                ))}
+              </div>
+              <span style={{ fontFamily: fm, fontSize: 8.5 * k, letterSpacing: "0.14em", color: "rgba(255,255,255,0.75)" }}>PARABOLIC MEMBER</span>
+            </div>
+          )}
 
-      {rank != null && (
-        <div style={{ position: "absolute", right: 20 * k, top: 18 * k, padding: `${5 * k}px ${11 * k}px`, borderRadius: 999, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(4px)" }}>
-          <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 12.5 * k, color: "#fff" }}>#{rank}</span>
-        </div>
-      )}
+          {rank != null && (
+            <div style={{ position: "absolute", right: 20 * k, top: 18 * k, padding: `${5 * k}px ${11 * k}px`, borderRadius: 999, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(4px)" }}>
+              <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 12.5 * k, color: "#fff" }}>#{rank}</span>
+            </div>
+          )}
 
-      <div style={{ position: "absolute", left: 22 * k, top: 88 * k }}>
-        <AvatarCircle avatar={avatar} size={40 * k} />
-      </div>
-      <div style={{ position: "absolute", left: 22 * k, bottom: 20 * k, maxWidth: 190 * k, fontFamily: fb, fontWeight: 700, fontSize: 19 * k, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {username}
-      </div>
+          <div style={{ position: "absolute", left: 22 * k, top: 88 * k }}>
+            <AvatarCircle avatar={avatar} size={40 * k} />
+          </div>
+          <div style={{ position: "absolute", left: 22 * k, bottom: 20 * k, maxWidth: 190 * k, fontFamily: fb, fontWeight: 700, fontSize: 19 * k, color: placeholder ? "rgba(255,255,255,0.35)" : "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {username}
+          </div>
 
-      {roiPct != null && (
-        <div style={{ position: "absolute", right: 22 * k, bottom: 22 * k, textAlign: "right" }}>
-          <div style={{ fontFamily: fb, fontWeight: 700, fontSize: 17 * k, color: roiPct >= 0 ? GREEN : "#ff5247" }}>{fmtRoi(roiPct)}</div>
-          {trades != null && <div style={{ fontFamily: fb, fontSize: 13 * k, color: "#a7abb3", marginTop: 2 * k }}>{trades} trades</div>}
-        </div>
+          {/* bottom-right — context swap: leaderboard/share show rank+ROI+trades; profile/onboarding
+              show the drawn signature. ROI takes precedence if both are somehow supplied. */}
+          {roiPct != null ? (
+            <div style={{ position: "absolute", right: 22 * k, bottom: 22 * k, textAlign: "right" }}>
+              <div style={{ fontFamily: fb, fontWeight: 700, fontSize: 17 * k, color: roiPct >= 0 ? GREEN : "#ff5247" }}>{fmtRoi(roiPct)}</div>
+              {trades != null && <div style={{ fontFamily: fb, fontSize: 13 * k, color: "#a7abb3", marginTop: 2 * k }}>{trades} trades</div>}
+            </div>
+          ) : signature?.d ? (
+            <div style={{ position: "absolute", right: 14 * k, bottom: 14 * k, opacity: 0.95, pointerEvents: "none" }}>
+              <svg width={150 * k} height={82 * k} viewBox={`0 0 ${signature.w} ${signature.h}`} preserveAspectRatio="xMidYMax meet">
+                <path d={signature.d} stroke="#fff" strokeWidth={Math.max(3, signature.w / 55)} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );

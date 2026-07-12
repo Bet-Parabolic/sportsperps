@@ -10,7 +10,7 @@ import { fmtUsd, fmtPct } from "../lib/helpers.js";
 import { API_URL } from "../lib/constants.js";
 import { getAuth, authToken, currentUserId } from "../lib/auth.js";
 import { parseAvatar } from "../lib/onboarding.js";
-import { MemberCard } from "./onboarding/MemberCard.jsx";
+import { StatCard } from "./CardShareModal.jsx";
 
 const GREEN = "#5ed87e";
 const fmtRoi = (v) => `${v >= 0 ? "+" : ""}${Number(v ?? 0).toFixed(2)}%`;
@@ -142,7 +142,7 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
 
               {/* Member card (avatar synced from their account; no signature — device-local) */}
               <div style={{ marginBottom: 12 }}>
-                <MemberCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={avatar} signature={null} />
+                <StatCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={avatar} signature={null} />
               </div>
 
               {wc?.rank != null && (

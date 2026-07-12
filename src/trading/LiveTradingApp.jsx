@@ -1222,7 +1222,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 : '$'+balance.toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2})}
             </div>
           </div>
-          <button onClick={()=>setShowDeposit(true)} style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>
+          {/* Deposit button removed on the WC surface (no deposits during the paper competition). */}
+          {!worldcup&&<button onClick={()=>setShowDeposit(true)} style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>}
           <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14,overflow:'hidden'}}>
             {cardAvatar ? <AvatarCircle avatar={cardAvatar} size={32}/> : '👤'}
           </div>
@@ -1233,8 +1234,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       <div style={{display:'flex',height:isMobile?'auto':'calc(100vh - 56px)',flexDirection:isMobile?'column':'row',minHeight:isMobile?'calc(100vh - 56px)':'auto'}}>
         {!isMobile && <NavRail active={null} onNav={(tab)=>onNavTo?.(tab)} liveGames={liveGames} onTrade={onTrade} hide={worldcup ? ["bookmarks"] : []}/>}
 
-        {/* LEFT SIDEBAR */}
-        {!isMobile&&<div style={{width:260,borderRight:'1px solid #1a1a1a',overflow:'auto',flexShrink:0,padding:'16px 0'}}>
+        {/* LEFT SIDEBAR — hidden on the World Cup surface: single-event, only ever one game live,
+            so the "other markets" column is noise (the chart takes the space instead). */}
+        {!isMobile&&!worldcup&&<div style={{width:260,borderRight:'1px solid #1a1a1a',overflow:'auto',flexShrink:0,padding:'16px 0'}}>
           {/* Viewing Now */}
           <div style={{margin:'0 16px 16px',padding:'12px 14px',background:B.primary+'12',borderRadius:12,border:'1px solid '+B.primary+'25'}}>
             <div style={{fontSize:10,color:B.primary,fontWeight:700,marginBottom:6,fontFamily:fm,letterSpacing:'0.08em'}}>LIVE NOW</div>

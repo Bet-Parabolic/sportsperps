@@ -23,9 +23,8 @@ const stagingId = () => getAuth()?.userId || onboardingStagingId();
 import { AuthModal } from "../AuthModal.jsx";
 import { track } from "../../lib/track.js";
 import { draft, resetDraft, persistCard, resizeAvatar, serializeAvatar } from "../../lib/onboarding.js";
-import { MemberCard } from "./MemberCard.jsx";
 import { SignaturePad } from "./SignaturePad.jsx";
-import { LanyardStrap } from "../CardShareModal.jsx";
+import { LanyardStrap, StatCard } from "../CardShareModal.jsx";
 import { LOGO_WORDMARK } from "../../lib/logos.js";
 const stadiumBg = "/stadium.webp"; // stable public/ url — same file worldcup.html preloads (no double-download)
 
@@ -76,7 +75,7 @@ function Shell({ children, corner, onClose, preview }) {
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
               <LanyardStrap strapH={140} width={36} />
               <div style={{ marginTop: -6, filter: "drop-shadow(0 24px 40px rgba(0,0,0,0.55))" }}>
-                <MemberCard width={356} username={preview?.username || "Username"} placeholder={!preview?.username}
+                <StatCard width={356} username={preview?.username || "Username"} placeholder={!preview?.username}
                   avatar={preview?.avatar || null} signature={preview?.signature || null} />
               </div>
             </div>
@@ -569,7 +568,7 @@ function DoneStep({ worldcup, onFinish, preview }) {
     <Shell onClose={null} preview={{ ...preview, username }} corner={null}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", maxWidth: 396, width: "100%", margin: "0 auto", textAlign: "center" }}>
         <div style={{ marginBottom: 22 }}>
-          <MemberCard width={190} username={username} avatar={draft.avatar} signature={draft.signature} />
+          <StatCard width={190} username={username} avatar={draft.avatar} signature={draft.signature} />
         </div>
         <span style={{ background: "rgba(94,216,126,0.14)", color: "#5ed87e", borderRadius: 999, padding: "5px 12px", fontSize: 12.5, fontWeight: 700 }}>Card issued</span>
         <div style={{ fontFamily: fd, fontSize: 21, fontWeight: 700, marginTop: 16 }}>Welcome, {username}</div>
