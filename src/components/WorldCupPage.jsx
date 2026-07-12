@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { Home, Ticket, Newspaper, Trophy } from "lucide-react";
+import { Home, Ticket, Newspaper, Trophy, BookOpen } from "lucide-react";
 import { B, fb, fd, fm } from "../lib/theme.js";
-import { LOGO_WORDMARK } from "../lib/logos.js";
+import { LOGO_WORDMARK, LOGO_MARK } from "../lib/logos.js";
 import { API_URL } from "../lib/constants.js";
 import { getAuth, authToken, currentUserId } from "../lib/auth.js";
 import { track } from "../lib/track.js";
@@ -285,15 +285,29 @@ function WCRail({ tab, onTab, liveWc, onOpenLive }) {
           </div>
         </div>
       )}
-      {/* X account — pinned to the rail's bottom = the page's bottom-left corner on desktop */}
-      <a href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Parabolic on X" title="@betparabolic on X"
-        style={{ marginTop: "auto", width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#63676e", textDecoration: "none" }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = "#63676e"; e.currentTarget.style.background = "transparent"; }}>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-        </svg>
-      </a>
+      {/* Bottom-left link stack: Parabolic logo → landing, docs, X — pinned to the rail's bottom */}
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+        <a href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" title="parabolic.gg"
+          style={{ width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", opacity: 0.55 }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.55"; e.currentTarget.style.background = "transparent"; }}>
+          <img src={LOGO_MARK} alt="Parabolic" style={{ width: 18, height: 18, objectFit: "contain" }} />
+        </a>
+        <a href="https://docs.parabolic.gg/docs" target="_blank" rel="noopener noreferrer" aria-label="Parabolic docs" title="Docs"
+          style={{ width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#63676e", textDecoration: "none" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#63676e"; e.currentTarget.style.background = "transparent"; }}>
+          <BookOpen size={17} strokeWidth={2} />
+        </a>
+        <a href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Parabolic on X" title="@betparabolic on X"
+          style={{ width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#63676e", textDecoration: "none" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "#63676e"; e.currentTarget.style.background = "transparent"; }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+        </a>
+      </div>
     </div>
   );
 }
@@ -602,12 +616,19 @@ export function WorldCupPage({ lockedOut = false }) {
           World Cup Cash is competition play money, fully separate from your Parabolic paper balance. Your account here IS your
           Parabolic account — same login everywhere. Prizes require verified identity; accounts showing manipulation may be voided.
         </p>
-        {/* mobile bottom-left X link — desktop gets it pinned at the bottom of the nav rail instead */}
+        {/* mobile bottom-left links (logo → landing · docs · X) — desktop pins these on the nav rail */}
         {isMobile && (
-          <div style={{ display: "flex", justifyContent: "flex-start", padding: "18px 4px 8px" }}>
+          <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 18, padding: "18px 4px 8px" }}>
+            <a href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" style={{ display: "flex", alignItems: "center", opacity: 0.55 }}>
+              <img src={LOGO_MARK} alt="Parabolic" style={{ width: 16, height: 16, objectFit: "contain" }} />
+            </a>
+            <a href="https://docs.parabolic.gg/docs" target="_blank" rel="noopener noreferrer" aria-label="Parabolic docs"
+              style={{ display: "flex", alignItems: "center", gap: 6, color: "#63676e", textDecoration: "none", fontFamily: fb, fontSize: 12.5, fontWeight: 600 }}>
+              <BookOpen size={14} strokeWidth={2} /> Docs
+            </a>
             <a href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Parabolic on X"
-              style={{ display: "flex", alignItems: "center", gap: 8, color: "#63676e", textDecoration: "none", fontFamily: fb, fontSize: 12.5, fontWeight: 600 }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              style={{ display: "flex", alignItems: "center", gap: 6, color: "#63676e", textDecoration: "none", fontFamily: fb, fontSize: 12.5, fontWeight: 600 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
               @betparabolic

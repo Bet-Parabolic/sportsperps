@@ -137,7 +137,11 @@ export default function App() {
   // state, so the lock lifts the moment they register/login). Every other route/page requires an
   // account. /dash keeps its own admin password; /waitlist stays public.
   const loggedOut = !getAuth();
-  const authGate = loggedOut && !isDash && !isWaitlist;
+  // The MARKETING domain (parabolic.gg) is exempt — it shows the landing page to everyone
+  // (July 12 fix: the gate was funneling parabolic.gg visitors to /worldcup too, making the
+  // landing page unreachable; only app.parabolic.gg should route logged-out visitors to the WC
+  // hub). parabolic.gg/worldcup still shows the locked WC page.
+  const authGate = loggedOut && !isDash && !isWaitlist && !(isProdLanding && !isWorldCup);
 
   const [page, setPage] = useState(postLogoutAuth ? "onboarding" : isAppDomain ? "trading" : "landing");
   const [liveGame, setLiveGame] = useState(null);
