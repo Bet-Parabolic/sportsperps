@@ -123,9 +123,10 @@ function LevSlider({ eL, ml, onChange, compact = false, liq = null, cap = null }
           <div style={{marginBottom:9}}>
             <span style={{color:!priceBinds?B.primary:'#fff',fontWeight:700}}>2 · The one-play rule{!priceBinds?' - binding now':''}.</span>{' '}
             Your liquidation buffer must survive one decisive play - a goal, a touchdown, a home run - without
-            gapping straight past your bankruptcy price. The possible swing grows sharply toward the end of a
-            close game, and in soccer a single goal moves a close match 6–7 points even before kickoff - so
-            tight soccer markets sit below the price table from the start. Lopsided games are barely restricted.
+            gapping straight past your bankruptcy price. In soccer the very first goal can move a close match
+            6-7 points, so tight soccer markets are capped below the price table from the moment they open -
+            and the cap tightens further late in a close game, when one goal decides everything. Lopsided
+            games are barely restricted.
             {!priceBinds && <> Right now this rule sets the ceiling at <span style={{color:'#fff',fontWeight:700}}>{ml}x</span>{priceCap!=null&&priceCap>ml?<> (the price cap alone would allow {priceCap}x)</>:null}.</>}
           </div>
           <div style={{color:'#6a6f77'}}>
@@ -1407,12 +1408,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       {g.status==='final'?'Final':g.status==='halftime'?'Half':g.status==='scheduled'?startsInLabel(g.startTime):g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||'Live'}
                     </div>
                   </div>
+                  {/* flag inner, text outer (July 12) — true mirror of the home side */}
                   <div style={{display:'flex',alignItems:'center',gap:8,flex:1,justifyContent:'flex-end',minWidth:0}}>
+                    {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>⚽</span>}
                     <div style={{textAlign:'right',minWidth:0}}>
                       <div style={{fontSize:14,fontWeight:800,color:'#fff',fontFamily:fm}}>{AWAY.short}</div>
                       <div style={{fontSize:9,color:'#555',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{AWAY.name}</div>
                     </div>
-                    {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>⚽</span>}
                   </div>
                 </div>
                 <div style={{marginTop:8,height:3,background:'#1a1a1a',borderRadius:3,overflow:'hidden'}}>
@@ -1448,12 +1450,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   </div>
                   <div style={{fontSize:11,color:'#555',marginTop:6}}>{g.shortName||g.name}</div>
                 </div>
+                {/* flag inner, text outer (July 12) — true mirror of the home side */}
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  <div>
+                  {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>⚽</span>}
+                  <div style={{textAlign:'right'}}>
                     <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{AWAY.name}</div>
                     <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{AWAY.short}</div>
                   </div>
-                  {AWAY.logoUrl?<img src={AWAY.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>⚽</span>}
                 </div>
               </div>
             )}
