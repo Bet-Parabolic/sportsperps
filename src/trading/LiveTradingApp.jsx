@@ -1183,6 +1183,63 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   }, [rawScoringPlays, chartData, isBaseball, curInning]);
 
   // ── render ──────────────────────────────────────────────────────────────
+  // ── STATIC RECAP for matches opened ALREADY final (July 12 user decision): final score +
+  // box score ONLY. No chart (archived tick spans render garbage x-axes), no positions/realized
+  // (those are account-wide numbers that read as per-match), no wager UI. Just the result.
+  if (openedFinalRef.current) {
+    const teams = g.boxscore?.teams || [];
+    const homeT = teams.find(t=>t.team===HOME.name) || teams[0];
+    const awayT = teams.find(t=>t.team===AWAY.name) || teams[1];
+    const awayByName = Object.fromEntries(((awayT&&awayT.stats)||[]).map(s=>[s.name,s.value]));
+    const rows = teams.length>=2 ? ((homeT.stats||[]).filter(s=>awayByName[s.name]!==undefined)) : [];
+    return (
+      <div style={{background:'#0a0a0a',fontFamily:fb,minHeight:'100vh',color:'#fff'}}>
+        <div style={{padding:isMobile?'0 12px':'0 24px',height:56,display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid #1a1a1a',position:'sticky',top:0,background:'#0a0a0a',zIndex:20}}>
+          <button onClick={onBack} aria-label="Back" style={{background:'none',border:'none',cursor:'pointer',color:'#888',fontSize:20,padding:'8px 12px',lineHeight:1}}>‹</button>
+          <span style={{fontSize:12,fontWeight:700,color:'#666',fontFamily:fm,letterSpacing:'0.08em'}}>FULL TIME</span>
+        </div>
+        <div style={{maxWidth:560,margin:'0 auto',padding:'22px 16px 40px'}}>
+          <div style={{background:'#101114',border:'1px solid #1c1e24',borderRadius:16,padding:'22px 18px',textAlign:'center'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',alignItems:'center',gap:10}}>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+                {HOME.logoUrl?<img src={HOME.logoUrl} alt="" style={{width:44,height:44,objectFit:'contain'}}/>:<span style={{fontSize:30}}>⚽</span>}
+                <span style={{fontSize:13,fontWeight:700}}>{HOME.name}</span>
+              </div>
+              <div>
+                <div style={{fontSize:34,fontWeight:800,fontFamily:fm}}>{g.home?.score??0} – {g.away?.score??0}</div>
+                <div style={{fontSize:12,color:B.primary,fontWeight:700,marginTop:2}}>Final</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+                {AWAY.logoUrl?<img src={AWAY.logoUrl} alt="" style={{width:44,height:44,objectFit:'contain'}}/>:<span style={{fontSize:30}}>⚽</span>}
+                <span style={{fontSize:13,fontWeight:700}}>{AWAY.name}</span>
+              </div>
+            </div>
+          </div>
+          <div style={{background:'#101114',border:'1px solid #1c1e24',borderRadius:16,padding:'16px 14px',marginTop:12}}>
+            <div style={{fontSize:11,fontWeight:700,color:'#777',letterSpacing:'0.1em',fontFamily:fm,marginBottom:10}}>BOX SCORE</div>
+            {rows.length===0 ? (
+              <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'18px 0'}}>Box score unavailable for this game.</div>
+            ) : (
+              <>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'2px 8px 10px'}}>
+                  <span style={{fontSize:12,fontWeight:800,color:HOME.light,fontFamily:fm}}>{HOME.short}</span>
+                  <span style={{fontSize:12,fontWeight:800,color:AWAY.light,fontFamily:fm}}>{AWAY.short}</span>
+                </div>
+                {rows.map((s,i)=>(
+                  <div key={s.name} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 8px',background:i%2===0?'#0a0a0a':'transparent',borderRadius:8}}>
+                    <span style={{flex:'0 0 72px',fontSize:13,fontWeight:700,color:'#fff',fontFamily:fm,textAlign:'left'}}>{s.value}</span>
+                    <span style={{flex:1,fontSize:11,color:'#888',textAlign:'center'}}>{s.displayName||s.name}</span>
+                    <span style={{flex:'0 0 72px',fontSize:13,fontWeight:700,color:'#fff',fontFamily:fm,textAlign:'right'}}>{awayByName[s.name]}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{background:'#0a0a0a', fontFamily:fb, minHeight:'100vh', color:'#fff'}}>
 
