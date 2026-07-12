@@ -255,6 +255,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const pollRef = useRef(null);  // latest poll() — lets WS events trigger reconciliation early
   const lastScoreIdRef = useRef(null);          // dedupe scoring plays across polls
   const prevScoreRef = useRef({ h: 0, a: 0 });  // detect which team just scored
+  const wsPlotRef = useRef({ ts: 0, px: null }); // Phase D: last chart point appended from a WS
+                                                 // game_update — server ts (monotonic guard) + price
   const closedIdsRef = useRef(new Set());       // position ids already moved to history (dedupe)
 
   // ── derived team objects ────────────────────────────────────────────────
@@ -697,6 +699,47 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       // popout is closed (and it's not our own message).
       if (msg.type === 'chat' && msg.message?.gameId === g.id) {
         if (!showChatPopRef.current && msg.message?.userId !== userId) setChatUnread(true);
+        return;
+      }
+      // ── Phase D: consume game_update push for THIS game ───────────────────────────────────
+      // Handled BEFORE the `msg.gameId` guard because game_update keys on msg.game.id (not
+      // msg.gameId), so the old guard silently dropped it and the active chart ran on the 5s
+      // poll alone. The 5s poll() below stays as reconciliation (balance/positions/depth/plays).
+      if (msg.type === 'game_update' && msg.game?.id === g.id) {
+        const gg = msg.game, o = gg.oracle;
+        setG(prev => ({ ...prev, home: gg.home ?? prev.home, away: gg.away ?? prev.away,
+          status: gg.status ?? prev.status, statusDetail: gg.statusDetail ?? prev.statusDetail,
+          period: gg.period ?? prev.period, clock: gg.clock ?? prev.clock }));
+        if (gg.maxLeverageBySide) setMarketMaxLevBySide(gg.maxLeverageBySide);
+        if (typeof gg.maxLeverage === 'number') setMarketMaxLev(gg.maxLeverage);
+        if (o && Number.isFinite(o.indexPrice)) {
+          const op = o.indexPrice, mp = Number.isFinite(o.markPrice) ? o.markPrice : op;
+          setOPrice(op); setOMark(mp);
+          if (Array.isArray(o.sources)) setOSrcs(o.sources);
+          if (Number.isFinite(o.confidence)) setOConf(o.confidence);
+          // Append a chart point stamped with SERVER time (o.updatedAt), not arrival time — so the
+          // X-axis reflects when the price was computed and true latency stays measurable. Throttle
+          // to match backend history: skip unless the price moved ≥0.05¢ or >10s since the last WS
+          // point. Monotonic guard drops out-of-order/duplicate pushes.
+          const svTs = Number.isFinite(o.updatedAt) ? o.updatedAt : Date.now();
+          const last = wsPlotRef.current;
+          const moved = last.px == null || Math.abs(op - last.px) >= 0.0005;
+          const aged = svTs - last.ts > 10_000;
+          if (svTs > last.ts && (moved || aged)) {
+            wsPlotRef.current = { ts: svTs, px: op };
+            setChartT0(prev => {
+              const ref = prev || Date.now();
+              const t = gameMinSince(initGame.startTime, svTs) ?? +((svTs - ref) / 60000).toFixed(2);
+              setChartData(cd => {
+                if (cd.length && cd[cd.length - 1].t >= t) return cd; // never plot behind the last point
+                return [...cd, { t, ph: op, pa: 1 - op, mp,
+                  floor: clamp(op - 0.2, 0.01, 0.99), ceil: clamp(op + 0.2, 0.01, 0.99),
+                  mh_val: null, mh_marker: null, ma_val: null, ma_marker: null }];
+              });
+              return prev || ref;
+            });
+          }
+        }
         return;
       }
       if (msg.gameId !== g.id) return;
