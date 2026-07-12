@@ -143,7 +143,9 @@ function RoundCard({ m, label, onOpen, gold = false, prob = null }) {
       boxShadow: tradeable ? `0 0 0 1px ${GOLD}, 0 0 18px ${GOLD}55, 0 3px 2px -2px rgba(0,0,0,0.25)` : gold ? "inset 0 1px 1px rgba(255,255,255,0.12), inset 0 0 18px rgba(255,238,160,0.10), 0 3px 2px -2px rgba(0,0,0,0.25)" : "inset 0 1px 1px rgba(255,255,255,0.05), 0 3px 2px -2px rgba(0,0,0,0.25)",
     }}>
       <RoundChip gold={gold}>{live ? "● LIVE" : label}</RoundChip>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: gold ? 10 : 16 }}>
+      {/* full-width + space-evenly so the team slots spread across the card — centered gap:10
+          left the TBD "?" chips squeezed together in the middle of the wide FINAL/3RD cards */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-evenly", width: "100%" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           <TeamSlot t={m?.home} size={gold ? 48 : 32} dim={done && m?.home.winner === false} />
           {m?.home && !m.home.tbd && <span style={{ fontFamily: fm, fontWeight: 700, fontSize: 11, color: done && m.home.winner === false ? "#666" : done && m.home.winner ? GREEN : "#fff" }}>{m.home.abbr}{m.state !== "pre" && m.home.score != null ? ` ${m.home.score}` : ""}</span>}
