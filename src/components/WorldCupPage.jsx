@@ -83,26 +83,31 @@ const fmtWhen = (d) => {
 
 /* ── circular flag: ESPN country pngs carry transparent padding, so scale the image up inside
    an overflow-hidden circle — no black letterbox (Figma glossy flag badges) ── */
-function FlagCircle({ src, size, dim = false, border = true }) {
+/* ── rectangular flag chip (full flag, 4:3, size = HEIGHT) — replaced the circular crop July 12:
+   ESPN's flag PNGs are letterboxed squares, so the circle showed blank space behind the flag.
+   objectFit:cover on a 4:3 rect fills the chip edge-to-edge with actual flag. ── */
+function FlagRect({ src, size, dim = false, border = true }) {
+  const w = Math.round(size * 4 / 3);
   return (
-    <div style={{ position: "relative", width: size, height: size, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "#1c1d21", border: border ? "1px solid rgba(255,255,255,0.14)" : "none", boxShadow: "inset 0 2px 3px rgba(255,255,255,0.18), inset 0 -2px 4px rgba(0,0,0,0.4)", opacity: dim ? 0.38 : 1 }}>
-      {src && <img src={src} alt="" style={{ position: "absolute", left: "-24%", top: "-24%", width: "148%", height: "148%", objectFit: "cover" }} />}
-      <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "radial-gradient(120% 90% at 30% 15%, rgba(255,255,255,0.22), rgba(255,255,255,0) 45%)" }} />
+    <div style={{ position: "relative", width: w, height: size, borderRadius: Math.max(3, Math.round(size * 0.12)), overflow: "hidden", flexShrink: 0, background: "#1c1d21", border: border ? "1px solid rgba(255,255,255,0.14)" : "none", boxShadow: "0 1px 3px rgba(0,0,0,0.4)", opacity: dim ? 0.38 : 1 }}>
+      {src && <img src={src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 42%)" }} />
     </div>
   );
 }
 
-/* ── team chip: circular flag when known, clean dark "?" for unresolved slots ── */
+/* ── team chip: rectangular flag when known, clean dark "?" for unresolved slots ── */
 function TeamSlot({ t, size = 32, dim = false }) {
   if (t?.tbd || !t?.logo) {
+    const w = Math.round(size * 4 / 3);
     return (
-      <div style={{ position: "relative", width: size, height: size, borderRadius: "50%", background: "#232323", border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.06)" }}>
+      <div style={{ position: "relative", width: w, height: size, borderRadius: Math.max(3, Math.round(size * 0.12)), background: "#232323", border: "1px solid rgba(255,255,255,0.1)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "inset 0 1px 1px rgba(255,255,255,0.06)" }}>
         <img src={laurelImg} alt="" style={{ position: "absolute", inset: "10%", width: "80%", height: "80%", objectFit: "contain", opacity: 0.22 }} />
         <span style={{ fontFamily: fb, fontWeight: 600, fontSize: size * 0.36, color: "#9a9a9a", position: "relative" }}>?</span>
       </div>
     );
   }
-  return <FlagCircle src={t.logo} size={size} dim={dim} />;
+  return <FlagRect src={t.logo} size={size} dim={dim} />;
 }
 
 /* win-% chip under a team once the oracle prices the matchup */
@@ -273,7 +278,7 @@ function WCRail({ tab, onTab, liveWc, onOpenLive }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             {liveWc.slice(0, 3).flatMap((g) => [g.home?.logo, g.away?.logo]).filter(Boolean).slice(0, 3).map((logo, i) => (
-              <div key={i} style={{ marginTop: i ? -5 : 0 }}><FlagCircle src={logo} size={18} /></div>
+              <div key={i} style={{ marginTop: i ? -5 : 0 }}><FlagRect src={logo} size={16} /></div>
             ))}
           </div>
         </div>
@@ -308,8 +313,9 @@ function CountdownRing({ nextMatch, live = false }) {
           </text>
         </svg>
         <img src={fifa26} alt="FIFA World Cup 26" style={{ position: "absolute", left: "50%", top: 96, transform: "translate(-50%,-50%)", width: 74, objectFit: "contain" }} />
-        <div style={{ position: "absolute", left: -4, top: 86 }}><FlagCircle src={nextMatch.away.logo} size={36} /></div>
-        <div style={{ position: "absolute", right: -4, top: 86 }}><FlagCircle src={nextMatch.home.logo} size={36} /></div>
+        {/* rect flags are wider than the old circles (4:3) — pull further out so they stay centered on the ring */}
+        <div style={{ position: "absolute", left: -12, top: 88 }}><FlagRect src={nextMatch.away.logo} size={32} /></div>
+        <div style={{ position: "absolute", right: -12, top: 88 }}><FlagRect src={nextMatch.home.logo} size={32} /></div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center", zIndex: 1 }}>
         <span style={{ fontFamily: fd, fontWeight: 800, fontSize: 17, letterSpacing: "0.05em", color: "#fff" }}>NEXT MATCH</span>
