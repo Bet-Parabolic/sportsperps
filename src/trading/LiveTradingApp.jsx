@@ -1008,6 +1008,19 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // the stale higher value keeps getting submitted and rejected, hard-sticking the user.
   useEffect(() => { if (orderLev > ml) setOrderLev(ml); }, [ml, orderLev]);
   const team = orderSide==='home' ? HOME : AWAY;
+  // WC semifinalists get NATIONAL-FLAG Buy buttons (July 12 user decision) — exact flag shades,
+  // keyed by TEAM NAME so the styling follows each country into the 3rd-place match and the Final
+  // automatically. Any team not in the map keeps the standard brand-green CTA.
+  //   France: tricolore blue #002395 / red #ED2939 · Spain: rojigualda red #AA151B / yellow #F1BF00
+  //   England: St George white #FFFFFF / red #CE1124 · Argentina: celeste #74ACDF / white #FFFFFF
+  const WC_TEAM_BTN = {
+    France:    { bg: '#002395', fg: '#ED2939' },
+    Spain:     { bg: '#AA151B', fg: '#F1BF00' },
+    England:   { bg: '#FFFFFF', fg: '#CE1124' },
+    Argentina: { bg: '#74ACDF', fg: '#FFFFFF' },
+  };
+  // Only style the LIVE Buy CTA — never the disabled (settled/market-closed) or Join states.
+  const teamBtn = (!settled && !marketNotOpen && !(isEventGame && wcJoined === false) && WC_TEAM_BTN[team?.name]) || null;
   // Event (WC) games run MM=0 — the estimated liq is the BANKRUPTCY price (full buffer), not
   // the main ledger's half-margin maintenance trigger.
   const expo = eM*eL, liqP = liqPrice(orderSide, oPrice, eL, isEventGame ? 0 : undefined);
@@ -1896,10 +1909,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 on the button. Team KIT colors stay on the side selectors/accents only, so no
                 team's color data can ever make this button illegible. */}
             <button onClick={placeOrder} disabled={settled||marketNotOpen||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
-              border:settled||marketNotOpen?'2px solid #333':'2px solid '+B.green,
+              border:settled||marketNotOpen?'2px solid #333':teamBtn?'2px solid '+teamBtn.fg:'2px solid '+B.green,
               cursor:settled||marketNotOpen||eM<10?'not-allowed':'pointer',fontFamily:fb,borderRadius:12,transition:'all .15s',
-              background:settled||marketNotOpen?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,
-              color:settled||marketNotOpen?'#fff':'#000',opacity:settled||marketNotOpen||eM<10?0.4:1,
+              background:settled||marketNotOpen?'#222':teamBtn?teamBtn.bg:`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,
+              color:settled||marketNotOpen?'#fff':teamBtn?teamBtn.fg:'#000',opacity:settled||marketNotOpen||eM<10?0.4:1,
               display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
               {!settled&&!marketNotOpen&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:24,height:24,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
               {settled?'Game Settled':marketNotOpen?opensLabel:isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
@@ -2107,8 +2120,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       );})()}
                     </div>
                     <button onClick={()=>{placeOrder();setShowWager(false);}} disabled={settled||marketNotOpen||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'16px 0',fontWeight:700,fontSize:16,
-                      border:settled||marketNotOpen?'2px solid #333':'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
-                      background:settled||marketNotOpen?'#222':`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,color:settled||marketNotOpen?'#fff':'#000',opacity:settled||marketNotOpen||eM<10?0.4:1,
+                      border:settled||marketNotOpen?'2px solid #333':teamBtn?'2px solid '+teamBtn.fg:'2px solid '+B.green,cursor:'pointer',fontFamily:fb,borderRadius:14,
+                      background:settled||marketNotOpen?'#222':teamBtn?teamBtn.bg:`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,color:settled||marketNotOpen?'#fff':teamBtn?teamBtn.fg:'#000',opacity:settled||marketNotOpen||eM<10?0.4:1,
                       display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
                       {!settled&&!marketNotOpen&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:26,height:26,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
                       {settled?'Game Settled':marketNotOpen?opensLabel:isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
