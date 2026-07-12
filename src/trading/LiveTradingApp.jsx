@@ -171,6 +171,11 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const [closedPnL,  setClosedPnL]  = useState(0);
   const [settled,    setSettled]    = useState(false);
   const [settledWinner, setSettledWinner] = useState(null);
+  // The celebration overlay ("🏆 X defeat Y" + portfolio return) is for a settlement that happens
+  // WHILE WATCHING. A game opened ALREADY final (bracket recap of an old match, incl. archived
+  // fallbacks) must render as a quiet recap — firing the overlay there showed a bogus
+  // just-settled/ROI screen on every old-match click (July 11 user report).
+  const openedFinalRef = useRef(initGame.status === 'final' || initGame.status === 'completed' || initGame.archived === true);
 
   const [orderSide,  setOrderSide]  = useState('home');
   const [orderMargin,setOrderMargin]= useState(500);
@@ -2065,8 +2070,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         )}
       </div>
 
-      {/* Settlement overlay */}
-      {settled&&(
+      {/* Settlement overlay — ONLY when the game settled during this session (never on recaps) */}
+      {settled&&!openedFinalRef.current&&(
         <div style={{position:'fixed',inset:0,zIndex:40,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,.85)',backdropFilter:'blur(20px)'}}>
           <div style={{textAlign:'center',padding:'48px 56px',maxWidth:440,background:'#111',borderRadius:24,border:'1px solid #2a2a2a'}}>
             <div style={{fontSize:56,marginBottom:16}}>🏆</div>
