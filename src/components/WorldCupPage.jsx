@@ -287,19 +287,19 @@ function WCRail({ tab, onTab, liveWc, onOpenLive }) {
       )}
       {/* Bottom-left link stack: Parabolic logo → landing, docs, X — pinned to the rail's bottom */}
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
-        <a href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" title="parabolic.gg"
+        <a data-ungated="1" href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" title="parabolic.gg"
           style={{ width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", opacity: 0.55 }}
           onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.55"; e.currentTarget.style.background = "transparent"; }}>
           <img src={LOGO_MARK} alt="Parabolic" style={{ width: 18, height: 18, objectFit: "contain" }} />
         </a>
-        <a href="https://docs.parabolic.gg/docs" target="_blank" rel="noopener noreferrer" aria-label="Parabolic docs" title="Docs"
+        <a data-ungated="1" href="https://docs.parabolic.gg/docs" target="_blank" rel="noopener noreferrer" aria-label="Parabolic docs" title="Docs"
           style={{ width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#63676e", textDecoration: "none" }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = "#63676e"; e.currentTarget.style.background = "transparent"; }}>
           <BookOpen size={17} strokeWidth={2} />
         </a>
-        <a href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Parabolic on X" title="@betparabolic on X"
+        <a data-ungated="1" href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Parabolic on X" title="@betparabolic on X"
           style={{ width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "#63676e", textDecoration: "none" }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = "#63676e"; e.currentTarget.style.background = "transparent"; }}>
@@ -619,14 +619,14 @@ export function WorldCupPage({ lockedOut = false }) {
         {/* mobile bottom-left links (logo → landing · docs · X) — desktop pins these on the nav rail */}
         {isMobile && (
           <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 18, padding: "18px 4px 8px" }}>
-            <a href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" style={{ display: "flex", alignItems: "center", opacity: 0.55 }}>
+            <a data-ungated="1" href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" style={{ display: "flex", alignItems: "center", opacity: 0.55 }}>
               <img src={LOGO_MARK} alt="Parabolic" style={{ width: 16, height: 16, objectFit: "contain" }} />
             </a>
-            <a href="https://docs.parabolic.gg/docs" target="_blank" rel="noopener noreferrer" aria-label="Parabolic docs"
+            <a data-ungated="1" href="https://docs.parabolic.gg/docs" target="_blank" rel="noopener noreferrer" aria-label="Parabolic docs"
               style={{ display: "flex", alignItems: "center", gap: 6, color: "#63676e", textDecoration: "none", fontFamily: fb, fontSize: 12.5, fontWeight: 600 }}>
               <BookOpen size={14} strokeWidth={2} /> Docs
             </a>
-            <a href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Parabolic on X"
+            <a data-ungated="1" href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Parabolic on X"
               style={{ display: "flex", alignItems: "center", gap: 6, color: "#63676e", textDecoration: "none", fontFamily: fb, fontSize: 12.5, fontWeight: 600 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -768,7 +768,11 @@ export function WorldCupPage({ lockedOut = false }) {
       // Guest elimination: a logged-out visitor may VIEW + scroll the WC page, but ANY click opens
       // onboarding. onClickCapture intercepts taps before children handle them; scroll (wheel/touch)
       // is untouched. Once onboarding is open (or the visitor logs in → !lockedOut) it stops firing.
-      onClickCapture={lockedOut && !auth && !showOnboard ? (e) => { e.preventDefault(); e.stopPropagation(); setShowOnboard(true); } : undefined}
+      onClickCapture={lockedOut && !auth && !showOnboard ? (e) => {
+        // The ONLY ungated clicks (July 12): the bottom-left external links — X, docs, landing.
+        if (e.target.closest?.('a[data-ungated]')) return;
+        e.preventDefault(); e.stopPropagation(); setShowOnboard(true);
+      } : undefined}
       style={{ height: "100vh", maxHeight: "100dvh", background: "#06070a", fontFamily: fb, color: "#eef1f6", display: "flex", overflow: "hidden" }}>
       {!isMobile && (
         <WCRail tab={tab} onTab={setTab} liveWc={wcLive} onOpenLive={openGame} />
