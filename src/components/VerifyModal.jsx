@@ -111,7 +111,7 @@ export function VerifyModal({ userId, onClose, onVerified }) {
           🏆 Verify to enter the championship
         </h2>
         <p style={{ margin: "0 0 14px", textAlign: "center", fontSize: 12.5, color: B.dim, fontFamily: fb, lineHeight: 1.55 }}>
-          Cash prizes need one entry per person. We use your email and phone to keep the contest fair and to contact winners — nothing else.
+          Cash prizes need one entry per person. We use your email and phone to keep the contest fair and to contact winners - nothing else.
         </p>
         <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 16 }}>
           {chip(status?.emailVerified, "Email")}
@@ -143,7 +143,7 @@ export function VerifyModal({ userId, onClose, onVerified }) {
               onKeyDown={(e) => e.key === "Enter" && !codeSent && sendCode()}
             />
             {!isEmail && !codeSent && (
-              <div style={{ fontSize: 11, color: B.dim, marginTop: 5 }}>Mobile numbers only — VoIP and landlines can't be verified.</div>
+              <div style={{ fontSize: 11, color: B.dim, marginTop: 5 }}>Mobile numbers only - VoIP and landlines can't be verified.</div>
             )}
             {codeSent && (
               <>

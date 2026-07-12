@@ -97,7 +97,7 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
 
   const avatar = parseAvatar(p?.avatar);
   const username = p?.username || "trader";
-  const joined = p?.createdAt ? new Date(p.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—";
+  const joined = p?.createdAt ? new Date(p.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "-";
   const points = p?.points ?? 0;
   const tier = tierOf(points);
   const positions = p?.openPositions || [];
@@ -109,7 +109,7 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 940, background: B.bg, overflowY: "auto", fontFamily: fb, color: "#eef1f6" }}>
       <div style={{ maxWidth: 1020, margin: "0 auto", padding: "16px 24px 70px" }}>
-        {/* Header — back, title, Follow */}
+        {/* Header - back, title, Follow */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 2px 14px" }}>
           <button onClick={onClose} title="Back" style={{ width: 34, height: 34, borderRadius: 17, background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>‹</button>
           <div style={{ fontFamily: fd, fontSize: 16, fontWeight: 700, color: B.white }}>Trader profile</div>
@@ -126,7 +126,7 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
 
         {p && (
           <div style={{ display: "grid", gridTemplateColumns: isWide ? "380px 1fr" : "1fr", gap: 24, alignItems: "start" }}>
-            {/* LEFT — identity, card, stats, open positions */}
+            {/* LEFT - identity, card, stats, open positions */}
             <div>
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
@@ -140,7 +140,7 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
                 </div>
               </div>
 
-              {/* Member card (avatar synced from their account; no signature — device-local) */}
+              {/* Member card (avatar synced from their account; no signature - device-local) */}
               <div style={{ marginBottom: 12 }}>
                 <StatCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={avatar} signature={null} />
               </div>
@@ -148,11 +148,11 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
               {wc?.rank != null && (
                 <div style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 8, background: "rgba(255,173,10,0.08)", border: "1px solid rgba(255,173,10,0.25)", borderRadius: 12, padding: "9px 13px" }}>
                   <span style={{ fontSize: 13 }}>🏆</span>
-                  <span style={{ fontSize: 12.5, color: "#ffd98a", fontWeight: 600 }}>World Cup Trading Competition — rank #{wc.rank}, {fmtRoi(wc.roiPct)} ROI</span>
+                  <span style={{ fontSize: 12.5, color: "#ffd98a", fontWeight: 600 }}>World Cup Trading Competition - rank #{wc.rank}, {fmtRoi(wc.roiPct)} ROI</span>
                 </div>
               )}
 
-              {/* Stat grid — mirrors the own-profile 2x2 */}
+              {/* Stat grid - mirrors the own-profile 2x2 */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
                 <StatBox label={worldcup ? "Competition P&L" : "All-time P&L"} value={`${(p.closedPnl ?? 0) >= 0 ? "+" : ""}${fmtUsd(p.closedPnl ?? 0)}`} color={(p.closedPnl ?? 0) >= 0 ? B.primary : B.red} />
                 <StatBox label="ROI" value={fmtPct(p.returnPct ?? 0)} color={(p.returnPct ?? 0) >= 0 ? B.primary : B.red} />
@@ -175,7 +175,7 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
               ))}
             </div>
 
-            {/* RIGHT — Bets | Badges */}
+            {/* RIGHT - Bets | Badges */}
             <div>
               <div style={{ display: "flex", gap: 20, margin: "2px 4px 12px" }}>
                 {["bets", "badges"].map((t) => (
@@ -210,7 +210,7 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
                         <div>
                           <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: fm, letterSpacing: "0.1em", color: B.dim, marginBottom: 4 }}>{lg.emoji} {lg.label}</div>
                           <div style={{ fontSize: 14, fontWeight: 600, color: B.white, textTransform: t.teamName ? "none" : "capitalize" }}>{t.teamName || t.side} · {t.leverage}x</div>
-                          <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{(t.entryPx * 100).toFixed(0)}¢ → {t.exitPx != null ? (t.exitPx * 100).toFixed(0) + "¢" : "—"}</div>
+                          <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{(t.entryPx * 100).toFixed(0)}¢ → {t.exitPx != null ? (t.exitPx * 100).toFixed(0) + "¢" : "-"}</div>
                         </div>
                         <div style={{ textAlign: "right" }}>
                           <div style={{ fontFamily: fm, fontWeight: 700, color: win ? B.primary : B.red }}>{win ? "+" : ""}{fmtUsd(t.pnl)}</div>

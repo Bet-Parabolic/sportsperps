@@ -39,7 +39,7 @@ const Splash = () => (
 
 /* ── Competition gate — during the World Cup event the MAIN terminal on app.parabolic.gg is
    team-only: stray visitors get funneled to /worldcup (the actual product right now), the team
-   unlocks with the dash password (verified against the backend admin login — no secret in the
+   unlocks with the dash password (verified against the backend admin login - no secret in the
    bundle). SOFT gate by design: it prevents accidental use, it is not a security boundary. ── */
 const GATE_KEY = "parabolic_team_gate";
 function TeamGate({ onUnlock }) {
@@ -56,7 +56,7 @@ function TeamGate({ onUnlock }) {
       const r = await fetch(`${API_URL}/admin/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
       if (r.ok) { try { localStorage.setItem(GATE_KEY, "1"); } catch { /* storage blocked */ } onUnlock(); }
       else setErr("Wrong password");
-    } catch { setErr("Network error — try again"); }
+    } catch { setErr("Network error - try again"); }
     setBusy(false);
   };
   return (
@@ -64,7 +64,7 @@ function TeamGate({ onUnlock }) {
       <img src={LOGO_MARK} alt="Parabolic" style={{ width: 56, height: 56, marginBottom: 22 }} />
       <h1 style={{ color: "#fff", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 10 }}>The World Cup Trading Competition is live</h1>
       <p style={{ color: "#8a93a6", fontSize: 14.5, lineHeight: 1.6, maxWidth: 420, marginBottom: 24 }}>
-        The main Parabolic terminal is closed while the competition runs. Join the championship — free entry, $10,000 World Cup Cash, real cash prizes.
+        The main Parabolic terminal is closed while the competition runs. Join the championship - free entry, $10,000 World Cup Cash, real cash prizes.
       </p>
       <a href="/worldcup" style={{ display: "inline-block", padding: "14px 28px", borderRadius: 999, background: "#fff", color: "#0a0a0a", fontWeight: 700, fontSize: 15, textDecoration: "none", boxShadow: "0 10px 34px rgba(255,255,255,0.15)" }}>
         Enter the Competition →
@@ -90,7 +90,7 @@ function TeamGate({ onUnlock }) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ROOT — page router + global styles
+   ROOT - page router + global styles
    ═══════════════════════════════════════════════════════════ */
 export default function App() {
   // Domain split: app.parabolic.gg → terminal; parabolic.gg → landing.

@@ -29,7 +29,7 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
 
   return (
     <div style={{background:"#030303",minHeight:"100vh",fontFamily:fb,color:"#fff",overflow:"hidden",position:"relative"}}>
-      {/* Background — flowing lines + ambient glows */}
+      {/* Background - flowing lines + ambient glows */}
       <div style={{position:"fixed",inset:0,pointerEvents:"none",overflow:"hidden"}}>
         <svg viewBox="0 0 1440 900" style={{width:"100%",height:"100%",position:"absolute"}} preserveAspectRatio="xMidYMid slice">
           <defs>
@@ -50,7 +50,7 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
       </div>
 
       <div style={{position:"relative",zIndex:1}}>
-        {/* CENTERED LOGO AT TOP — no nav bar */}
+        {/* CENTERED LOGO AT TOP - no nav bar */}
         <div style={{...a(0),display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isMobile?"24px 16px 0":"40px 32px 0"}}>
           <div style={{display:"flex",alignItems:"center",cursor:"pointer"}} onClick={onLaunch}>
             <img src={LOGO_WORDMARK} style={{height:isMobile?40:60,width:"auto"}} alt="Parabolic"/>
@@ -86,7 +86,7 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
         </section>
         {showWaitlist && <WaitlistModal onClose={() => setShowWaitlist(false)} />}
 
-        {/* TERMINAL PREVIEW — accurate trading experience */}
+        {/* TERMINAL PREVIEW - accurate trading experience */}
         <div style={{...a(0.25),maxWidth:isMobile?"100%":960,margin:"0 auto",padding:isMobile?"0 12px 60px":"0 32px 80px"}}>
           <div style={{background:"#0a0a0a",border:"1px solid #1f1f1f",borderRadius:isMobile?14:20,overflow:"hidden",boxShadow:"0 30px 80px rgba(254,66,2,0.08)"}}>
             {/* Terminal header */}
@@ -114,7 +114,7 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
                 </div>
               </div>
               <div style={{textAlign:"center"}}>
-                <div style={{fontSize:isMobile?22:26,fontWeight:900,color:"#fff",fontFamily:fm,lineHeight:1}}>24 <span style={{color:"#333",fontSize:14}}>—</span> 0</div>
+                <div style={{fontSize:isMobile?22:26,fontWeight:900,color:"#fff",fontFamily:fm,lineHeight:1}}>24 <span style={{color:"#333",fontSize:14}}>-</span> 0</div>
                 <div style={{fontSize:9,color:B.green,fontWeight:700,marginTop:3,fontFamily:fm,letterSpacing:"0.08em"}}>Q3 · 14:32</div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"flex-end"}}>
@@ -269,14 +269,14 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
           </div>
         </div>
 
-        {/* HOW IT WORKS — with visuals */}
+        {/* HOW IT WORKS - with visuals */}
         <section style={{maxWidth:1200,margin:"0 auto",padding:isMobile?"60px 16px":"100px 32px"}}>
           <div style={{...a(0.35),textAlign:"center",marginBottom:isMobile?40:72}}>
             <span style={{fontSize:isMobile?36:70,fontWeight:800,letterSpacing:"-0.01em",wordSpacing:"0.1em",color:R}}>How it works</span>
             <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.01em",wordSpacing:"0.1em",marginTop:12,lineHeight:1.1,color:"#fff"}}>Three steps. Zero complexity.</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:isMobile?20:24}}>
-            {/* STEP 1 — Pick a Side */}
+            {/* STEP 1 - Pick a Side */}
             <div style={{...a(0.4),background:"#0a0a0a",borderRadius:18,border:"1px solid #1f1f1f",padding:isMobile?"24px 20px":"28px 24px",display:"flex",flexDirection:"column"}}>
               <div style={{height:isMobile?140:180,background:"#050505",borderRadius:12,marginBottom:18,padding:14,display:"flex",flexDirection:"column",justifyContent:"center",gap:10,border:"1px solid #1a1a1a"}}>
                 <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:"0.08em",fontFamily:fm}}>SELECT YOUR SIDE</div>
@@ -301,7 +301,7 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
               <p style={{fontSize:isMobile?13:14,lineHeight:1.6,color:"#888"}}>Select the team you believe wins. You're trading their live win probability as a perpetual future.</p>
             </div>
 
-            {/* STEP 2 — Set Leverage */}
+            {/* STEP 2 - Set Leverage */}
             <div style={{...a(0.45),background:"#0a0a0a",borderRadius:18,border:"1px solid #1f1f1f",padding:isMobile?"24px 20px":"28px 24px",display:"flex",flexDirection:"column"}}>
               <div style={{height:isMobile?140:180,background:"#050505",borderRadius:12,marginBottom:18,padding:14,display:"flex",flexDirection:"column",justifyContent:"center",gap:14,border:"1px solid #1a1a1a"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
@@ -327,7 +327,7 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
               <p style={{fontSize:isMobile?13:14,lineHeight:1.6,color:"#888"}}>1× to 10×. Higher leverage amplifies gains and losses. Dynamic liquidation engine protects the pool.</p>
             </div>
 
-            {/* STEP 3 — Trade Live */}
+            {/* STEP 3 - Trade Live */}
             <div style={{...a(0.5),background:"#0a0a0a",borderRadius:18,border:"1px solid #1f1f1f",padding:isMobile?"24px 20px":"28px 24px",display:"flex",flexDirection:"column"}}>
               <div style={{height:isMobile?140:180,background:"#050505",borderRadius:12,marginBottom:18,padding:14,display:"flex",flexDirection:"column",justifyContent:"space-between",border:"1px solid #1a1a1a",position:"relative",overflow:"hidden"}}>
                 <div style={{display:"flex",justifyContent:"space-between"}}>
@@ -366,7 +366,7 @@ export function LandingPage({ onLaunch, onDocs, onCreateAccount }) {
             <h2 style={{fontFamily:fd,fontSize:isMobile?20:30,fontWeight:700,letterSpacing:"-0.01em",wordSpacing:"0.1em",marginTop:12,lineHeight:1.1,color:"#fff"}}>DeFi-grade infrastructure.</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:isMobile?12:16}}>
-            {[{title:"Multi-Oracle Consensus",desc:"Weighted median across Polymarket, Kalshi, sportsbooks, ESPN and our internal model. Manipulation-resistant fair price discovery.",icon:"◉",c:R},{title:"Perpetual Futures",desc:"Continuous price exposure to win probability. Not a binary bet — trade in, trade out at any point during the live game.",icon:"∞",c:"#52e0a3"},{title:"Liquidation Engine",desc:"Real-time mark-to-market. Dynamic max leverage based on oracle confidence. Automatic liquidation protects the pool.",icon:"⚡",c:TL},{title:"Trustless Settlement",desc:"Every trade, funding payment, and liquidation settles trustlessly. Transparent, verifiable, zero counterparty risk.",icon:"◆",c:T}].map((f,i) => (
+            {[{title:"Multi-Oracle Consensus",desc:"Weighted median across Polymarket, Kalshi, sportsbooks, ESPN and our internal model. Manipulation-resistant fair price discovery.",icon:"◉",c:R},{title:"Perpetual Futures",desc:"Continuous price exposure to win probability. Not a binary bet - trade in, trade out at any point during the live game.",icon:"∞",c:"#52e0a3"},{title:"Liquidation Engine",desc:"Real-time mark-to-market. Dynamic max leverage based on oracle confidence. Automatic liquidation protects the pool.",icon:"⚡",c:TL},{title:"Trustless Settlement",desc:"Every trade, funding payment, and liquidation settles trustlessly. Transparent, verifiable, zero counterparty risk.",icon:"◆",c:T}].map((f,i) => (
               <div key={f.title} style={{...a(0.6+i*0.05),background:"#0a0a0a",borderRadius:16,border:"1px solid #1f1f1f",padding:isMobile?"24px 20px":"32px 28px"}}>
                 <div style={{fontSize:isMobile?20:24,color:f.c,marginBottom:isMobile?12:16}}>{f.icon}</div>
                 <h4 style={{fontFamily:fd,fontSize:isMobile?15:16,fontWeight:700,marginBottom:10}}>{f.title}</h4>

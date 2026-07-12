@@ -2,7 +2,7 @@ import { WS_URL } from "./constants.js";
 import { currentUserId, authToken, handleUnauthorized } from "./auth.js";
 
 /* ─────────────────────────────────────────────────────────────
-   liveSocket — ONE shared WebSocket for the whole app.
+   liveSocket - ONE shared WebSocket for the whole app.
 
    Both the games list (useLiveGames) and the active trading view
    (LiveTradingApp) subscribe to this single connection instead of
@@ -52,7 +52,7 @@ function connect() {
     // Backend rejected our subscribe (credentialed account with a dead/rotated token) → treat as a
     // session expiry so the UI prompts a clean re-login. After clearAuth we re-subscribe as guest.
     if (msg.type === "subscribe_error") { handleUnauthorized(); return; }
-    subscribers.forEach((fn) => { try { fn(msg); } catch { /* subscriber error — isolate */ } });
+    subscribers.forEach((fn) => { try { fn(msg); } catch { /* subscriber error - isolate */ } });
   };
 
   sock.onclose = () => scheduleReconnect();

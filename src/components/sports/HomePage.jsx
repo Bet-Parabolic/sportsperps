@@ -67,7 +67,7 @@ export function HomePage({ liveGames = [], onTrade }) {
           {live.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: B.green, fontFamily: fm, padding: "2px 8px", background: B.green + "15", borderRadius: 6, letterSpacing: "0.06em", animation: "pulse 2s infinite" }}>{live.length} LIVE</span>}
         </div>
         <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 8 }}>Live &amp; upcoming</h2>
-        <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6 }}>Trade live games now, or browse what's coming up — upcoming markets organized by sport.</p>
+        <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6 }}>Trade live games now, or browse what's coming up - upcoming markets organized by sport.</p>
       </div>
 
       {!hasAny && (
@@ -76,7 +76,7 @@ export function HomePage({ liveGames = [], onTrade }) {
         </div>
       )}
 
-      {/* LIVE — all sports together, tradeable */}
+      {/* LIVE - all sports together, tradeable */}
       {live.length > 0 && (
         <div style={{ marginBottom: 36 }}>
           <SectionHeader label="● LIVE" color={B.green} />
@@ -86,7 +86,7 @@ export function HomePage({ liveGames = [], onTrade }) {
         </div>
       )}
 
-      {/* UPCOMING — one section per sport (World Cup + Baseball first) */}
+      {/* UPCOMING - one section per sport (World Cup + Baseball first) */}
       {sections.map((s) => (
         <div key={s.key} style={{ marginBottom: 36 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14 }}>

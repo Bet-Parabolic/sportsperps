@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component {
         <div style={{ fontSize: 34 }}>⚠️</div>
         <div style={{ color: "#eef1f6", fontSize: 17, fontWeight: 700 }}>Something went wrong</div>
         <div style={{ color: "#8a93a6", fontSize: 13, maxWidth: 340, lineHeight: 1.6 }}>
-          A part of the app crashed. Reloading usually fixes it — your balance and positions are safe on the server.
+          A part of the app crashed. Reloading usually fixes it - your balance and positions are safe on the server.
         </div>
         <button
           onClick={() => window.location.reload()}

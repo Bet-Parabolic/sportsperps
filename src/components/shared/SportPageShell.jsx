@@ -28,7 +28,7 @@ export function SportPageShell({ title, subtitle, emoji, liveCount, loading, err
         </div>
         <h2 style={{fontFamily:fd,fontSize:28,fontWeight:800,letterSpacing:"-0.03em",color:"#fff",marginBottom:8}}>{title}</h2>
         {loading&&<p style={{fontSize:13,color:"#666"}}>Loading games…</p>}
-        {error&&<p style={{fontSize:13,color:"#ef4444"}}>Could not reach ESPN — try again shortly.</p>}
+        {error&&<p style={{fontSize:13,color:"#ef4444"}}>Could not reach ESPN - try again shortly.</p>}
       </div>
       {loading&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:16}}>{[0,1,2,3].map(i=><SkeletonCard key={i}/>)}</div>}
       {!loading&&!error&&children}

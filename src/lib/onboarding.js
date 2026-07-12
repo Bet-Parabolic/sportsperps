@@ -46,7 +46,7 @@ export function persistCard() {
   try {
     localStorage.setItem(CARD_KEY, JSON.stringify(data));
     if (draft.referral) localStorage.setItem(REFERRAL_KEY, draft.referral);
-  } catch { /* storage full — the card is cosmetic, never block onboarding on it */ }
+  } catch { /* storage full - the card is cosmetic, never block onboarding on it */ }
 }
 
 export function loadCard() {
@@ -109,7 +109,7 @@ export function resizeAvatar(dataUrl, px = 128) {
 }
 
 /** Best-effort one-shot upload of the device-local avatar to the account (so leaderboards can
-    show it). Safe to call on every mount — a localStorage flag stops repeats per avatar. */
+    show it). Safe to call on every mount - a localStorage flag stops repeats per avatar. */
 export async function syncAvatarToBackend({ apiUrl, userId, token }) {
   try {
     if (!userId) return;
@@ -132,5 +132,5 @@ export async function syncAvatarToBackend({ apiUrl, userId, token }) {
       body: JSON.stringify({ avatar: payload, token }),
     });
     if (res.ok) localStorage.setItem(KEY, sig);
-  } catch { /* offline — retry next visit */ }
+  } catch { /* offline - retry next visit */ }
 }

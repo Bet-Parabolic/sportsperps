@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   PARABOLIC — twin-parabola brand
+   PARABOLIC - twin-parabola brand
    Accent green = #1fd182 (replaces orange)
    ═══════════════════════════════════════════════════════════ */
 export const B = {

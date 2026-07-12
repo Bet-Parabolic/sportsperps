@@ -18,7 +18,7 @@ export function NFLPage({ data={events:[],loading:true,error:false}, onTrade, li
     <SportPageShell title="NFL" subtitle="FOOTBALL" emoji="🏈" liveCount={live.length} loading={data.loading} error={data.error}>
       {!data.loading&&!data.error&&games.length===0&&<EmptyState emoji="🏈" sport="NFL" scheduledGames={sched}/>}
       {live.length>0&&<><SectionHeader label="● LIVE NOW" color={B.green}/><Grid>{live.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={tradeFn} _espnKey="nfl" liveGames={liveGames}/>)}</Grid></>}
-      {pregame.length>0&&<><SectionHeader label="◷ PREGAME — OPEN FOR WAGERING" color={B.primaryLight}/><Grid>{pregame.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={tradeFn} _espnKey="nfl" liveGames={liveGames}/>)}</Grid></>}
+      {pregame.length>0&&<><SectionHeader label="◷ PREGAME - OPEN FOR WAGERING" color={B.primaryLight}/><Grid>{pregame.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord onTrade={tradeFn} _espnKey="nfl" liveGames={liveGames}/>)}</Grid></>}
       {upcoming.length>0&&<><SectionHeader label="UPCOMING"/><Grid>{upcoming.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord _espnKey="nfl" liveGames={liveGames}/>)}</Grid></>}
       {final.length>0&&<><SectionHeader label="FINAL"/><Grid>{final.map(g=><MatchCard key={g.id} g={g} emoji="🏈" showRecord/>)}</Grid></>}
     </SportPageShell>

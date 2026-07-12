@@ -62,8 +62,8 @@ const REJECT_COPY = {
   positionLimit: 'Position size limit reached for this game',
   tooManyOrders: 'Too many open orders on this game',
   tickRejected: 'Price must be in 0.1¢ increments',
-  invalidInput: 'Invalid order — check your inputs',
-  userNotFound: 'Account not found — try refreshing the page',
+  invalidInput: 'Invalid order - check your inputs',
+  userNotFound: 'Account not found - try refreshing the page',
   badAloPxRejected: 'Post-only order would cross the market',
   joinRequired: 'Join the championship to trade this match',
 };
@@ -112,24 +112,25 @@ function LevSlider({ eL, ml, onChange, compact = false, liq = null, cap = null }
       {ml<ABS_MAX && showWhy && (
         <div style={{marginTop:8,background:'#101216',border:'1px solid #1c1f24',borderRadius:14,padding:'13px 15px',fontSize:12,color:'#9aa0a8',lineHeight:1.6,textAlign:'left'}}>
           <div style={{marginBottom:9}}>
-            Two safety rules set the ceiling — whichever is <span style={{color:'#fff'}}>lower</span> wins:
+            Two safety rules set the ceiling - whichever is <span style={{color:'#fff'}}>lower</span> wins:
           </div>
           <div style={{marginBottom:9}}>
-            <span style={{color:priceBinds?B.primary:'#fff',fontWeight:700}}>1 · The price cap{priceBinds?' — binding now':''}.</span>{' '}
+            <span style={{color:priceBinds?B.primary:'#fff',fontWeight:700}}>1 · The price cap{priceBinds?' - binding now':''}.</span>{' '}
             The closer a price is to 0% or 100%, the less distance there is to liquidation, so the ceiling
             steps down with the favorite's odds: up to 60% → 10x · 75% → 5x · 85% → 3x · 95% → 2x · beyond → 1x.
             {favPct != null && <> This market's favorite trades at <span style={{color:'#fff'}}>{favPct}%</span>, so the price cap is <span style={{color:'#fff'}}>{priceCap}x</span>.</>}
           </div>
           <div style={{marginBottom:9}}>
-            <span style={{color:!priceBinds?B.primary:'#fff',fontWeight:700}}>2 · The one-play rule{!priceBinds?' — binding now':''}.</span>{' '}
-            Your liquidation buffer must survive one decisive play — a goal, a touchdown, a home run — without
-            gapping straight past your bankruptcy price. The possible swing from one play grows sharply toward the
-            end of a close game (a late goal can move win probability 10+ points), so leverage tightens as the
-            clock runs down while the score stays tight. Early-game and lopsided situations are barely restricted.
+            <span style={{color:!priceBinds?B.primary:'#fff',fontWeight:700}}>2 · The one-play rule{!priceBinds?' - binding now':''}.</span>{' '}
+            Your liquidation buffer must survive one decisive play - a goal, a touchdown, a home run - without
+            gapping straight past your bankruptcy price. The possible swing grows sharply toward the end of a
+            close game, and in soccer a single goal moves a close match 6–7 points even before kickoff - so
+            tight soccer markets sit below the price table from the start. Lopsided games are barely restricted.
+            {!priceBinds && <> Right now this rule sets the ceiling at <span style={{color:'#fff',fontWeight:700}}>{ml}x</span>{priceCap!=null&&priceCap>ml?<> (the price cap alone would allow {priceCap}x)</>:null}.</>}
           </div>
           <div style={{color:'#6a6f77'}}>
             Backing the favorite keeps a bigger buffer than the underdog, so it's often allowed more leverage at the
-            same price. Caps apply only to opening or adding — <span style={{color:'#9aa0a8'}}>closing is never capped; you can always exit.</span>
+            same price. Caps apply only to opening or adding - <span style={{color:'#9aa0a8'}}>closing is never capped; you can always exit.</span>
           </div>
         </div>
       )}
@@ -221,7 +222,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   const toggleBookmark = () => setBookmarked((was) => { toggleBookmarkStore(initGame.id, !was); return !was; });
   const shareMarket = async () => {
     const url = "https://app.parabolic.gg";
-    const text = `Trading ${initGame.home?.name ?? "Home"} vs ${initGame.away?.name ?? "Away"} live on Parabolic — ${url}`;
+    const text = `Trading ${initGame.home?.name ?? "Home"} vs ${initGame.away?.name ?? "Away"} live on Parabolic - ${url}`;
     if (navigator.share) { try { await navigator.share({ text, url }); return; } catch { /* cancelled */ } }
     try { await navigator.clipboard.writeText(text); notify("Link copied to clipboard", "green"); } catch { /* ignore */ }
   };
@@ -433,7 +434,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             const upd=cpE.filter(pos=>{if(pos.gameId!==norm.id)return true;const pnl=calcPnL(pos.side,pos.exposure,pos.entry,mp);if(pnl<=-pos.margin*0.95){ch=true;setClosedPos(pr=>[{...pos,closedAt:op,exitPx:op,pnl:-pos.margin,closeType:'LIQ'},...pr]);setClosedPnL(p=>p-pos.margin);notify('☠ LIQUIDATED','red');return false;}return true;});
             if(ch)setPositions(upd);
           }
-          if((norm.status==='final'||norm.status==='completed')&&!settled){setSettled(true);const homeWins=(norm.home.score||0)>(norm.away.score||0);const finalP=homeWins?1.0:0.0;setSettledWinner(homeWins?HOME.name:AWAY.name);const fp=posR.current;if(fp.length){let sp=0;const nc2=fp.map(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,finalP);sp+=pnl;return{...pos,closedAt:finalP,pnl,closeType:'SETTLED'};});setClosedPos(pr=>[...nc2,...pr]);setBalance(b=>b+fp.reduce((s,p)=>s+p.margin,0)+sp);setClosedPnL(p=>p+sp);setPositions([]);notify('🏆 FINAL — '+fmtUsd(sp),'green');}}
+          if((norm.status==='final'||norm.status==='completed')&&!settled){setSettled(true);const homeWins=(norm.home.score||0)>(norm.away.score||0);const finalP=homeWins?1.0:0.0;setSettledWinner(homeWins?HOME.name:AWAY.name);const fp=posR.current;if(fp.length){let sp=0;const nc2=fp.map(pos=>{const pnl=calcPnL(pos.side,pos.exposure,pos.entry,finalP);sp+=pnl;return{...pos,closedAt:finalP,pnl,closeType:'SETTLED'};});setClosedPos(pr=>[...nc2,...pr]);setBalance(b=>b+fp.reduce((s,p)=>s+p.margin,0)+sp);setClosedPnL(p=>p+sp);setPositions([]);notify('🏆 FINAL - '+fmtUsd(sp),'green');}}
           return;
         }
 
@@ -627,7 +628,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 setPositions(prev => [...prev.filter(p => p.gameId !== g.id), ...mappedE]);
               }
             }
-          } catch (e) { /* event endpoints unavailable — keep local state */ }
+          } catch (e) { /* event endpoints unavailable - keep local state */ }
         }
 
         // THIS game's wager tape (all public traders) — powers the Wager Activity tab.
@@ -661,8 +662,8 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         if ((upd.status==='final'||upd.status==='completed') && !settled) {
           setSettled(true);
           const hs=upd.home.score||0, as=upd.away.score||0;
-          if (hs===as) { setSettledWinner('Draw'); notify('Game Final — '+HOME.short+' '+hs+'–'+as+' '+AWAY.short+' (draw, push)', 'info'); }
-          else { const homeWins=hs>as; setSettledWinner(homeWins?HOME.name:AWAY.name); notify('Game Final — '+(homeWins?HOME.name:AWAY.name)+' wins', 'green'); }
+          if (hs===as) { setSettledWinner('Draw'); notify('Game Final - '+HOME.short+' '+hs+'–'+as+' '+AWAY.short+' (draw, push)', 'info'); }
+          else { const homeWins=hs>as; setSettledWinner(homeWins?HOME.name:AWAY.name); notify('Game Final - '+(homeWins?HOME.name:AWAY.name)+' wins', 'green'); }
         }
       } catch(e) {}
     };
@@ -750,12 +751,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       }
       if (msg.gameId !== g.id) return;
       if (msg.type === 'liquidation' && msg.userId === userId) {
-        notify('☠ LIQUIDATED — ' + fmtUsd(msg.pnl ?? 0), 'red');
+        notify('☠ LIQUIDATED - ' + fmtUsd(msg.pnl ?? 0), 'red');
         pollRef.current?.(); // reconcile positions/balance immediately
       } else if (msg.type === 'deleverage' && msg.userId === userId) {
         // House trimmed the position to keep its buffer ≥ the growing late-game swing — the user
         // keeps their margin + realized PnL on the slice. MUST be surfaced (never silent).
-        notify(`⚠ POSITION REDUCED — sold ${Math.round(msg.trim)} of ${Math.round(msg.fromSize)} @ ${(msg.execPx * 100).toFixed(1)}¢ to guard against a late-game swing (${fmtUsd(msg.pnl ?? 0)} realized)`, 'yellow');
+        notify(`⚠ POSITION REDUCED - sold ${Math.round(msg.trim)} of ${Math.round(msg.fromSize)} @ ${(msg.execPx * 100).toFixed(1)}¢ to guard against a late-game swing (${fmtUsd(msg.pnl ?? 0)} realized)`, 'yellow');
         pollRef.current?.(); // reconcile size/leverage/balance immediately
       } else if (msg.type === 'settlement') {
         pollRef.current?.(); // poll() detects final state + settles
@@ -777,7 +778,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       if (res.ok && d.joined) {
         setWcJoined(true);
         setWcBalance(d.worldCupCash);
-        notify(`🏆 You're in — $${Math.round(d.worldCupCash || 10000).toLocaleString()} World Cup Cash granted`, 'green');
+        notify(`🏆 You're in - $${Math.round(d.worldCupCash || 10000).toLocaleString()} World Cup Cash granted`, 'green');
         pollRef.current?.();
       } else {
         // Identity gate (A3): a verification 403 opens the verify flow instead of a dead-end toast.
@@ -850,9 +851,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         } else if (result.reason === 'oracleRejected') {
           // Backend rejects limits >25¢ from the oracle (clob.js MAX_ORACLE_DISTANCE).
           const mkt = Math.round((orderSide==='home'?op:1-op)*100);
-          notify(`Limit too far from market — must be within 25¢ of ${mkt}¢ (${Math.max(1,mkt-25)}–${Math.min(99,mkt+25)}¢)`, 'red');
+          notify(`Limit too far from market - must be within 25¢ of ${mkt}¢ (${Math.max(1,mkt-25)}–${Math.min(99,mkt+25)}¢)`, 'red');
         } else {
-          notify(REJECT_COPY[result.reason] || 'Order rejected — '+(result.reason||'unknown'), 'red');
+          notify(REJECT_COPY[result.reason] || 'Order rejected - '+(result.reason||'unknown'), 'red');
         }
         return;
       }
@@ -866,7 +867,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         // bettors feed stays put and their own bet message just streams in).
         setBottomTab(t => t === 'chat' ? 'chat' : 'positions');
         notify(addingToPos
-          ? 'Added to '+tn.name+' — positions merged, liq updated'
+          ? 'Added to '+tn.name+' - positions merged, liq updated'
           : tn.name+' '+lev+'x @ '+(avgPx*100).toFixed(1)+'¢', orderSide==='home'?'green':'red');
         // Confirm the risk levels that were attached — users setting TP/SL from the mobile sheet
         // otherwise have no feedback that they took.
@@ -884,7 +885,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         // Track it immediately (green dotted line on the chart + Pending entry); the poll
         // reconciles against the backend and removes it once it fills or is cancelled.
         if (result.oid != null) setLimitOrders(p => [...p.filter(l => l.id !== result.oid), { id: result.oid, gameId: g.id, side: orderSide, limitPrice: limitCents/100, leverage: lev, margin, size }]);
-        notify('Limit '+tn.name+' @ '+limitCents+'¢ — resting', 'info');
+        notify('Limit '+tn.name+' @ '+limitCents+'¢ - resting', 'info');
       }
     } catch(e) {
       notify('Order failed: '+e.message, 'red');
@@ -897,7 +898,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     setLimitOrders(p => p.filter(l => l.id !== lo.id));   // optimistic
     try {
       const res = await fetch(`${API_URL}/orders/${lo.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
-      notify(res.ok ? 'Order cancelled' : 'Cancel failed — will retry on next sync', res.ok ? 'info' : 'red');
+      notify(res.ok ? 'Order cancelled' : 'Cancel failed - will retry on next sync', res.ok ? 'info' : 'red');
     } catch (e) {
       notify('Cancel failed: ' + e.message, 'red');
     }
@@ -956,7 +957,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         const pnlPct = pos.margin > 0 ? (pnl / pos.margin) * 100 : 0;
         addMark(chartNow, avgPx, pnl>=0?'exit-win':'exit-loss', pos.side);
         const tn = pos.side==='home' ? HOME : AWAY;
-        notify('Closed '+tn.name+' — '+fmtUsd(pnl), pnl>=0?'green':'red');
+        notify('Closed '+tn.name+' - '+fmtUsd(pnl), pnl>=0?'green':'red');
         if (pos.id) closedIdsRef.current.add(pos.id); // dedupe vs poll-diff history
         setClosedPos(pr => [{...pos, closedAt: chartNow, exitPx: avgPx, pnl, pnlPct, closeType: 'CLOSED'}, ...pr]);
         setClosedPnL(p => p + pnl);
@@ -1269,9 +1270,9 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
       {/* Trading-action notifications now live in a persistent tray at the bottom of the wager panel (see NotifTray). */}
 
-      {/* HEADER — left corner: back+logo, center: tabs, right corner: live+deposit+profile */}
+      {/* HEADER - left corner: back+logo, center: tabs, right corner: live+deposit+profile */}
       <div style={{padding:isMobile?'0 10px':'0 24px',height:56,display:'grid',gridTemplateColumns:'auto 1fr auto',alignItems:'center',borderBottom:'1px solid #1a1a1a',background:'#0a0a0a',position:'sticky',top:0,zIndex:20}}>
-        {/* LEFT — back arrow + pd emblem + wordmark */}
+        {/* LEFT - back arrow + pd emblem + wordmark */}
         <div style={{display:'flex',alignItems:'center',gap:isMobile?8:16,justifySelf:'start'}}>
           <button onClick={onBack} style={{background:'none',border:'none',cursor:'pointer',color:'#666',display:'flex',alignItems:'center',gap:4,fontSize:13,fontWeight:600,fontFamily:fb,padding:0}}>
             <span style={{fontSize:18,lineHeight:1}}>‹</span>
@@ -1282,7 +1283,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               : <img src={LOGO_WORDMARK} style={{height:30,width:'auto'}} alt="Parabolic"/>}
           </button>
         </div>
-        {/* CENTER — sport tabs (hidden on the World Cup surface: single-sport event) */}
+        {/* CENTER - sport tabs (hidden on the World Cup surface: single-sport event) */}
         {worldcup ? <div /> : <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
           {[['home','Home',sportCounts.live],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.soccer],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
             <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
@@ -1296,7 +1297,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </button>
           ))}
         </div>}
-        {/* RIGHT — market actions (chat/bookmark/share) + live indicator + balance + deposit + profile */}
+        {/* RIGHT - market actions (chat/bookmark/share) + live indicator + balance + deposit + profile */}
         <div style={{display:'flex',alignItems:'center',gap:10,justifySelf:'end'}}>
           {!isMobile && <div style={{display:'flex',alignItems:'center',gap:4,marginRight:2}}>
             <button onClick={()=>{ setShowChatPop(v=>!v); setChatUnread(false); }} title="Live chat" style={{position:'relative',width:34,height:34,borderRadius:'50%',border:'none',background:showChatPop?'#22252b':'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -1334,7 +1335,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       <div style={{display:'flex',height:isMobile?'auto':'calc(100vh - 56px)',flexDirection:isMobile?'column':'row',minHeight:isMobile?'calc(100vh - 56px)':'auto'}}>
         {!isMobile && <NavRail active={null} onNav={(tab)=>onNavTo?.(tab)} liveGames={liveGames} onTrade={onTrade} hide={worldcup ? ["bookmarks"] : []}/>}
 
-        {/* LEFT SIDEBAR — hidden on the World Cup surface: single-event, only ever one game live,
+        {/* LEFT SIDEBAR - hidden on the World Cup surface: single-event, only ever one game live,
             so the "other markets" column is noise (the chart takes the space instead). */}
         {!isMobile&&!worldcup&&<div style={{width:260,borderRight:'1px solid #1a1a1a',overflow:'auto',flexShrink:0,padding:'16px 0'}}>
           {/* Viewing Now */}
@@ -1350,7 +1351,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
           </div>
 
-          {/* Other markets — split into Pregame + Live */}
+          {/* Other markets - split into Pregame + Live */}
           {(sidebarPregame.length > 0 || sidebarLive.length > 0) && (
             <div style={{padding:'0 16px'}}>
               {[
@@ -1387,12 +1388,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             {isMobile ? (
               <div style={{width:'100%',background:'#111',borderRadius:14,border:'1px solid #1f1f1f',padding:'12px 14px'}}>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  {/* text left, flag right (July 12) - mirrors the away side */}
                   <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0}}>
-                    {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>⚽</span>}
                     <div style={{minWidth:0}}>
                       <div style={{fontSize:14,fontWeight:800,color:'#fff',fontFamily:fm}}>{HOME.short}</div>
                       <div style={{fontSize:9,color:'#555',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{HOME.name}</div>
                     </div>
+                    {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:28,height:28,objectFit:'contain',flexShrink:0}} alt=""/>:<span style={{fontSize:22,flexShrink:0}}>⚽</span>}
                   </div>
                   <div style={{textAlign:'center',padding:'0 10px',flexShrink:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -1423,17 +1425,18 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             ) : (
               <div style={{display:'flex',alignItems:'center',gap:32,padding:'20px 40px',background:'#111',borderRadius:16,border:'1px solid #1f1f1f'}}>
+                {/* text left, flag right (July 12) - mirrors the away side */}
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
-                  {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>⚽</span>}
-                  <div style={{textAlign:'right'}}>
+                  <div style={{textAlign:'left'}}>
                     <div style={{fontSize:16,fontWeight:700,color:'#fff'}}>{HOME.name}</div>
                     <div style={{fontSize:11,color:'#666',fontFamily:fm}}>{HOME.short}</div>
                   </div>
+                  {HOME.logoUrl?<img src={HOME.logoUrl} style={{width:48,height:48,objectFit:'contain'}} alt=""/>:<span style={{fontSize:32}}>⚽</span>}
                 </div>
                 <div style={{textAlign:'center',minWidth:160}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:16}}>
                     <span style={{fontSize:48,fontWeight:900,fontFamily:fm,color:'#fff',lineHeight:1}}>{g.home.score??'–'}</span>
-                    <span style={{fontSize:20,color:'#333'}}>—</span>
+                    <span style={{fontSize:20,color:'#333'}}>-</span>
                     <span style={{fontSize:48,fontWeight:900,fontFamily:fm,color:'#fff',lineHeight:1}}>{g.away.score??'–'}</span>
                   </div>
                   <div style={{marginTop:8}}>
@@ -1456,15 +1459,15 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             )}
           </div>
 
-          {/* Knockout settlement rule — the #1 soccer-rules question: what happens at full time? */}
+          {/* Knockout settlement rule - the #1 soccer-rules question: what happens at full time? */}
           {worldcup&&g.status!=='final'&&(
             <div style={{margin:isMobile?'0 12px 8px':'0 24px 8px',textAlign:'center',fontSize:isMobile?10.5:11.5,color:'#556',fontFamily:fb,lineHeight:1.5}}>
-              Knockout market: settles when the tie is decided — extra time and penalties count.
+              Knockout market: settles when the tie is decided - extra time and penalties count.
               The team that advances settles at 100%.
             </div>
           )}
 
-          {/* STATS BAR — desktop only */}
+          {/* STATS BAR - desktop only */}
           {!isMobile&&<div style={{margin:'0 24px 0',padding:'8px 20px',background:'#0a0a0a',borderRadius:12,border:'1px solid #1a1a1a',display:'grid',gridTemplateColumns:'repeat(5,1fr)'}}>
             {[
               {label:'Mark',  value:(oPrice*100).toFixed(1)+'¢', color:B.primaryLight},
@@ -1496,7 +1499,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   <span style={{color:'#666'}}>{AWAY.short}</span>
                 </span>
               </div>
-              {/* Zoom controls — quick windows; scroll-wheel + drag zoom natively (TradingView) */}
+              {/* Zoom controls - quick windows; scroll-wheel + drag zoom natively (TradingView) */}
               <div style={{display:'flex',gap:2,background:'#0a0a0a',borderRadius:8,padding:2,border:'1px solid #1a1a1a'}}>
                 {[['5m',5],['15m',15],['1H',60],['All',null]].map(([label,val])=>{
                   const active = chartWin===val;
@@ -1599,7 +1602,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                             <div style={{fontSize:11,color:pctClr(pnl),fontFamily:fm}}>{fmtPct(pnlPct)}</div>
                           </div>
                         </div>
-                        {/* game label — which matchup this position belongs to (click to pull it up) */}
+                        {/* game label - which matchup this position belongs to (click to pull it up) */}
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 14px 6px'}}>
                           <span style={{fontSize:10,color:'#666',fontFamily:fm}}>{homeShort} <span style={{color:'#444'}}>vs</span> {awayShort}{isCur&&<span style={{color:B.primary,marginLeft:6}}>• viewing</span>}</span>
                           {canSwitch&&<span style={{fontSize:10,color:B.primary,fontWeight:700}}>View →</span>}
@@ -1618,18 +1621,18 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                             style={{padding:'5px 12px',background:tpslEdit?.id===pos.id?B.primary+'25':'#1a1a1a',border:'1px solid '+(tpslEdit?.id===pos.id?B.primary+'50':'#2a2a2a'),borderRadius:8,cursor:'pointer',color:tpslEdit?.id===pos.id?B.primaryLight:'#aaa',fontWeight:700,fontSize:11,fontFamily:fb}}>TP/SL</button>
                           <button onClick={(e)=>{e.stopPropagation();closePosition(pos);}} style={{padding:'5px 14px',background:'#ef444415',border:'1px solid #ef444430',borderRadius:8,cursor:'pointer',color:'#ef4444',fontWeight:700,fontSize:11,fontFamily:fb}}>Close</button>
                         </div>
-                        {/* Inline TP/SL editor — set/clear take-profit & stop-loss on this position (side-scale ¢) */}
+                        {/* Inline TP/SL editor - set/clear take-profit & stop-loss on this position (side-scale ¢) */}
                         {tpslEdit?.id===pos.id&&(
                           <div onClick={(e)=>e.stopPropagation()} style={{padding:'10px 14px',borderTop:'1px solid #1a1a1a',background:'#0c0c0c'}}>
                             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
                               <div>
                                 <div style={{fontSize:9,color:B.green,fontWeight:600,marginBottom:3}}>Take Profit ¢</div>
-                                <input type="number" inputMode="decimal" min={1} max={99} value={tpslEdit.tp} placeholder="—" onChange={e=>setTpslEdit(c=>({...c,tp:e.target.value}))}
+                                <input type="number" inputMode="decimal" min={1} max={99} value={tpslEdit.tp} placeholder="-" onChange={e=>setTpslEdit(c=>({...c,tp:e.target.value}))}
                                   style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:7,padding:'6px 8px',color:B.green,fontSize:isMobile?16:12,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                               </div>
                               <div>
                                 <div style={{fontSize:9,color:B.red,fontWeight:600,marginBottom:3}}>Stop Loss ¢</div>
-                                <input type="number" inputMode="decimal" min={1} max={99} value={tpslEdit.sl} placeholder="—" onChange={e=>setTpslEdit(c=>({...c,sl:e.target.value}))}
+                                <input type="number" inputMode="decimal" min={1} max={99} value={tpslEdit.sl} placeholder="-" onChange={e=>setTpslEdit(c=>({...c,sl:e.target.value}))}
                                   style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:7,padding:'6px 8px',color:B.red,fontSize:isMobile?16:12,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                               </div>
                             </div>
@@ -1657,7 +1660,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                               // exitPx is the home-terms exit when known; closedAt was a MIXED field
                               // (price / chart-time / 0) and printed nonsense like "→ 0.0¢".
                               const ex = cp.exitPx ?? (cp.closeType === 'LIQ' ? cp.liq : null);
-                              return ex != null ? ((cp.side==='home'?ex:1-ex)*100).toFixed(1)+'¢' : '—';
+                              return ex != null ? ((cp.side==='home'?ex:1-ex)*100).toFixed(1)+'¢' : '-';
                             })()}</span>
                             <span style={{color:pctClr(cp.pnl),fontWeight:700}}>{fmtUsd(cp.pnl)}</span>
                             <span style={{fontSize:10,padding:'2px 7px',borderRadius:5,background:typeC+'15',color:typeC,fontWeight:700}}>{cp.closeType}</span>
@@ -1671,7 +1674,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             </div>
           </div>
 
-          {/* (Mobile activity card removed — wager activity lives in the "Wager Activity" tab
+          {/* (Mobile activity card removed - wager activity lives in the "Wager Activity" tab
               of the gamecast box below, same as desktop. Toasts still cover immediacy.) */}
 
           {/* GAMECAST */}
@@ -1687,7 +1690,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             <div style={{minHeight:200,padding:'10px 16px',maxHeight:320,overflow:'auto'}}>
               {bottomTab==='activity' && (
                 activity.length===0?(
-                  <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>No wagers yet — every bet, cash-out, TP/SL and liquidation lands here</div>
+                  <div style={{textAlign:'center',fontSize:13,color:'#555',padding:'28px 0'}}>No wagers yet - every bet, cash-out, TP/SL and liquidation lands here</div>
                 ):(
                   <div style={{display:'flex',flexDirection:'column',gap:5}}>
                     {activity.map((e,i)=>{
@@ -1706,7 +1709,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                             <div style={{minWidth:0}}>
                               <div style={{fontSize:12.5,fontWeight:700,color:'#fff',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                                 <span style={{color:e.userId===userId?B.primary:'#fff'}}>{e.username||'trader'}{e.userId===userId?' (you)':''}</span>
-                                <span style={{color:'#8a93a6',fontWeight:600}}> · {e.teamName||e.side||'—'}{e.leverage?` · ${e.leverage}x`:''}</span>
+                                <span style={{color:'#8a93a6',fontWeight:600}}> · {e.teamName||e.side||'-'}{e.leverage?` · ${e.leverage}x`:''}</span>
                               </div>
                               <div style={{fontSize:10.5,color:'#666',fontFamily:fm,marginTop:1}}>
                                 {[margin!=null&&('margin '+fmtUsd(margin)),e.notional!=null&&('notional '+fmtUsd(e.notional))].filter(Boolean).join(' · ')}
@@ -1789,7 +1792,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
           <div style={{height:24}}/>
         </div>
 
-        {/* RIGHT SIDEBAR — Wager + Order Book (desktop only) */}
+        {/* RIGHT SIDEBAR - Wager + Order Book (desktop only) */}
         {!isMobile&&<div style={{width:360,overflow:'auto',flexShrink:0,padding:'12px 10px',display:'flex',flexDirection:'column',gap:8}}>
 
           {/* Tab strip */}
@@ -1844,7 +1847,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 </div>
               </div>
               <div style={{fontSize:10,color:'#555',textAlign:'center',marginBottom:12}}>@ {(entryP*100).toFixed(1)}¢ per share</div>
-              {/* Leverage slider — progress-bar track, cap-aware (see LevSlider) */}
+              {/* Leverage slider - progress-bar track, cap-aware (see LevSlider) */}
               <LevSlider eL={eL} ml={ml} onChange={setOrderLev} liq={levLiq} cap={{ px: oPrice }}/>
             </div>
             {/* Limit price */}
@@ -1864,12 +1867,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                 <div>
                   <div style={{fontSize:10,color:B.green,fontWeight:600,marginBottom:4}}>Take Profit ¢</div>
-                  <input type="number" inputMode="decimal" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="—"
+                  <input type="number" inputMode="decimal" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="-"
                     style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:8,padding:'7px 10px',color:B.green,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                 </div>
                 <div>
                   <div style={{fontSize:10,color:B.red,fontWeight:600,marginBottom:4}}>Stop Loss ¢</div>
-                  <input type="number" inputMode="decimal" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="—"
+                  <input type="number" inputMode="decimal" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="-"
                     style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:8,padding:'7px 10px',color:B.red,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                 </div>
               </div>
@@ -1896,14 +1899,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
             {/* Net-position notice: betting the other side nets against the existing one */}
             {oppPos&&<div style={{fontSize:11,color:'#ff9f1c',marginBottom:8,padding:'7px 10px',background:'#ff9f1c10',borderRadius:8,border:'1px solid #ff9f1c22',lineHeight:1.5}}>
-              You already hold <b>{oppPos.side==='home'?HOME.short:AWAY.short}</b> on this game. Buying {team.short} is the opposite side — it will <b>reduce or close</b> that position, not open a second one.
+              You already hold <b>{oppPos.side==='home'?HOME.short:AWAY.short}</b> on this game. Buying {team.short} is the opposite side - it will <b>reduce or close</b> that position, not open a second one.
             </div>}
             {/* Warnings */}
             {balPct>50&&<div style={{fontSize:11,color:'#ff9f1c',marginBottom:8,padding:'6px 10px',background:'#ff9f1c10',borderRadius:8,border:'1px solid #ff9f1c22'}}>
               Using {balPct.toFixed(0)}% of your balance
             </div>}
             {eL>=ml&&ml<10&&<div style={{fontSize:11,color:B.red,marginBottom:8,padding:'6px 10px',background:B.red+'10',borderRadius:8,border:'1px solid '+B.red+'22'}}>
-              Maximum leverage — higher liquidation risk
+              Maximum leverage - higher liquidation risk
             </div>}
             </>);})()}
             {/* Reduce Only */}
@@ -1913,10 +1916,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
               <div>
                 <div style={{fontSize:12,fontWeight:700,color:reduceOnly?B.primaryLight:'#888'}}>Reduce Only</div>
-                <div style={{fontSize:10,color:'#444',lineHeight:1.5}}>Only closes or shrinks a position you already hold — never opens a new one or adds to it. Use it to lock in an exit without accidentally flipping sides.</div>
+                <div style={{fontSize:10,color:'#444',lineHeight:1.5}}>Only closes or shrinks a position you already hold - never opens a new one or adds to it. Use it to lock in an exit without accidentally flipping sides.</div>
               </div>
             </div>
-            {/* Submit — always the brand-green CTA (like Launch App); team identity = the logo
+            {/* Submit - always the brand-green CTA (like Launch App); team identity = the logo
                 on the button. Team KIT colors stay on the side selectors/accents only, so no
                 team's color data can ever make this button illegible. */}
             <button onClick={placeOrder} disabled={settled||marketNotOpen||(joinNeeded?false:eM<10)} style={{width:'100%',padding:'14px 0',fontWeight:700,fontSize:14,
@@ -1926,7 +1929,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               color:settled||marketNotOpen?'#fff':teamBtn?teamBtn.fg:'#000',opacity:settled||marketNotOpen||eM<10?0.4:1,
               display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
               {!settled&&!marketNotOpen&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:24,height:24,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
-              {settled?'Game Settled':marketNotOpen?opensLabel:isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship — get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
+              {settled?'Game Settled':marketNotOpen?opensLabel:isEventGame&&wcJoined===false?'🏆 Join the World Cup Championship - get $10,000':orderType==='limit'?`Limit ${team.name} @ ${limitCents}¢ · ${fmtShares(shareCount)} shares`:`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
             </button>
             {/* Account */}
             <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid #1f1f1f',display:'flex',justifyContent:'space-between',fontSize:11}}>
@@ -1948,7 +1951,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 );})}
               </div>
             )}
-            {/* (Activity tray moved to the "Wager Activity" tab in the gamecast box — the wager
+            {/* (Activity tray moved to the "Wager Activity" tab in the gamecast box - the wager
                 panel stays focused on placing the next bet.) */}
           </div>)}
 
@@ -2022,14 +2025,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               </div>
             )}
 
-            {/* Floating trade button — the WC nav below navigates away, so this is the wager-sheet entry point */}
+            {/* Floating trade button - the WC nav below navigates away, so this is the wager-sheet entry point */}
             {worldcup&&onNavTo&&!showWager&&(
               <button aria-label="Trade" onClick={()=>setShowWager(true)} style={{position:'fixed',right:16,bottom:'calc(72px + env(safe-area-inset-bottom))',zIndex:41,width:52,height:52,borderRadius:26,border:'none',background:B.primary,color:'#000',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 6px 20px rgba(31,209,130,0.35)'}}>
                 <Zap size={22} color="#000" fill="#000"/>
               </button>
             )}
 
-            {/* Sticky bottom tab bar — WC mode: the exact WC home nav (Home/Bets/News/Leaderboard) */}
+            {/* Sticky bottom tab bar - WC mode: the exact WC home nav (Home/Bets/News/Leaderboard) */}
             <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:40,background:'#050505',borderTop:'1px solid #131313',display:'flex',height:56,paddingBottom:'env(safe-area-inset-bottom)'}}>
               {worldcup&&onNavTo
                 ? [['home',Home],['bets',Ticket],['news',Newspaper],['leaderboard',Trophy]].map(([key,Icon])=>(
@@ -2090,18 +2093,18 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                     <div style={{marginBottom:12}}>
                       <LevSlider eL={eL} ml={ml} onChange={setOrderLev} compact liq={levLiq} cap={{ px: oPrice }}/>
                     </div>
-                    {/* Risk tools — TP/SL in the order's own side scale (same states the desktop panel binds) */}
+                    {/* Risk tools - TP/SL in the order's own side scale (same states the desktop panel binds) */}
                     <div style={{marginBottom:12}}>
                       <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:6}}>Risk Tools <span style={{color:'#383838'}}>optional</span></div>
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                         <div>
                           <div style={{fontSize:10,color:B.green,fontWeight:600,marginBottom:4}}>Take Profit ¢</div>
-                          <input type="number" inputMode="decimal" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="—"
+                          <input type="number" inputMode="decimal" min={1} max={99} value={tpCents} onChange={e=>setTpCents(e.target.value)} placeholder="-"
                             style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.green+'22',borderRadius:8,padding:'9px 10px',color:B.green,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                         </div>
                         <div>
                           <div style={{fontSize:10,color:B.red,fontWeight:600,marginBottom:4}}>Stop Loss ¢</div>
-                          <input type="number" inputMode="decimal" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="—"
+                          <input type="number" inputMode="decimal" min={1} max={99} value={slCents} onChange={e=>setSlCents(e.target.value)} placeholder="-"
                             style={{width:'100%',background:'#1a1a1a',border:'1px solid '+B.red+'22',borderRadius:8,padding:'9px 10px',color:B.red,fontSize:16,fontWeight:700,fontFamily:fm,outline:'none',boxSizing:'border-box'}}/>
                         </div>
                       </div>
@@ -2113,7 +2116,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       </div>
                       <div>
                         <div style={{fontSize:12,fontWeight:700,color:reduceOnly?B.primaryLight:'#888'}}>Reduce Only</div>
-                        <div style={{fontSize:10,color:'#555',lineHeight:1.5}}>Only closes or shrinks a position you already hold — it can never open a new one or add to it. Use it to lock in an exit without accidentally flipping sides.</div>
+                        <div style={{fontSize:10,color:'#555',lineHeight:1.5}}>Only closes or shrinks a position you already hold - it can never open a new one or add to it. Use it to lock in an exit without accidentally flipping sides.</div>
                       </div>
                     </div>
                     <div style={{background:'#111',borderRadius:12,padding:'10px 14px',marginBottom:14,fontSize:12}}>
@@ -2135,7 +2138,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                       background:settled||marketNotOpen?'#222':teamBtn?teamBtn.bg:`linear-gradient(135deg, ${B.primary}, ${B.primaryLight||'#52e0a3'})`,color:settled||marketNotOpen?'#fff':teamBtn?teamBtn.fg:'#000',opacity:settled||marketNotOpen||eM<10?0.4:1,
                       display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
                       {!settled&&!marketNotOpen&&!(isEventGame&&wcJoined===false)&&team.logoUrl&&<img src={team.logoUrl} alt="" style={{width:26,height:26,objectFit:'contain',borderRadius:3,flexShrink:0}}/>}
-                      {settled?'Game Settled':marketNotOpen?opensLabel:isEventGame&&wcJoined===false?'🏆 Join the Championship — get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
+                      {settled?'Game Settled':marketNotOpen?opensLabel:isEventGame&&wcJoined===false?'🏆 Join the Championship - get $10,000':`Buy ${team.name} · ${fmtShares(shareCount)} shares`}
                     </button>
                     <div style={{marginTop:12,display:'flex',justifyContent:'space-between',fontSize:12,color:'#555',paddingBottom:4}}>
                       <span>Balance <span style={{color:'#fff',fontFamily:fm,fontWeight:700}}>{fmtUsd(balance)}</span></span>
@@ -2151,7 +2154,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         )}
       </div>
 
-      {/* Settlement overlay — ONLY when the game settled during this session (never on recaps) */}
+      {/* Settlement overlay - ONLY when the game settled during this session (never on recaps) */}
       {settled&&!openedFinalRef.current&&(
         <div style={{position:'fixed',inset:0,zIndex:40,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,.85)',backdropFilter:'blur(20px)'}}>
           <div style={{textAlign:'center',padding:'48px 56px',maxWidth:440,background:'#111',borderRadius:24,border:'1px solid #2a2a2a'}}>
@@ -2188,14 +2191,14 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
       )}
       {showAuth && (
         <AuthModal
-          reason={sessionExpired ? "Your session expired — please sign in again." : "Sign in or create an account to place a wager."}
+          reason={sessionExpired ? "Your session expired - please sign in again." : "Sign in or create an account to place a wager."}
           defaultMode={sessionExpired ? "login" : "signup"}
           onClose={()=>{ setShowAuth(false); setSessionExpired(false); }}
           onAuth={(data)=>{ setAuth(data); setShowAuth(false); setSessionExpired(false); pollRef.current?.(); }}
         />
       )}
       {tradeCard && <TradeCard card={tradeCard} onClose={()=>setTradeCard(null)}/>}
-      {/* Mobile floating toasts — the activity tray lives in the desktop wager panel, so phones need
+      {/* Mobile floating toasts - the activity tray lives in the desktop wager panel, so phones need
           their own surface or rejections are invisible (A7 finding #2). Stacked queue (max 3) so
           bursts don't overwrite each other; zIndex 1200 keeps them visible above the auth/verify
           modals (1000) and the profile page (900); tap any to dismiss early. */}

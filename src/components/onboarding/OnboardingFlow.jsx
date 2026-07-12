@@ -233,7 +233,7 @@ function WelcomeStep({ onClose, onLogin, onNext, onProviderAuth, say, preview })
   const wallet = async () => {
     if (busy) return;
     const eth = typeof window !== "undefined" ? window.ethereum : null;
-    if (!eth) { say("No wallet extension found — install MetaMask, or sign up with Email."); return; }
+    if (!eth) { say("No wallet extension found - install MetaMask, or sign up with Email."); return; }
     setBusy(true);
     try {
       const [address] = await eth.request({ method: "eth_requestAccounts" });
@@ -266,7 +266,7 @@ function WelcomeStep({ onClose, onLogin, onNext, onProviderAuth, say, preview })
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {GOOGLE_CLIENT_ID
             ? <div ref={gRef} style={{ height: 42, display: "flex", justifyContent: "center" }} />
-            : <button onClick={() => say("Google sign-up is being configured — use Email for now.")} style={darkPill}><GoogleIcon /> Sign up with Google</button>}
+            : <button onClick={() => say("Google sign-up is being configured - use Email for now.")} style={darkPill}><GoogleIcon /> Sign up with Google</button>}
           <button onClick={wallet} disabled={busy} style={{ ...darkPill, opacity: busy ? 0.6 : 1 }}><WalletIcon /> {busy ? "Waiting for wallet…" : "Sign up with Wallet"}</button>
         </div>
         <button onClick={onLogin} style={{ background: "none", border: "none", color: "#8a8f98", fontSize: 13, cursor: "pointer", padding: "18px 0 0", fontFamily: fb }}>
@@ -383,7 +383,7 @@ function PhoneStep({ onBack, onNext, preview }) {
         {phase === "enter" ? (
           <>
             <div style={{ fontFamily: fd, fontSize: 20, fontWeight: 700, textAlign: "center" }}>Verify your phone</div>
-            <div style={{ fontSize: 13.5, color: "#8a8f98", textAlign: "center", margin: "9px 0 24px", lineHeight: 1.5 }}>One entry per person — we text a code to keep the competition fair. Mobile numbers only.</div>
+            <div style={{ fontSize: 13.5, color: "#8a8f98", textAlign: "center", margin: "9px 0 24px", lineHeight: 1.5 }}>One entry per person - we text a code to keep the competition fair. Mobile numbers only.</div>
             <input value={phone} onChange={(e) => { setError(""); setPhone(e.target.value); }} placeholder="+1 (555) 000-0000" type="tel" autoComplete="tel" autoFocus style={fieldInput}
               onKeyDown={(e) => e.key === "Enter" && phoneOk && send()} />
             {error && <div style={{ ...badge, marginTop: 12 }}>{error}</div>}
@@ -428,7 +428,7 @@ function ProfileStep({ username, setUsername, onAvatar, onBack, onNext }) {
       try {
         const r = await fetch(`${API_URL}/auth/available?username=${encodeURIComponent(username)}`);
         if (r.ok) { const d = await r.json(); setAvail(!!d.available); }
-      } catch { /* offline — resolve at Create account */ }
+      } catch { /* offline - resolve at Create account */ }
     }, 400);
     return () => clearTimeout(t);
   }, [username, valid]);
@@ -479,7 +479,7 @@ function ProfileStep({ username, setUsername, onAvatar, onBack, onNext }) {
             <span style={{ alignSelf: "flex-start", background: "rgba(255,82,71,0.14)", color: B.red, borderRadius: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 600 }}>{username} is already taken</span>
           )}
           {username.length > 0 && !valid && (
-            <span style={{ alignSelf: "flex-start", background: "rgba(255,255,255,0.08)", color: "#8a8f98", borderRadius: 8, padding: "5px 10px", fontSize: 12.5 }}>3–20 characters — letters, numbers, underscores</span>
+            <span style={{ alignSelf: "flex-start", background: "rgba(255,255,255,0.08)", color: "#8a8f98", borderRadius: 8, padding: "5px 10px", fontSize: 12.5 }}>3–20 characters - letters, numbers, underscores</span>
           )}
         </div>
 
@@ -528,7 +528,7 @@ function SignatureStep({ username, mode, onDraw, onBack, onNext, preview }) {
       onNext();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Something went wrong";
-      setError(/taken|exists/i.test(msg) ? `${username} is already taken — go back to change it` : msg);
+      setError(/taken|exists/i.test(msg) ? `${username} is already taken - go back to change it` : msg);
     } finally { setBusy(false); }
   };
 

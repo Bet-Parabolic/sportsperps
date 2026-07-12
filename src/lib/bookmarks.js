@@ -39,7 +39,7 @@ export async function syncBookmarks() {
       const d = await r.json();
       if (Array.isArray(d.gameIds)) { setCache(d.gameIds); return d.gameIds; }
     }
-  } catch { /* offline — fall back to cache */ }
+  } catch { /* offline - fall back to cache */ }
   return cachedBookmarks();
 }
 

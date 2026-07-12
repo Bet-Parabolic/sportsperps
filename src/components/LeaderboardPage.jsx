@@ -49,11 +49,11 @@ export function LeaderboardPage({ userId }) {
         </div>
         <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 8 }}>Top Traders</h2>
         <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6, marginBottom: 16 }}>
-          {wc ? "World Cup Championship — ranked by equity on the $10,000 World Cup Cash grant."
-            : pts ? "Ranked by points earned — wager volume + daily streaks." : "Ranked by return % on the initial $10,000 balance."}
+          {wc ? "World Cup Championship - ranked by equity on the $10,000 World Cup Cash grant."
+            : pts ? "Ranked by points earned - wager volume + daily streaks." : "Ranked by return % on the initial $10,000 balance."}
         </p>
         <Toggle />
-        {/* How points work — mirrors the backend rules in src/points.js (keep in sync) */}
+        {/* How points work - mirrors the backend rules in src/points.js (keep in sync) */}
         {pts && (
           <div style={{ marginTop: 14, padding: "14px 16px", background: "#101010", borderRadius: 12, border: "1px solid #1c1c1c", maxWidth: 720 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.1em", fontFamily: fm, marginBottom: 8 }}>HOW POINTS WORK</div>
@@ -108,7 +108,7 @@ export function LeaderboardPage({ userId }) {
                   : pts
                   ? <>
                       <div style={{ textAlign: "right", fontWeight: 800, color: B.primaryLight }}>{(entry.points || 0).toLocaleString()}</div>
-                      <div style={{ textAlign: "right", color: entry.streak > 0 ? "#ff9f1c" : "#555" }}>{entry.streak > 0 ? "🔥 " + entry.streak : "—"}</div>
+                      <div style={{ textAlign: "right", color: entry.streak > 0 ? "#ff9f1c" : "#555" }}>{entry.streak > 0 ? "🔥 " + entry.streak : "-"}</div>
                       <div style={{ textAlign: "right", color: "#888" }}>{entry.tradeCount}</div>
                     </>
                   : <>

@@ -106,9 +106,9 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
 
   return (
     <div style={{background:"#0a0a0a",fontFamily:fb,minHeight:"100vh",color:"#fff"}}>
-      {/* HEADER — left corner: back+logo, center: tabs, right corner: deposit+profile */}
+      {/* HEADER - left corner: back+logo, center: tabs, right corner: deposit+profile */}
       <div style={{padding:isMobile?"0 12px":"0 24px",height:56,display:"grid",gridTemplateColumns:"auto 1fr auto",alignItems:"center",borderBottom:"1px solid #1a1a1a",background:"#0a0a0a",position:"sticky",top:0,zIndex:30}}>
-        {/* LEFT — back arrow + pd emblem + wordmark */}
+        {/* LEFT - back arrow + pd emblem + wordmark */}
         <div style={{display:"flex",alignItems:"center",gap:isMobile?8:16,justifySelf:"start"}}>
           <button onClick={onChangeGame} style={{background:"none",border:"none",cursor:"pointer",color:"#666",display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:600,fontFamily:fb,padding:0}}>
             <ChevronRight size={16} style={{transform:"rotate(180deg)"}}/>
@@ -120,9 +120,9 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           </div>
         </div>
 
-        {/* CENTER — sport tabs (natural width, centered) */}
+        {/* CENTER - sport tabs (natural width, centered) */}
         <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",justifySelf:"center",maxWidth:"100%",minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
-          {/* Desktop: home/bets/news/leaderboard live on the left rail — the top bar is sports only.
+          {/* Desktop: home/bets/news/leaderboard live on the left rail - the top bar is sports only.
               Mobile: no rail, so Bets/News fold into the scrollable tab bar. */}
           {(isMobile
             ? ["Home","Bets","News","World Cup","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"]
@@ -144,7 +144,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           );})}
         </div>
 
-        {/* RIGHT — balance + deposit + profile */}
+        {/* RIGHT - balance + deposit + profile */}
         <div style={{display:"flex",alignItems:"center",gap:10,justifySelf:"end"}}>
           {balance != null && (
             <div style={{padding:isMobile?"6px 10px":"7px 14px",borderRadius:10,background:"#111",border:"1px solid #1f1f1f",textAlign:"right"}}>

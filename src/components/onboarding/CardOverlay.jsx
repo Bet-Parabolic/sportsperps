@@ -30,7 +30,7 @@ export function CardOverlay({ onClose }) {
     } catch { /* ignore */ }
   };
   const share = async () => {
-    const message = `Join me on Parabolic — trade live win probability. Use my code ${code} when you sign up: ${shareUrl}`;
+    const message = `Join me on Parabolic - trade live win probability. Use my code ${code} when you sign up: ${shareUrl}`;
     if (navigator.share) {
       try { await navigator.share({ text: message, url: shareUrl }); return; } catch { /* cancelled */ }
     }

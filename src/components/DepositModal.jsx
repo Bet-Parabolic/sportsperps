@@ -14,7 +14,7 @@ export function DepositModal({ balance, onClose }) {
         <h2 style={{ margin: "0 0 6px", fontFamily: fd, fontSize: 21, color: B.white, fontWeight: 700 }}>Deposits &amp; withdrawals</h2>
         <div style={{ display: "inline-block", fontSize: 11, fontWeight: 800, fontFamily: fm, letterSpacing: "0.1em", color: B.primaryLight, background: B.primary + "1c", padding: "4px 12px", borderRadius: 999, marginBottom: 14 }}>COMING SOON</div>
         <p style={{ margin: "0 0 16px", fontSize: 13.5, color: "#9aa1ab", lineHeight: 1.6 }}>
-          Parabolic is in paper trading — every account starts with <strong style={{ color: B.white }}>$10,000</strong> of practice funds. Real USDC deposits and withdrawals arrive with on-chain settlement.
+          Parabolic is in paper trading - every account starts with <strong style={{ color: B.white }}>$10,000</strong> of practice funds. Real USDC deposits and withdrawals arrive with on-chain settlement.
         </p>
         {balance != null && (
           <div style={{ background: B.bg, border: `1px solid ${B.border2}`, borderRadius: 14, padding: "12px 16px", marginBottom: 18 }}>

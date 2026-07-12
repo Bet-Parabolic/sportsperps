@@ -88,7 +88,7 @@ export function ProfileModal({ userId, onClose }) {
                     <div>
                       <span style={{color:t.side==='home'?B.primary:'#ef4444',fontWeight:700}}>{t.side.toUpperCase()}</span>
                       <span style={{color:'#555',margin:'0 6px'}}>{t.leverage}x</span>
-                      <span style={{color:'#888'}}>{(t.entryPx*100).toFixed(1)}¢ → {t.exitPx!=null?(t.exitPx*100).toFixed(1)+'¢':'—'}</span>
+                      <span style={{color:'#888'}}>{(t.entryPx*100).toFixed(1)}¢ → {t.exitPx!=null?(t.exitPx*100).toFixed(1)+'¢':'-'}</span>
                     </div>
                     <div style={{display:'flex',gap:12,alignItems:'center'}}>
                       <span style={{color:t.pnl>=0?B.green:B.red,fontWeight:700}}>{t.pnl>=0?'+':''}{fmtUsd(t.pnl)}</span>

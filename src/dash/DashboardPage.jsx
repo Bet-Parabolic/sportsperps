@@ -23,12 +23,12 @@ const adminPost = (path, body) =>
   fetch(`${API_URL}${path}`, { method: "POST", headers: { "x-admin-token": localStorage.getItem(TOK) || "", "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
     .then((r) => { if (r.status === 401) throw new Error("401"); return r.json(); });
 
-const fmt = (v, d = 4) => (v == null ? "—" : (+v).toFixed(d));
-const fmtUsd = (v) => (v == null ? "—" : "$" + (+v).toLocaleString(undefined, { maximumFractionDigits: 0 }));
-const fmtSigned = (v) => (v == null ? "—" : (v >= 0 ? "+$" : "−$") + Math.abs(+v).toFixed(0));
-const cents = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "¢");
+const fmt = (v, d = 4) => (v == null ? "-" : (+v).toFixed(d));
+const fmtUsd = (v) => (v == null ? "-" : "$" + (+v).toLocaleString(undefined, { maximumFractionDigits: 0 }));
+const fmtSigned = (v) => (v == null ? "-" : (v >= 0 ? "+$" : "−$") + Math.abs(+v).toFixed(0));
+const cents = (v) => (v == null ? "-" : (v * 100).toFixed(1) + "¢");
 const ago = (ts) => {
-  if (!ts) return "—";
+  if (!ts) return "-";
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
   if (s < 60) return s + "s";
   if (s < 3600) return Math.floor(s / 60) + "m";
@@ -65,17 +65,17 @@ const Info = ({ text }) => {
 };
 const TIP = {
   games: "Finished games we've scored the oracle against. Each one feeds every metric below.",
-  forecasts: "Individual (predicted price → actual result) checkpoints across all graded games — the sample size behind the metrics.",
+  forecasts: "Individual (predicted price → actual result) checkpoints across all graded games - the sample size behind the metrics.",
   brier: "The headline accuracy score: average squared gap between the oracle's price and what actually happened. 0 = perfect, 0.25 = a useless 50/50 guess. Lower is better. Target: green < 0.18, amber to 0.22, red above (barely beating a coin).",
   logloss: "Like Brier, but punishes being confident AND wrong much harder. Lower is better. Target: green < 0.55; above 0.69 (red) means we're confidently wrong somewhere.",
   auc: "Can the oracle tell winners from losers? 1.0 = always priced the winner higher; 0.5 = a coin flip. Target: green > 0.82, amber to 0.72, red below.",
   reliability: "How far the prices sit from reality on average (the gap in the calibration curve). 0 = perfectly honest. Lower is better. Target: green < 0.01, amber to 0.03, red above.",
   skill: "Brier Skill Score: how much we beat a dumb forecaster that always guesses the average outcome. > 0 = we add value; 1 = perfect; negative = worse than guessing. Target: green > 0.2, amber > 0, red ≤ 0.",
-  phases: "Brier within each phase of the game (per sport) — shows WHERE in a game the oracle is least accurate (e.g. the chaotic final innings/minutes). Each cell colors once it has ≥ 10 forecasts.",
-  weights: "Data-driven weighting: each source's suggested share is INVERSELY proportional to its error (more accurate → more weight). A heuristic to nudge toward — NOT a final answer; wait for ~1000 forecasts before a big reweight. ↑ = source is underweighted vs its accuracy, ↓ = overweighted.",
+  phases: "Brier within each phase of the game (per sport) - shows WHERE in a game the oracle is least accurate (e.g. the chaotic final innings/minutes). Each cell colors once it has ≥ 10 forecasts.",
+  weights: "Data-driven weighting: each source's suggested share is INVERSELY proportional to its error (more accurate → more weight). A heuristic to nudge toward - NOT a final answer; wait for ~1000 forecasts before a big reweight. ↑ = source is underweighted vs its accuracy, ↓ = overweighted.",
   calibration: "Each dot: of all the moments the oracle said X%, did it actually happen X% of the time? On the dashed line = honest. Below = overpriced, above = underpriced.",
   sources: "Each price source graded on its own (lower Brier = more accurate). Tells us which source to trust and how to weight the blend.",
-  singleSource: "Share of a game's logged moments priced by only ONE source. Target: green < 25%, amber to 50%, red above — over 50% it can't be cross-checked (soccer's known weak spot).",
+  singleSource: "Share of a game's logged moments priced by only ONE source. Target: green < 25%, amber to 50%, red above - over 50% it can't be cross-checked (soccer's known weak spot).",
   avgConf: "The oracle's own confidence (how much its sources agreed), averaged over the game. Higher = sources agreed.",
   settleGap: "How far the oracle's last live price was from the true 1/0 result. A big gap = a late surprise it didn't see coming.",
   staleKalshi: "How often the safety guard dropped a Kalshi quote for disagreeing with the live model. High = Kalshi was stale that game.",
@@ -83,9 +83,9 @@ const TIP = {
   liveSources: "How many independent price sources are feeding this game right now.",
   ticks: "Price points logged for this game so far. 0 on a settled game = it was already over when capture started.",
   // Vault tab
-  vBalance: "The vault's paper-USDC balance — its capital base. Grows with fees + winning inventory; shrinks on losing inventory.",
+  vBalance: "The vault's paper-USDC balance - its capital base. Grows with fees + winning inventory; shrinks on losing inventory.",
   vInsurance: "Insurance fund reserve. Capitalized by net trading fees + liquidation penalties; absorbs bad debt (underwater settlements/liquidations) BEFORE the vault's LP capital. 'covered' = lifetime bad debt it has paid.",
-  vBadDebt: "Bad debt the VAULT backstopped after the insurance fund was exhausted — a direct hit to LP capital. Should stay near 0 while the insurance fund is funded.",
+  vBadDebt: "Bad debt the VAULT backstopped after the insurance fund was exhausted - a direct hit to LP capital. Should stay near 0 while the insurance fund is funded.",
   vPnl: "Realized PnL booked from settled games (vault collected premium, then paid out the outcome). Lifetime.",
   vUnreal: "Open inventory marked at the current oracle price across all active games. What realized PnL would be if every game settled at today's price.",
   vLiability: "Total notional the vault is currently short across all games (sum of per-side exposure). The book it would need to hedge.",
@@ -96,59 +96,59 @@ const TIP = {
   vVenue: "Cheapest hedge venue right now (fee/gas-aware) and the price it'd cross at for the side being hedged.",
   vBasis: "Hedge venue's price minus our oracle (P = Polymarket, K = Kalshi). The cost of crossing to hedge; near 0 is ideal.",
   vState: "open = live game with residual delta, keep the hedge on. unwind = game final or all user positions closed → close the hedge. none = nothing to hedge.",
-  vFills: "Every fill the vault took as counterparty, newest first — the moment a user's order was filled by the vault.",
+  vFills: "Every fill the vault took as counterparty, newest first - the moment a user's order was filled by the vault.",
   vFunding: "Net funding the vault has collected as the residual counterparty (it's short the book's net delta). A small steady revenue line that also pays traders to balance the book.",
   vFundRow: "Current funding rate for this game, %/hr (already tapered). + → home longs pay (away + vault receive); − → away longs pay (home + vault receive). Driven by book premium + vault inventory skew, per-sport calibrated. ·t = the time-to-settlement taper (1 early → 0.1 at the final whistle) shrinking the carry near game end. See FUNDING_SPEC.",
-  vPin: "Funding→exposure coupling. When one side stays heavily one-sided (|skew| ≥ 0.8) the vault throttles how much MORE inventory it'll take on that side — its cap shrinks from ×1.00 toward ×0.50 over ~30 min of sustained pinning, then recovers as skew normalizes. Shows the pinned side (HOME/AWAY), how long it's been pinned, and the current cap multiplier. Applies symmetrically to either side.",
+  vPin: "Funding→exposure coupling. When one side stays heavily one-sided (|skew| ≥ 0.8) the vault throttles how much MORE inventory it'll take on that side - its cap shrinks from ×1.00 toward ×0.50 over ~30 min of sustained pinning, then recovers as skew normalizes. Shows the pinned side (HOME/AWAY), how long it's been pinned, and the current cap multiplier. Applies symmetrically to either side.",
   vHistory: "Every position taken against the vault, full lifecycle: the user's entry + close, and the vault's mirror PnL on Parabolic plus the shadow hedge prices. Open episodes first, then closed.",
-  vHedgePhase2: "Phase-2a hedging: each block, the vault's net delta on an MLB game is driven to ZERO by holding an offsetting Polymarket position, priced off the LIVE CLOB book (full delta-flat — no inventory liability). PAPER mode computes + books the fills it WOULD send; no capital, no orders. 'Hedge PnL (realized)' should OFFSET the vault's inventory PnL, leaving only ~0.5–1¢/contract crossing cost — the proof the hedge works before deploying capital (Phase 2b).",
+  vHedgePhase2: "Phase-2a hedging: each block, the vault's net delta on an MLB game is driven to ZERO by holding an offsetting Polymarket position, priced off the LIVE CLOB book (full delta-flat - no inventory liability). PAPER mode computes + books the fills it WOULD send; no capital, no orders. 'Hedge PnL (realized)' should OFFSET the vault's inventory PnL, leaving only ~0.5–1¢/contract crossing cost - the proof the hedge works before deploying capital (Phase 2b).",
   vFundUser: "Net funding the user paid (−) or received (+) over the life of the position.",
-  vVaultPnl: "The vault's PnL on Parabolic for this position — the zero-sum counterparty result (≈ −user PnL). Funding and platform fees are separate lines.",
+  vVaultPnl: "The vault's PnL on Parabolic for this position - the zero-sum counterparty result (≈ −user PnL). Funding and platform fees are separate lines.",
   vHedgeShadow: "SHADOW hedge: the venue (P=Polymarket, K=Kalshi) and price the vault would have crossed at to flatten this position's side, at open / at close. No real order is placed yet (Phase 2).",
   vHedgeShares: "Polymarket outcome-token shares the vault holds to hedge this game. 'Home shares' pay out if the home team wins, 'Away shares' if the away team wins. Holding both offsets the vault's directional risk; the difference between them is the residual delta the hedge is driving to zero.",
   vHedgeKind: "What the hedge engine did this block. rebalance = adjusted the Polymarket position to flatten the vault's net delta · settle = closed the hedge at the game's final outcome · uncovered = no Polymarket market for this game, so the vault's delta is running UNHEDGED · no-book = the Polymarket market exists but had no liquidity to trade against.",
   // Health tab
   hUptime: "How long the backend has run since its last deploy/restart. The rolling counters below reset on restart.",
   hWs: "Live WebSocket clients connected right now (browsers watching games), plus total connects since restart.",
-  hBlind: "In-play games running with NO fresh oracle source right now — priced blind / frozen. Should be 0; investigate any game listed below.",
-  hSingle: "In-play games priced by only ONE source right now — can't be cross-checked against a second feed. Fewer is better.",
+  hBlind: "In-play games running with NO fresh oracle source right now - priced blind / frozen. Should be 0; investigate any game listed below.",
+  hSingle: "In-play games priced by only ONE source right now - can't be cross-checked against a second feed. Fewer is better.",
   hFetch: "Per data-source fetch success since restart: % of API calls that succeeded + the last error. A dropping rate = that feed is failing, which means mispriced or frozen markets.",
   hMatch: "Of a league's eligible games, how many this source actually matched on the latest poll. A low rate means the source has markets but our matcher isn't joining them to our games (a coverage hole).",
   hApi: "Per API route: request count and p50/p95 latency (ms) over the recent window, plus 4xx/5xx counts. Rising p95 or 5xx = backend trouble.",
-  hStale: "Times a fresh source quote was dropped for disagreeing with the live model (kept OUT of the blend), by source — plus the most recent incidents. A few is healthy (the guard working); a flood means a feed is persistently wrong.",
+  hStale: "Times a fresh source quote was dropped for disagreeing with the live model (kept OUT of the blend), by source - plus the most recent incidents. A few is healthy (the guard working); a flood means a feed is persistently wrong.",
   // Product tab
-  pDau: "Daily active users — distinct users who took any tracked action (login, wager, account created) today (UTC).",
-  pWau: "Weekly active users — distinct users active in the last 7 days.",
+  pDau: "Daily active users - distinct users who took any tracked action (login, wager, account created) today (UTC).",
+  pWau: "Weekly active users - distinct users active in the last 7 days.",
   pSignups: "Distinct users who created a username/password account (a signup event). Guests can wager without signing up, so this is lower than activated users.",
-  pActivation: "Activation rate = of all users seen, the share that placed at least one wager. The single most important early metric — are people actually trying the core action?",
-  pFunnel: "The activation journey: users seen → placed a wager → became a repeat trader (wagered on 2+ different days). '% of prev' is the conversion at each step. It's non-strict — signup isn't required to wager.",
+  pActivation: "Activation rate = of all users seen, the share that placed at least one wager. The single most important early metric - are people actually trying the core action?",
+  pFunnel: "The activation journey: users seen → placed a wager → became a repeat trader (wagered on 2+ different days). '% of prev' is the conversion at each step. It's non-strict - signup isn't required to wager.",
   pRetention: "Do users come back? D1 = of users whose first day was ≥1 day ago, the share active again the next day. D7 = active again within the following week. Cohort = how many users are old enough to count. Target: green ≥40%, amber ≥20%.",
   pDaily: "Activity per day: DAU (distinct active users, green) and new users first seen that day (amber). Watch the trend across match-days.",
-  pEvents: "Raw event volume by type since the backend last restarted — a sanity check that each tracked action is firing.",
+  pEvents: "Raw event volume by type since the backend last restarted - a sanity check that each tracked action is firing.",
   // Economics tab
   eVaultBal: "The vault's current paper-USDC balance. Starts at $50,000; moves with vault trading PnL (at settlement) + net funding collected. The core capital line.",
   eHouse: "Total house economics = realized (vault trading PnL + funding + fee revenue) + open-inventory unrealized. What the house has made on paper. Validates the money model before real capital.",
   eFees: "Fee revenue = taker fees collected − maker rebates paid. In a well-hedged book this + funding is the reliable house revenue (vault trading PnL should net toward 0). Since backend restart.",
-  eFunding: "Net funding the vault has collected as the residual counterparty — a small steady revenue line that also pays traders to balance the book.",
+  eFunding: "Net funding the vault has collected as the residual counterparty - a small steady revenue line that also pays traders to balance the book.",
   eWaterfall: "How the house made (or lost) money, broken out: vault trading PnL + funding + fee revenue = realized house profit; add open-inventory mark-to-oracle for the total incl. open risk.",
-  eTrend: "House economics over time from periodic snapshots (every 5 min). Realized house = trading + funding + fees. Watch the slope — is the model compounding profit as volume grows?",
+  eTrend: "House economics over time from periodic snapshots (every 5 min). Realized house = trading + funding + fees. Watch the slope - is the model compounding profit as volume grows?",
   eLiq: "Liquidations since restart: how many positions were force-closed and their total notional. A spike means the leverage/risk settings may be too loose (or a big gap hit).",
   eActivity: "Live platform activity at the latest snapshot: open interest (notional in open positions), open positions, active traders, live markets.",
   // Execution tab
   xOrders: "Total order submissions the engine has processed since restart (fills, rests, and rejections).",
   xFillRate: "Share of orders that got at least a partial fill. Low fill rate = users are trying to trade but can't (illiquid book / no vault quote / rejections).",
-  xReject: "Share of orders rejected outright. Break down the reasons below — a spike in one reason points at a specific friction (leverage cap too tight, margin, price bounds).",
+  xReject: "Share of orders rejected outright. Break down the reasons below - a spike in one reason points at a specific friction (leverage cap too tight, margin, price bounds).",
   xSlippage: "Execution cost vs the oracle fair price, in cents (taker perspective). Positive = the taker paid above fair (the vault spread). Lower is a better fill. Watch p95 for worst-case fills.",
   xFillMix: "Where fills come from: the vault (house is counterparty) vs the order book (peer-to-peer). Early on the vault carries most flow; a growing book share = real two-sided liquidity.",
   xRejReasons: "Why orders were rejected, most common first. leverageRejected = above the gap-aware cap; perpMarginRejected = not enough balance; oracleRejected = limit too far from the oracle; marketClosed = market not open.",
   // Risk tab
-  rDeficit: "Uncovered bad debt: total loss from liquidations that exceeded the trader's posted margin. The gap-aware leverage cap is designed to keep this at $0 — ANY nonzero value means a liquidation gapped into deficit and the cap needs tightening. The #1 pre-real-money gate.",
+  rDeficit: "Uncovered bad debt: total loss from liquidations that exceeded the trader's posted margin. The gap-aware leverage cap is designed to keep this at $0 - ANY nonzero value means a liquidation gapped into deficit and the cap needs tightening. The #1 pre-real-money gate.",
   rCoverage: "Vault solvency: vault balance ÷ its total short-book liability. > 1.0 means the vault could cover every position settling against it at once. < 1.0 is under-collateralized (a hard blocker for real money).",
-  rSurplus: "Vault balance minus its total liability — the cushion above what it owes the book. Positive = solvent with room to spare.",
-  rLiq: "Liquidation activity since restart: how many positions were force-closed, their total notional, the single largest loss, and — critically — how many produced a deficit (bad debt).",
+  rSurplus: "Vault balance minus its total liability - the cushion above what it owes the book. Positive = solvent with room to spare.",
+  rLiq: "Liquidation activity since restart: how many positions were force-closed, their total notional, the single largest loss, and - critically - how many produced a deficit (bad debt).",
   rExposure: "Per-game vault exposure vs the per-side cap (MAX_VAULT_EXPOSURE). 'Near cap' ≥ 80%, 'Over cap' > 100% (the vault is holding more one-sided risk than the cap allows). Bars show each game's worst side.",
   rDrawdown: "Vault-balance drawdown from its running peak, from the economics snapshots. Max drawdown = worst peak-to-trough capital erosion; current = how far below peak right now.",
-  rDelev: "Force-deleverage keeps a held position's liquidation buffer ≥ the game's largest plausible single-event swing as that swing grows late-game (the at-open leverage cap only binds at open). Phase 2: ENFORCED for all sports except soccer (wcup/mls stay log-only — terminal-gap calibration undersampled n=14; hedging is the real fix for the 38.7¢ tail). 'enforced' rows actually trimmed — margin retained, PnL on the slice realized to the user, who is notified via WS + push + tray toast. 'log' rows are the trims it would apply. Est. bad-debt avoided = what those contracts would add on a full adverse gap. Not ADL — it reduces the at-risk holder's own position, zero-sum vs the vault.",
+  rDelev: "Force-deleverage keeps a held position's liquidation buffer ≥ the game's largest plausible single-event swing as that swing grows late-game (the at-open leverage cap only binds at open). Phase 2: ENFORCED for all sports except soccer (wcup/mls stay log-only - terminal-gap calibration undersampled n=14; hedging is the real fix for the 38.7¢ tail). 'enforced' rows actually trimmed - margin retained, PnL on the slice realized to the user, who is notified via WS + push + tray toast. 'log' rows are the trims it would apply. Est. bad-debt avoided = what those contracts would add on a full adverse gap. Not ADL - it reduces the at-risk holder's own position, zero-sum vs the vault.",
 };
 
 function Login({ onAuthed }) {
@@ -201,12 +201,12 @@ const Stat = ({ label, value, sub, info, valueColor }) => (
 
 // Sample-size confidence: how much to trust the graded metrics (see ORACLE_METRICS_GUIDE.md §1).
 function confidence(games, forecasts) {
-  if (games == null) return { color: C.mut, label: "—", msg: "" };
+  if (games == null) return { color: C.mut, label: "-", msg: "" };
   if (games < 10 || forecasts < 100)
-    return { color: C.red, label: "Not yet meaningful", msg: "Too little data — ignore the values below for now. Watch that games accumulate and coverage stays healthy. (Trust overall numbers at ~50 games / 500 forecasts.)" };
+    return { color: C.red, label: "Not yet meaningful", msg: "Too little data - ignore the values below for now. Watch that games accumulate and coverage stays healthy. (Trust overall numbers at ~50 games / 500 forecasts.)" };
   if (games < 50 || forecasts < 500)
     return { color: C.amber, label: "Directional only", msg: "Big biases and trends are visible, but the numbers aren't precise yet. Confirm at ~50 games / 500 forecasts." };
-  return { color: C.primary, label: "Confident", msg: "Sample is large enough to trust — confirm it holds stable across multiple match-days." };
+  return { color: C.primary, label: "Confident", msg: "Sample is large enough to trust - confirm it holds stable across multiple match-days." };
 }
 const ConfidenceBanner = ({ games, forecasts }) => {
   const c = confidence(games, forecasts);
@@ -287,7 +287,7 @@ function VaultTab({ vault, history = [], hedge = null }) {
         <Stat label="Funding collected" value={fmtSigned(v.fundingCollected)} sub="net carry" info={TIP.vFunding} />
         {vault.insurance && <Stat label="Insurance fund" value={fmtUsd(vault.insurance.balance)} sub={`covered ${fmtUsd(vault.insurance.deficitsCovered)}`} info={TIP.vInsurance} />}
         <Stat label="Vault bad debt" value={fmtUsd(v.badDebt || 0)} sub="backstopped" info={TIP.vBadDebt} />
-        {vault.shadow && <Stat label="Hedge coverage" value={vault.shadow.coverageRate != null ? (vault.shadow.coverageRate * 100).toFixed(0) + "%" : "—"} sub={`${vault.shadow.samples || 0} samples`} />}
+        {vault.shadow && <Stat label="Hedge coverage" value={vault.shadow.coverageRate != null ? (vault.shadow.coverageRate * 100).toFixed(0) + "%" : "-"} sub={`${vault.shadow.samples || 0} samples`} />}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -300,7 +300,7 @@ function VaultTab({ vault, history = [], hedge = null }) {
       {sub === "live" && <>
 
       {hedge && (hedge.mode === "paper" || hedge.mode === "live") && (
-        <Panel title={`Phase-2 hedging — ${hedge.mode === "paper" ? "PAPER (no capital)" : "LIVE"} · ${(hedge.leagues || []).join(", ").toUpperCase()} · full delta-flat`} info={TIP.vHedgePhase2}>
+        <Panel title={`Phase-2 hedging - ${hedge.mode === "paper" ? "PAPER (no capital)" : "LIVE"} · ${(hedge.leagues || []).join(", ").toUpperCase()} · full delta-flat`} info={TIP.vHedgePhase2}>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: (hedge.recent || []).length ? 12 : 0 }}>
             <Stat label="Open hedge positions" value={(hedge.openPositions || []).length} />
             <Stat label="Settled games hedged" value={hedge.scorecard?.games ?? 0} />
@@ -326,13 +326,13 @@ function VaultTab({ vault, history = [], hedge = null }) {
               <thead><tr><th style={th}>When</th><th style={th}>Game</th><th style={th}>Event<Info text={TIP.vHedgeKind} /></th><th style={th}>Net Δ</th><th style={th}>Home-eq</th><th style={th}>Traded</th><th style={th}>Exec px</th><th style={th}>Note</th></tr></thead>
               <tbody>{hedge.recent.map((e, i) => (
                 <tr key={i}>
-                  <td style={{ ...td, color: C.mut }}>{e.ts ? Math.round((Date.now() - e.ts) / 1000) + "s" : "—"}</td>
+                  <td style={{ ...td, color: C.mut }}>{e.ts ? Math.round((Date.now() - e.ts) / 1000) + "s" : "-"}</td>
                   <td style={{ ...td, color: C.mut }}>{e.matchup || e.gameId}</td>
                   <td style={{ ...td, color: e.kind === "settle" ? C.primaryLt : e.kind === "uncovered" || e.kind === "no-book" ? "#f5a524" : C.text }}>{e.kind}</td>
-                  <td style={td}>{e.netDelta != null ? Math.round(e.netDelta) : "—"}</td>
-                  <td style={td}>{e.homeEquiv != null ? Math.round(e.homeEquiv) : "—"}</td>
-                  <td style={td}>{e.traded != null ? Math.round(e.traded) : "—"}</td>
-                  <td style={td}>{e.execPx != null ? e.execPx.toFixed(3) : "—"}</td>
+                  <td style={td}>{e.netDelta != null ? Math.round(e.netDelta) : "-"}</td>
+                  <td style={td}>{e.homeEquiv != null ? Math.round(e.homeEquiv) : "-"}</td>
+                  <td style={td}>{e.traded != null ? Math.round(e.traded) : "-"}</td>
+                  <td style={td}>{e.execPx != null ? e.execPx.toFixed(3) : "-"}</td>
                   <td style={{ ...td, color: C.mut, fontSize: 11 }}>{e.note || (e.realized != null ? `pnl ${e.realized}` : "")}</td>
                 </tr>
               ))}</tbody>
@@ -366,18 +366,18 @@ function VaultTab({ vault, history = [], hedge = null }) {
                   <td style={{ ...td, color: signColor(g.users?.netHomeDelta) }}>{(g.users?.netHomeDelta ?? 0) >= 0 ? "+" : ""}{g.users?.netHomeDelta}</td>
                   <td style={td}>{fmtUsd(g.liability?.homeNotional)} / {fmtUsd(g.liability?.awayNotional)}</td>
                   <td style={{ ...td, color: signColor(g.unrealizedPnl) }}>{fmtSigned(g.unrealizedPnl)}</td>
-                  <td style={{ ...td, color: g.funding ? signColor(g.funding.hourlyPct) : C.mut }}>{g.funding ? (g.funding.hourlyPct >= 0 ? "+" : "") + g.funding.hourlyPct.toFixed(3) + "%" : "—"}{g.funding && g.funding.taper != null && g.funding.taper < 0.99 ? <span style={{ color: C.mut, fontSize: 10 }}> ·t{g.funding.taper.toFixed(2)}</span> : null}</td>
+                  <td style={{ ...td, color: g.funding ? signColor(g.funding.hourlyPct) : C.mut }}>{g.funding ? (g.funding.hourlyPct >= 0 ? "+" : "") + g.funding.hourlyPct.toFixed(3) + "%" : "-"}{g.funding && g.funding.taper != null && g.funding.taper < 0.99 ? <span style={{ color: C.mut, fontSize: 10 }}> ·t{g.funding.taper.toFixed(2)}</span> : null}</td>
                   <td style={td}>{(() => {
                     const f = g.funding;
-                    if (!f || !f.pinSide) return <span style={{ color: C.mut }}>—</span>;
+                    if (!f || !f.pinSide) return <span style={{ color: C.mut }}>-</span>;
                     const side = f.pinSide > 0 ? "HOME" : "AWAY";
                     const cap = f.exposureScale ? (f.pinSide > 0 ? f.exposureScale.home : f.exposureScale.away) : 1;
                     const hot = cap <= 0.75;
                     return <span style={{ color: hot ? C.red : C.amber, fontWeight: 700 }}>{side} {f.pinMinutes}m <span style={{ color: C.mut, fontWeight: 400 }}>×{cap.toFixed(2)}</span></span>;
                   })()}</td>
-                  <td style={td}>{g.hedge?.contracts > 0 ? `${g.hedge.side} ×${g.hedge.contracts}` : "—"}</td>
+                  <td style={td}>{g.hedge?.contracts > 0 ? `${g.hedge.side} ×${g.hedge.contracts}` : "-"}</td>
                   <td style={td}>{g.hedge?.bestVenue ? `${g.hedge.bestVenue} @ ${cents(g.hedge.bestVenuePx)}` : <span style={{ color: C.red }}>no venue</span>}</td>
-                  <td style={td}>{g.hedge?.basisPoly != null ? (g.hedge.basisPoly * 100).toFixed(1) : "—"} / {g.hedge?.basisKalshi != null ? (g.hedge.basisKalshi * 100).toFixed(1) : "—"}</td>
+                  <td style={td}>{g.hedge?.basisPoly != null ? (g.hedge.basisPoly * 100).toFixed(1) : "-"} / {g.hedge?.basisKalshi != null ? (g.hedge.basisKalshi * 100).toFixed(1) : "-"}</td>
                   <td style={{ ...td, color: stateColor[g.hedge?.state] || C.mut, fontWeight: 700 }}>{g.hedge?.state}</td>
                 </tr>
               ))}</tbody>
@@ -409,7 +409,7 @@ function VaultTab({ vault, history = [], hedge = null }) {
 
 function VaultHistory({ rows }) {
   const signColor = (n) => ((n || 0) >= 0 ? C.primaryLt : C.red);
-  const px = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "¢");
+  const px = (v) => (v == null ? "-" : (v * 100).toFixed(1) + "¢");
   const closed = rows.filter((r) => r.status === "closed");
   const open = rows.filter((r) => r.status === "open");
   const Row = ({ r }) => (
@@ -424,16 +424,16 @@ function VaultHistory({ rows }) {
       <td style={{ ...td, color: C.mut }}>{px(r.liq_price)}</td>
       <td style={td}>{r.leverage}x</td>
       {/* User close */}
-      <td style={td}>{r.close_type ? <span style={{ color: C.mut }}>{r.close_type}</span> : "—"}</td>
+      <td style={td}>{r.close_type ? <span style={{ color: C.mut }}>{r.close_type}</span> : "-"}</td>
       <td style={td}>{px(r.exit_px)}</td>
-      <td style={{ ...td, color: signColor(r.user_pnl) }}>{r.user_pnl == null ? "—" : fmtSigned(r.user_pnl)}</td>
-      <td style={{ ...td, color: signColor(r.funding_user) }}>{r.funding_user == null ? "—" : fmtSigned(r.funding_user)}</td>
+      <td style={{ ...td, color: signColor(r.user_pnl) }}>{r.user_pnl == null ? "-" : fmtSigned(r.user_pnl)}</td>
+      <td style={{ ...td, color: signColor(r.funding_user) }}>{r.funding_user == null ? "-" : fmtSigned(r.funding_user)}</td>
       <td style={{ ...td, color: C.mut }}>{fmtUsd((r.open_fee || 0) + (r.close_fee || 0))}</td>
       {/* Vault side */}
-      <td style={{ ...td, color: signColor(r.vault_pnl) }}>{r.vault_pnl == null ? "—" : fmtSigned(r.vault_pnl)}</td>
-      <td style={td}>{r.hedge_venue_open ? `${r.hedge_venue_open[0].toUpperCase()} ${px(r.hedge_px_open)}` : "—"}</td>
-      <td style={td}>{r.hedge_venue_close ? `${r.hedge_venue_close[0].toUpperCase()} ${px(r.hedge_px_close)}` : "—"}</td>
-      <td style={{ ...td, color: C.mut }}>{r.closed_at ? new Date(r.closed_at).toLocaleString() : (r.opened_at ? new Date(r.opened_at).toLocaleString() : "—")}</td>
+      <td style={{ ...td, color: signColor(r.vault_pnl) }}>{r.vault_pnl == null ? "-" : fmtSigned(r.vault_pnl)}</td>
+      <td style={td}>{r.hedge_venue_open ? `${r.hedge_venue_open[0].toUpperCase()} ${px(r.hedge_px_open)}` : "-"}</td>
+      <td style={td}>{r.hedge_venue_close ? `${r.hedge_venue_close[0].toUpperCase()} ${px(r.hedge_px_close)}` : "-"}</td>
+      <td style={{ ...td, color: C.mut }}>{r.closed_at ? new Date(r.closed_at).toLocaleString() : (r.opened_at ? new Date(r.opened_at).toLocaleString() : "-")}</td>
     </tr>
   );
   const head = (
@@ -455,7 +455,7 @@ function VaultHistory({ rows }) {
     </thead>
   );
   return (
-    <Panel title={`Position history — all vault counterparty actions (${rows.length})`} info={TIP.vHistory}>
+    <Panel title={`Position history - all vault counterparty actions (${rows.length})`} info={TIP.vHistory}>
       <div style={{ color: C.mut, fontSize: 11, marginBottom: 10 }}>Hedge columns are <b>shadow</b> prices (the venue + price the vault would cross at). Real on-venue execution + its fees/PnL arrive in Phase 2.</div>
       {rows.length === 0
         ? <div style={{ color: C.mut, fontSize: 13 }}>No vault actions recorded yet.</div>
@@ -474,7 +474,7 @@ function VaultHistory({ rows }) {
 function HealthTab({ data }) {
   if (!data) return <Panel title="Health"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   const live = data.live || { total: 0, noSource: 0, singleSource: 0, blind: [] };
-  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
+  const pct = (v) => (v == null ? "-" : (v * 100).toFixed(0) + "%");
   const up = data.uptimeS || 0, upH = Math.floor(up / 3600), upM = Math.floor((up % 3600) / 60);
   const fetchColor = (r) => r == null ? C.mut : r >= 0.98 ? C.primary : r >= 0.9 ? C.amber : C.red;
   const matchColor = (r) => r == null ? C.mut : r >= 0.8 ? C.primary : r >= 0.5 ? C.amber : C.red;
@@ -509,8 +509,8 @@ function HealthTab({ data }) {
               <td style={td}>{s.source}</td>
               <td style={{ ...td, color: fetchColor(s.okRate) }}>{pct(s.okRate)}</td>
               <td style={{ ...td, color: C.mut }}>{s.ok} / {s.fail}</td>
-              <td style={{ ...td, color: C.mut }}>{s.lastOkAgoS == null ? "—" : s.lastOkAgoS + "s ago"}</td>
-              <td style={{ ...td, color: s.lastError ? C.red : C.mut, fontFamily: "inherit", maxWidth: 340, whiteSpace: "normal" }}>{s.lastError || "—"}</td>
+              <td style={{ ...td, color: C.mut }}>{s.lastOkAgoS == null ? "-" : s.lastOkAgoS + "s ago"}</td>
+              <td style={{ ...td, color: s.lastError ? C.red : C.mut, fontFamily: "inherit", maxWidth: 340, whiteSpace: "normal" }}>{s.lastError || "-"}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -518,7 +518,7 @@ function HealthTab({ data }) {
 
       <Panel title="Market match rate by league (latest poll)" info={TIP.hMatch}>
         {(data.match || []).length === 0
-          ? <div style={{ color: C.mut, fontSize: 13 }}>No match data yet — no active games this poll.</div>
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No match data yet - no active games this poll.</div>
           : <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr><th style={th}>Source</th><th style={th}>League</th><th style={th}>Matched</th><th style={th}>Rate</th></tr></thead>
               <tbody>{data.match.map((m) => (
@@ -540,9 +540,9 @@ function HealthTab({ data }) {
                 <tr key={r.route}>
                   <td style={{ ...td, fontFamily: "inherit" }}>{r.route}</td>
                   <td style={td}>{r.count}</td>
-                  <td style={td}>{r.p50 == null ? "—" : r.p50.toFixed(0)}</td>
-                  <td style={{ ...td, color: p95Color(r.p95) }}>{r.p95 == null ? "—" : r.p95.toFixed(0)}</td>
-                  <td style={{ ...td, color: C.mut }}>{r.maxMs == null ? "—" : r.maxMs.toFixed(0)}</td>
+                  <td style={td}>{r.p50 == null ? "-" : r.p50.toFixed(0)}</td>
+                  <td style={{ ...td, color: p95Color(r.p95) }}>{r.p95 == null ? "-" : r.p95.toFixed(0)}</td>
+                  <td style={{ ...td, color: C.mut }}>{r.maxMs == null ? "-" : r.maxMs.toFixed(0)}</td>
                   <td style={{ ...td, color: r.err4xx > 0 ? C.amber : C.mut }}>{r.err4xx}</td>
                   <td style={{ ...td, color: r.err5xx > 0 ? C.red : C.mut }}>{r.err5xx}</td>
                   <td style={{ ...td, color: errColor(r.errRate) }}>{(r.errRate * 100).toFixed(1)}%</td>
@@ -554,7 +554,7 @@ function HealthTab({ data }) {
       <Panel title="Oracle stale-source drops" info={TIP.hStale}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: (data.staleIncidents || []).length ? 12 : 0 }}>
           {(data.staleDrops || []).length === 0
-            ? <div style={{ color: C.mut, fontSize: 13 }}>None — no source has been dropped as stale since restart.</div>
+            ? <div style={{ color: C.mut, fontSize: 13 }}>None - no source has been dropped as stale since restart.</div>
             : data.staleDrops.map((s) => <Stat key={s.source} label={s.source} value={s.count} sub="stale drops" />)}
         </div>
         {(data.staleIncidents || []).length > 0 && (
@@ -575,7 +575,7 @@ function ProductTab({ data }) {
   if (!data) return <Panel title="Product"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   const f = data.funnel || { stages: [], activationRate: null, repeatRate: null, signups: 0 };
   const r = data.retention || {};
-  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
+  const pct = (v) => (v == null ? "-" : (v * 100).toFixed(0) + "%");
   const maxStage = Math.max(1, ...(f.stages || []).map((s) => s.count));
   const retColor = (v) => (v == null ? C.mut : v >= 0.4 ? C.primary : v >= 0.2 ? C.amber : C.red);
   return (
@@ -589,12 +589,12 @@ function ProductTab({ data }) {
       </div>
 
       {data.visitors && (
-        <Panel title="Visitors — top of funnel (client beacon, incl. anonymous)">
+        <Panel title="Visitors - top of funnel (client beacon, incl. anonymous)">
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Stat label="Visitor DAU" value={data.visitors.dauToday ?? 0} sub="all ids incl. anon" />
             <Stat label="Visitor WAU" value={data.visitors.wau ?? 0} />
             <Stat label="Sessions (7d)" value={data.visitors.sessions7d ?? 0} sub="from 60s heartbeats" />
-            <Stat label="Median session" value={data.visitors.medianSessionMin != null ? `${data.visitors.medianSessionMin}m` : "—"} />
+            <Stat label="Median session" value={data.visitors.medianSessionMin != null ? `${data.visitors.medianSessionMin}m` : "-"} />
             <Stat label="Landing → App" value={pct(data.visitors.landingToApp)} sub={`${data.visitors.landingViews ?? 0} landing views`} />
           </div>
         </Panel>
@@ -664,7 +664,7 @@ function EconomicsTab({ data }) {
   if (!data) return <Panel title="Economics"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   if (!data.hasData) return (
     <Panel title="Economics">
-      <div style={{ color: C.mut, fontSize: 13 }}>No snapshots yet — the first one is taken at boot, then every 5 minutes. Check back shortly.</div>
+      <div style={{ color: C.mut, fontSize: 13 }}>No snapshots yet - the first one is taken at boot, then every 5 minutes. Check back shortly.</div>
     </Panel>
   );
   const w = data.waterfall || {};
@@ -715,7 +715,7 @@ function EconomicsTab({ data }) {
 
       <Panel title="House economics over time" info={TIP.eTrend}>
         {chart.length < 2
-          ? <div style={{ color: C.mut, fontSize: 13 }}>Need at least two snapshots to plot a trend — building history (every 5 min).</div>
+          ? <div style={{ color: C.mut, fontSize: 13 }}>Need at least two snapshots to plot a trend - building history (every 5 min).</div>
           : <ResponsiveContainer width="100%" height={200}>
               <LineChart data={chart} margin={{ top: 8, right: 12, bottom: 4, left: -6 }}>
                 <CartesianGrid stroke={C.border} strokeDasharray="3 3" />
@@ -758,15 +758,15 @@ const REJ_LABEL = {
   leverageRejected: "Leverage too high", perpMarginRejected: "Insufficient margin",
   oracleRejected: "Price too far from oracle", tickRejected: "Invalid price tick",
   reduceOnlyRejected: "Reduce-only mismatch", badAloPxRejected: "ALO would cross",
-  iocCancelRejected: "IOC — no fill", marketClosed: "Market not open", userNotFound: "User not found",
+  iocCancelRejected: "IOC - no fill", marketClosed: "Market not open", userNotFound: "User not found",
 };
 function ExecutionTab({ data }) {
   if (!data) return <Panel title="Execution"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   const o = data.outcomes || {};
   const mix = data.fillMix || {};
   const sl = data.slippage || {};
-  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
-  const cents = (v) => (v == null ? "—" : (v >= 0 ? "" : "−") + Math.abs(v).toFixed(2) + "¢");
+  const pct = (v) => (v == null ? "-" : (v * 100).toFixed(0) + "%");
+  const cents = (v) => (v == null ? "-" : (v >= 0 ? "" : "−") + Math.abs(v).toFixed(2) + "¢");
   const fillColor = data.fillRate == null ? C.mut : data.fillRate >= 0.8 ? C.primary : data.fillRate >= 0.5 ? C.amber : C.red;
   const rejColor = data.rejectRate == null ? C.mut : data.rejectRate <= 0.05 ? C.primary : data.rejectRate <= 0.15 ? C.amber : C.red;
   const slipColor = sl.avgCents == null ? C.mut : sl.avgCents <= 1 ? C.primary : sl.avgCents <= 3 ? C.amber : C.red;
@@ -807,7 +807,7 @@ function ExecutionTab({ data }) {
         <div style={{ flex: "1 1 320px" }}>
           <Panel title="Rejection reasons" info={TIP.xRejReasons}>
             {(data.rejections || []).length === 0
-              ? <div style={{ color: C.mut, fontSize: 13 }}>No rejections — every order was fillable.</div>
+              ? <div style={{ color: C.mut, fontSize: 13 }}>No rejections - every order was fillable.</div>
               : <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr><th style={th}>Reason</th><th style={th}>Count</th><th style={{ ...th, width: "45%" }}></th></tr></thead>
                   <tbody>{data.rejections.map((r) => (
@@ -849,7 +849,7 @@ function RiskTab({ data }) {
   const lq = data.liquidations || {};
   const dv = data.deleverage || {};
   const dd = data.drawdown || {};
-  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(0) + "%");
+  const pct = (v) => (v == null ? "-" : (v * 100).toFixed(0) + "%");
   const badDebt = lq.totalDeficit || 0;
   const deficitGames = [...new Set((lq.recent || []).filter((r) => r.deficit > 0).map((r) => r.matchup || r.gameId))];
   const solvent = badDebt === 0 && (s.coverage == null || s.coverage >= 1);
@@ -859,14 +859,14 @@ function RiskTab({ data }) {
     <>
       {/* Hero: the one thing that must be true before real money. */}
       <div style={{ background: (solvent ? C.primary : C.red) + "14", border: `1px solid ${(solvent ? C.primary : C.red)}55`, borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
-        <span style={{ color: solvent ? C.primary : C.red, fontWeight: 800, fontSize: 14 }}>{solvent ? "✓ Solvent — no bad debt" : "⚠ Risk flag"}</span>
+        <span style={{ color: solvent ? C.primary : C.red, fontWeight: 800, fontSize: 14 }}>{solvent ? "✓ Solvent - no bad debt" : "⚠ Risk flag"}</span>
         <span style={{ color: C.text, fontSize: 13 }}> · {badDebt > 0 ? `$${badDebt.toLocaleString()} uncovered bad debt across ${lq.deficitCount} liquidation(s)` : "every liquidation stayed within posted margin"}{s.coverage != null && s.coverage < 1 ? ` · vault covers only ${pct(s.coverage)} of its book` : ""}</span>
         <div style={{ color: C.mut, fontSize: 12, marginTop: 3 }}>The gap-aware leverage cap should keep bad debt at $0 and vault coverage ≥ 100%. Any red here is a hard blocker for real funds.</div>
       </div>
 
       {badDebt > 0 && (
         <div style={{ background: C.red + "0d", border: `1px solid ${C.red}33`, borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
-          <div style={{ color: C.red, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>What happened{deficitGames.length ? ` — ${deficitGames.join(", ")}` : ""}</div>
+          <div style={{ color: C.red, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>What happened{deficitGames.length ? ` - ${deficitGames.join(", ")}` : ""}</div>
           <div style={{ color: C.text, fontSize: 12.5, lineHeight: 1.6 }}>
             A liquidation closed a position for more than the trader's posted margin: the price gapped through both the maintenance trigger and the bankruptcy price before the position could be closed, so the vault had to absorb the shortfall.
             <div style={{ marginTop: 8, color: C.mut }}>
@@ -878,7 +878,7 @@ function RiskTab({ data }) {
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <Stat label="Uncovered bad debt" value={badDebt > 0 ? "−" + fmtUsd(badDebt) : "$0"} valueColor={badDebt > 0 ? C.red : C.primary} sub={`${lq.deficitCount || 0} deficit liq`} info={TIP.rDeficit} />
-        <Stat label="Vault coverage" value={s.coverage == null ? "—" : s.coverage.toFixed(2) + "×"} valueColor={covColor} sub="balance ÷ book" info={TIP.rCoverage} />
+        <Stat label="Vault coverage" value={s.coverage == null ? "-" : s.coverage.toFixed(2) + "×"} valueColor={covColor} sub="balance ÷ book" info={TIP.rCoverage} />
         <Stat label="Surplus" value={fmtSigned(s.surplus)} valueColor={s.surplus >= 0 ? C.primaryLt : C.red} info={TIP.rSurplus} />
         <Stat label="Liability" value={fmtUsd(s.liability)} sub="short book" />
         <Stat label="Max drawdown" value={fmtUsd(dd.maxDrawdown)} sub={`peak ${fmtUsd(dd.peak)}`} info={TIP.rDrawdown} />
@@ -901,7 +901,7 @@ function RiskTab({ data }) {
                 <td style={td}>{r.matchup || r.gameId}</td>
                 <td style={{ ...td, color: r.side === "home" ? C.primaryLt : C.red }}>{r.side}</td>
                 <td style={{ ...td, color: r.pnl < 0 ? C.red : C.text }}>{fmtSigned(r.pnl)}</td>
-                <td style={{ ...td, color: r.deficit > 0 ? C.red : C.mut, fontWeight: r.deficit > 0 ? 700 : 400 }}>{r.deficit > 0 ? fmtSigned(-r.deficit) : "—"}</td>
+                <td style={{ ...td, color: r.deficit > 0 ? C.red : C.mut, fontWeight: r.deficit > 0 ? 700 : 400 }}>{r.deficit > 0 ? fmtSigned(-r.deficit) : "-"}</td>
                 <td style={td}>{fmtUsd(r.notional)}</td>
                 <td style={{ ...td, color: C.mut }}>{r.agoS}s ago</td>
               </tr>
@@ -910,14 +910,14 @@ function RiskTab({ data }) {
         )}
       </Panel>
 
-      <Panel title={`Force-deleverage ${dv.enforcedCount > 0 ? "(ENFORCING)" : "(log-only — would-be trims)"}`} info={TIP.rDelev}>
+      <Panel title={`Force-deleverage ${dv.enforcedCount > 0 ? "(ENFORCING)" : "(log-only - would-be trims)"}`} info={TIP.rDelev}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: (dv.recent || []).length ? 12 : 0 }}>
           <Stat label="Events" value={dv.count ?? 0} valueColor={dv.count > 0 ? C.amber : C.primary} sub={`${dv.enforcedCount || 0} enforced`} />
           <Stat label="Contracts trimmed" value={(dv.contractsTrimmed || 0).toLocaleString()} />
           <Stat label="Bad debt avoided (est.)" value={dv.deficitAvoided > 0 ? fmtUsd(dv.deficitAvoided) : "$0"} valueColor={dv.deficitAvoided > 0 ? C.amber : C.primary} />
         </div>
         {(dv.recent || []).length === 0
-          ? <div style={{ color: C.mut, fontSize: 13 }}>No positions have outgrown their buffer yet — the at-open leverage cap is holding.</div>
+          ? <div style={{ color: C.mut, fontSize: 13 }}>No positions have outgrown their buffer yet - the at-open leverage cap is holding.</div>
           : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr><th style={th}>User</th><th style={th}>Game</th><th style={th}>Side</th><th style={th}>Size→</th><th style={th}>Buffer</th><th style={th}>Swing</th><th style={th}>Avoided</th><th style={th}>Mode</th><th style={th}>When</th></tr></thead>
               <tbody>{dv.recent.map((r, i) => (
@@ -928,7 +928,7 @@ function RiskTab({ data }) {
                   <td style={td}>{r.fromSize?.toLocaleString()}→{r.targetSize?.toLocaleString()}</td>
                   <td style={{ ...td, color: C.mut }}>{(r.buffer * 100).toFixed(1)}%</td>
                   <td style={{ ...td, color: C.amber }}>{(r.swing * 100).toFixed(1)}%</td>
-                  <td style={{ ...td, color: r.deficitAvoided > 0 ? C.amber : C.mut }}>{r.deficitAvoided > 0 ? fmtUsd(r.deficitAvoided) : "—"}</td>
+                  <td style={{ ...td, color: r.deficitAvoided > 0 ? C.amber : C.mut }}>{r.deficitAvoided > 0 ? fmtUsd(r.deficitAvoided) : "-"}</td>
                   <td style={{ ...td, color: r.enforced ? C.red : C.mut }}>{r.enforced ? "enforced" : "log"}</td>
                   <td style={{ ...td, color: C.mut }}>{r.agoS}s ago</td>
                 </tr>
@@ -959,9 +959,9 @@ function RiskTab({ data }) {
 function WaitlistTab({ data }) {
   if (!data) return <Panel title="Waitlist"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   const rows = data.recent || [];
-  const yn = (v) => (v === 1 ? "Yes" : v === 0 ? "No" : "—");
-  const when = (ts) => (ts ? new Date(ts).toLocaleString() : "—");
-  const contact = (r) => r.email || (r.x_handle ? "@" + r.x_handle : "—");
+  const yn = (v) => (v === 1 ? "Yes" : v === 0 ? "No" : "-");
+  const when = (ts) => (ts ? new Date(ts).toLocaleString() : "-");
+  const contact = (r) => r.email || (r.x_handle ? "@" + r.x_handle : "-");
   const Tally = ({ title, obj }) => {
     const ents = Object.entries(obj || {}).sort((a, b) => b[1] - a[1]);
     const max = Math.max(1, ...ents.map(([, n]) => n));
@@ -1002,9 +1002,9 @@ function WaitlistTab({ data }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginBottom: 12 }}>
-        <Tally title="Traders — favorite sport" obj={data.bySport} />
-        <Tally title="Market makers — weekly perp volume" obj={data.byPerpVol} />
-        <Tally title="Market makers — weekly prediction volume" obj={data.byPredVol} />
+        <Tally title="Traders - favorite sport" obj={data.bySport} />
+        <Tally title="Market makers - weekly perp volume" obj={data.byPerpVol} />
+        <Tally title="Market makers - weekly prediction volume" obj={data.byPredVol} />
       </div>
 
       <Panel title={`Recent signups (${rows.length})`}>
@@ -1020,11 +1020,11 @@ function WaitlistTab({ data }) {
                   <td style={{ ...td, color: C.mut, whiteSpace: "nowrap" }}>{when(r.ts)}</td>
                   <td style={td}><span style={{ color: r.kind === "mm" ? C.primaryLt : C.text, fontWeight: 600 }}>{r.kind === "mm" ? "Market maker" : "Trader"}</span></td>
                   <td style={td}>{contact(r)}</td>
-                  <td style={td}>{r.fav_sport || "—"}</td>
+                  <td style={td}>{r.fav_sport || "-"}</td>
                   <td style={td}>{r.kind === "mm" ? yn(r.runs_perps) : yn(r.traded_perps)}</td>
                   <td style={td}>{r.kind === "mm" ? yn(r.makes_predictions) : yn(r.traded_predictions)}</td>
-                  <td style={td}>{r.perp_vol || "—"}</td>
-                  <td style={td}>{r.pred_vol || "—"}</td>
+                  <td style={td}>{r.perp_vol || "-"}</td>
+                  <td style={td}>{r.pred_vol || "-"}</td>
                 </tr>
               ))}</tbody>
             </table></div>}
@@ -1088,7 +1088,7 @@ function WCEconTab({ data }) {
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <Stat label="Open interest" value={fmtUsd(data.openInterest)} sub={`${data.openPositions ?? 0} open positions`} />
         <Stat label="Conservation drift" value={fmtSigned(data.conservationDrift)} color={driftBig ? C.red : C.mut}
-          sub={data.openPositions > 0 || data.vaultInventoryOpen ? "open inventory in flight — closes at settlement" : driftBig ? "⚠ should be $0 with all books flat" : "money conserves"} />
+          sub={data.openPositions > 0 || data.vaultInventoryOpen ? "open inventory in flight - closes at settlement" : driftBig ? "⚠ should be $0 with all books flat" : "money conserves"} />
       </div>
 
       <ShadowMMPanel />
@@ -1124,7 +1124,7 @@ function FinalSnapshotPanel() {
     setBusy(true); setMsg("");
     try {
       const r = await adminPost("/admin/event/snapshot", { kind: "final" });
-      setMsg(r?.ok ? `✓ Snapshot captured — ${r.snapshot.participants} entrants frozen` : "Capture failed");
+      setMsg(r?.ok ? `✓ Snapshot captured - ${r.snapshot.participants} entrants frozen` : "Capture failed");
       await load();
     } catch { setMsg("Capture failed"); }
     setBusy(false);
@@ -1247,8 +1247,8 @@ function ShadowMMPanel() {
                       <td style={{ padding: "6px 8px", color: C.text }}>{(r.trigger_px * 100).toFixed(1)}¢</td>
                       <td style={{ padding: "6px 8px", color: C.text }}>{fmtUsd(r.margin)}</td>
                       <td style={{ padding: "6px 8px", color: sign(r.scenarioPnl), fontWeight: 700 }}>{fmtSigned(r.scenarioPnl)}</td>
-                      <td style={{ padding: "6px 8px", color: r.actualPnl == null ? C.mut : sign(r.actualPnl), fontWeight: 700 }}>{r.actualPnl == null ? "—" : fmtSigned(r.actualPnl)}</td>
-                      <td style={{ padding: "6px 8px", color: r.delta == null ? C.mut : sign(r.delta), fontWeight: 700 }}>{r.delta == null ? "—" : fmtSigned(r.delta)}</td>
+                      <td style={{ padding: "6px 8px", color: r.actualPnl == null ? C.mut : sign(r.actualPnl), fontWeight: 700 }}>{r.actualPnl == null ? "-" : fmtSigned(r.actualPnl)}</td>
+                      <td style={{ padding: "6px 8px", color: r.delta == null ? C.mut : sign(r.delta), fontWeight: 700 }}>{r.delta == null ? "-" : fmtSigned(r.delta)}</td>
                       <td style={{ padding: "6px 8px", color: C.mut, whiteSpace: "nowrap" }}>{r.status}</td>
                     </tr>
                   ))}
@@ -1257,7 +1257,7 @@ function ShadowMMPanel() {
             </div>
           )}
           {(rep.rows || []).length === 0 && (
-            <div style={{ color: C.mut, fontSize: 12.5 }}>No shadow liquidations recorded yet at MM {mm} — no event position has crossed that maintenance trigger.</div>
+            <div style={{ color: C.mut, fontSize: 12.5 }}>No shadow liquidations recorded yet at MM {mm} - no event position has crossed that maintenance trigger.</div>
           )}
         </>
       )}
@@ -1274,9 +1274,9 @@ function UsersTab({ data }) {
   const rows = needle
     ? all.filter((u) => [u.username, u.email, u.walletAddress, u.xHandle, u.userId].some((v) => v && String(v).toLowerCase().includes(needle)))
     : all;
-  const when = (ts) => (ts ? new Date(ts).toLocaleDateString() : "—");
-  const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
-  const check = (v) => (v ? <span style={{ color: C.primary }}>✓</span> : <span style={{ color: C.mut }}>—</span>);
+  const when = (ts) => (ts ? new Date(ts).toLocaleDateString() : "-");
+  const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "-");
+  const check = (v) => (v ? <span style={{ color: C.primary }}>✓</span> : <span style={{ color: C.mut }}>-</span>);
   const registered = all.filter((u) => u.hasPassword);
 
   const exportCsv = () => {
@@ -1312,18 +1312,18 @@ function UsersTab({ data }) {
               <tbody>{rows.slice(0, 500).map((u) => (
                 <tr key={u.userId}>
                   <td style={{ ...td, fontWeight: 600, color: u.hasPassword ? C.text : C.mut }} title={u.userId}>{u.username || `guest-${u.userId.slice(0, 6)}`}</td>
-                  <td style={td}>{u.email || "—"}</td>
+                  <td style={td}>{u.email || "-"}</td>
                   <td style={td}>{check(u.emailVerified)}</td>
-                  <td style={{ ...td, whiteSpace: "nowrap" }}>{u.phone || "—"}</td>
+                  <td style={{ ...td, whiteSpace: "nowrap" }}>{u.phone || "-"}</td>
                   <td style={td}>{check(u.phoneVerified)}</td>
                   <td style={{ ...td, fontFamily: "monospace", fontSize: 12 }} title={u.walletAddress || ""}>{short(u.walletAddress)}</td>
-                  <td style={td}>{u.xHandle ? `@${u.xHandle}` : "—"}</td>
+                  <td style={td}>{u.xHandle ? `@${u.xHandle}` : "-"}</td>
                   <td style={td}>{(u.points || 0).toLocaleString()}</td>
                   <td style={td}>{u.tradeCount || 0}</td>
                   <td style={{ ...td, color: C.mut, whiteSpace: "nowrap" }}>{when(u.createdAt)}</td>
                 </tr>
               ))}</tbody>
-            </table>{rows.length > 500 && <div style={{ color: C.mut, fontSize: 12, marginTop: 8 }}>Showing first 500 — narrow with search or use Export CSV for the full list.</div>}</div>}
+            </table>{rows.length > 500 && <div style={{ color: C.mut, fontSize: 12, marginTop: 8 }}>Showing first 500 - narrow with search or use Export CSV for the full list.</div>}</div>}
       </Panel>
     </>
   );
@@ -1333,11 +1333,11 @@ function UsersTab({ data }) {
 function FeedbackTab({ data }) {
   if (!data) return <Panel title="Feedback"><div style={{ color: C.mut, fontSize: 13 }}>Loading…</div></Panel>;
   const rows = data.feedback || [];
-  const when = (ts) => (ts ? new Date(ts).toLocaleString() : "—");
+  const when = (ts) => (ts ? new Date(ts).toLocaleString() : "-");
   return (
     <Panel title={`Feedback (${rows.length})`}>
       {rows.length === 0
-        ? <div style={{ color: C.mut, fontSize: 13 }}>Nothing yet — submissions from the profile-page widget land here.</div>
+        ? <div style={{ color: C.mut, fontSize: 13 }}>Nothing yet - submissions from the profile-page widget land here.</div>
         : <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr>
               <th style={th}>When</th><th style={th}>User</th><th style={th}>Surface</th><th style={{ ...th, width: "55%" }}>Message</th>
@@ -1346,7 +1346,7 @@ function FeedbackTab({ data }) {
               <tr key={r.id ?? `${r.created_at}-${r.user_id}`}>
                 <td style={{ ...td, color: C.mut, whiteSpace: "nowrap" }}>{when(r.created_at)}</td>
                 <td style={{ ...td, fontWeight: 600 }} title={r.user_id || ""}>{r.username || (r.user_id ? `guest-${String(r.user_id).slice(0, 6)}` : "anon")}</td>
-                <td style={td}>{r.context || "—"}</td>
+                <td style={td}>{r.context || "-"}</td>
                 <td style={{ ...td, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{r.message}</td>
               </tr>
             ))}</tbody>
@@ -1362,8 +1362,8 @@ function AlertsTab({ data }) {
   if (!data) return <div style={{ color: C.mut, padding: 24 }}>Loading alerts…</div>;
   const { active = [], history = [] } = data;
   const toggle = (id) => setOpenIds((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const fmtT = (ts) => ts ? new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
-  const fmtDur = (s) => s == null ? "—" : s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`;
+  const fmtT = (ts) => ts ? new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
+  const fmtDur = (s) => s == null ? "-" : s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`;
   const sevChip = (severity, activeNow) => (
     <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", padding: "2px 8px", borderRadius: 6,
       color: !activeNow ? C.mut : severity === "crit" ? C.red : C.amber,
@@ -1383,7 +1383,7 @@ function AlertsTab({ data }) {
     </div>
   ) : (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, color: C.mut, fontSize: 12 }}>
-      No runbook entry for this alert key yet — check the message and the Health/Risk tabs.
+      No runbook entry for this alert key yet - check the message and the Health/Risk tabs.
     </div>
   );
   const Row = ({ ep, activeNow }) => {
@@ -1410,17 +1410,17 @@ function AlertsTab({ data }) {
       <div>
         <div style={{ color: C.text, fontWeight: 800, fontSize: 14, marginBottom: 8 }}>Active now {activeEpisodes.length > 0 && <span style={{ color: C.red }}>({activeEpisodes.length})</span>}</div>
         {activeEpisodes.length === 0
-          ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", color: C.primaryLt, fontSize: 13, fontWeight: 600 }}>✓ All clear — no active alert conditions</div>
+          ? <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", color: C.primaryLt, fontSize: 13, fontWeight: 600 }}>✓ All clear - no active alert conditions</div>
           : <div style={{ display: "grid", gap: 8 }}>{activeEpisodes.map((ep) => <Row key={ep.id} ep={ep} activeNow />)}</div>}
         {/* live-computed set can briefly differ from persisted episodes between loop ticks */}
         {active.length !== activeEpisodes.length && (
-          <div style={{ color: C.mut, fontSize: 11, marginTop: 6 }}>({active.length} condition(s) live-computed this refresh — the feed reconciles within one 2-min loop tick)</div>
+          <div style={{ color: C.mut, fontSize: 11, marginTop: 6 }}>({active.length} condition(s) live-computed this refresh - the feed reconciles within one 2-min loop tick)</div>
         )}
       </div>
       <div>
         <div style={{ color: C.text, fontWeight: 800, fontSize: 14, marginBottom: 8 }}>History <span style={{ color: C.mut, fontWeight: 500, fontSize: 12 }}>· each episode = fired → resolved · click for the runbook</span></div>
         {resolved.length === 0
-          ? <div style={{ color: C.mut, fontSize: 13, padding: "8px 0" }}>No resolved alert episodes yet — history accumulates from deploy time.</div>
+          ? <div style={{ color: C.mut, fontSize: 13, padding: "8px 0" }}>No resolved alert episodes yet - history accumulates from deploy time.</div>
           : <div style={{ display: "grid", gap: 8 }}>{resolved.map((ep) => <Row key={ep.id} ep={ep} activeNow={false} />)}</div>}
       </div>
     </div>
@@ -1542,7 +1542,7 @@ export function DashboardPage() {
 
       {err && <div style={{ color: C.red, marginBottom: 12 }}>{err}</div>}
 
-      {/* Global alert banner — server-computed conditions (feeds down, blind games, bad debt,
+      {/* Global alert banner - server-computed conditions (feeds down, blind games, bad debt,
           under-collateralized vault). Shown on EVERY tab so nothing hides behind tab choice. */}
       {tab !== "alerts" && (healthData?.alerts || []).length > 0 && (
         <div onClick={() => setTab("alerts")} title="Open the Alerts tab for the breakdown + history"
@@ -1578,7 +1578,7 @@ export function DashboardPage() {
 
       {tab === "feedback" && <FeedbackTab data={feedbackData} />}
 
-      {/* WC competition — EVENT ledger only, isolated from the main-ledger Vault/Economics tabs */}
+      {/* WC competition - EVENT ledger only, isolated from the main-ledger Vault/Economics tabs */}
       {tab === "wcvault" && <VaultTab vault={wcVaultData} history={[]} hedge={null} />}
 
       {tab === "wcecon" && <WCEconTab data={wcEconData} />}
@@ -1586,7 +1586,7 @@ export function DashboardPage() {
       {tab === "alerts" && <AlertsTab data={alertsData} />}
 
       {tab === "oracle" && <>
-      <Panel title={`Live now — capturing (${live.length})`}>
+      <Panel title={`Live now - capturing (${live.length})`}>
         {live.length === 0
           ? <div style={{ color: C.mut, fontSize: 13 }}>No live games right now.</div>
           : <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1596,7 +1596,7 @@ export function DashboardPage() {
                   <td style={td}>{g.away}@{g.home} <span style={{ color: C.mut }}>{g.league}</span></td>
                   <td style={td}>{g.away_score}-{g.home_score}</td>
                   <td style={{ ...td, color: C.mut }}>{g.statusDetail || `P${g.period}`}</td>
-                  <td style={{ ...td, color: C.primaryLt }}>{g.ip == null ? "—" : (g.ip * 100).toFixed(1) + "¢"}</td>
+                  <td style={{ ...td, color: C.primaryLt }}>{g.ip == null ? "-" : (g.ip * 100).toFixed(1) + "¢"}</td>
                   <td style={{ ...td, color: C.mut }}>{g.sources}</td>
                   <td style={td}>{g.ticks}</td>
                   <td style={td}><button onClick={() => setExplore(g.game_id)} style={{ background: "none", border: `1px solid ${C.border}`, color: C.primaryLt, borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontSize: 11 }}>path</button></td>
@@ -1609,7 +1609,7 @@ export function DashboardPage() {
 
       {summary && <ConfidenceBanner games={summary.games} forecasts={summary.pairs} />}
 
-      {empty && <Panel title="No data yet"><div style={{ color: C.mut, fontSize: 13 }}>No games graded yet — settlements populate as live games finish. Capture is recording; check back after a game ends.</div></Panel>}
+      {empty && <Panel title="No data yet"><div style={{ color: C.mut, fontSize: 13 }}>No games graded yet - settlements populate as live games finish. Capture is recording; check back after a game ends.</div></Panel>}
 
       {summary && !empty && (
         <>
@@ -1635,7 +1635,7 @@ export function DashboardPage() {
             </Panel>
           </div>
 
-          <Panel title="Source weighting — current vs suggested" info={TIP.weights}>
+          <Panel title="Source weighting - current vs suggested" info={TIP.weights}>
             {(summary.weights || []).length === 0
               ? <div style={{ color: C.mut, fontSize: 13 }}>No source data yet.</div>
               : (() => {
@@ -1648,7 +1648,7 @@ export function DashboardPage() {
                     const up = r.suggestedShare > cur + 0.02, down = r.suggestedShare < cur - 0.02;
                     return <tr key={r.name}>
                       <td style={td}>{r.name}</td>
-                      <td style={{ ...td, color: C.mut }}>{r.current ?? "—"} · {(cur * 100).toFixed(0)}%</td>
+                      <td style={{ ...td, color: C.mut }}>{r.current ?? "-"} · {(cur * 100).toFixed(0)}%</td>
                       <td style={{ ...td, color: up ? C.primaryLt : down ? C.amber : C.text, fontWeight: 700 }}>{(r.suggestedShare * 100).toFixed(0)}% {up ? "↑" : down ? "↓" : ""}</td>
                       <td style={td}>{fmt(r.logLoss, 3)}</td>
                       <td style={{ ...td, color: C.mut }}>{r.n}</td>

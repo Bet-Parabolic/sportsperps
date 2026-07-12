@@ -153,7 +153,7 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
               <span style={{ fontSize: 10, fontWeight: 700, fontFamily: fm, padding: "3px 8px", borderRadius: 6, background: a.bg, color: a.color, flexShrink: 0, whiteSpace: "nowrap" }}>{a.label}</span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {e.teamName || e.side || "—"}{e.leverage ? <span style={{ color: "#8a93a6", fontWeight: 600 }}> · {e.leverage}x</span> : null}
+                  {e.teamName || e.side || "-"}{e.leverage ? <span style={{ color: "#8a93a6", fontWeight: 600 }}> · {e.leverage}x</span> : null}
                 </div>
                 <div style={{ fontSize: 11, color: "#666", fontFamily: fm, marginTop: 1 }}>
                   {[margin != null && `margin ${fmtUsd(margin)}`, e.notional != null && `notional ${fmtUsd(e.notional)}`, e.game].filter(Boolean).join(" · ")}
@@ -193,7 +193,7 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
               <div style={{ fontSize: 12, color: "#666" }}>
                 {liveNow.length > 0 || pregame.length > 0
                   ? "Pick a market below to open your next position."
-                  : upcoming.length > 0 ? opensIn(upcoming[0]) + " — see the schedule below." : "Your wager history is below."}
+                  : upcoming.length > 0 ? opensIn(upcoming[0]) + " - see the schedule below." : "Your wager history is below."}
               </div>
             </div>
             {MarketsSection()}

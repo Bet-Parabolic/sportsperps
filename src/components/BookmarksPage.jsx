@@ -31,7 +31,7 @@ export function BookmarksPage({ liveGames = [], onTrade }) {
         <div style={{ ...card, textAlign: "center", padding: "48px 20px" }}>
           <div style={{ fontSize: 30, marginBottom: 10 }}>🔖</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 4 }}>Nothing saved yet</div>
-          <div style={{ fontSize: 12.5, color: "#666" }}>Open any market and hit the bookmark icon in its header — it'll be waiting here.</div>
+          <div style={{ fontSize: 12.5, color: "#666" }}>Open any market and hit the bookmark icon in its header - it'll be waiting here.</div>
         </div>
       ) : marked.map((g) => {
         const isLive = g.status === "live" || g.status === "halftime";

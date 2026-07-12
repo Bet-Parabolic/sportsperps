@@ -37,5 +37,5 @@ export function webNotify(title, body) {
   try {
     if (webNotifyState() !== "on" || !document.hidden) return;
     new Notification(title, { body, icon: "/favicon.svg", tag: "parabolic-" + title });
-  } catch { /* notification constructor can throw on some mobile browsers — never break callers */ }
+  } catch { /* notification constructor can throw on some mobile browsers - never break callers */ }
 }

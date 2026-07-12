@@ -82,7 +82,7 @@ const fmtWhen = (d) => {
 };
 
 /* ── circular flag: ESPN country pngs carry transparent padding, so scale the image up inside
-   an overflow-hidden circle — no black letterbox (Figma glossy flag badges) ── */
+   an overflow-hidden circle - no black letterbox (Figma glossy flag badges) ── */
 /* ── rectangular flag chip (full flag, 4:3, size = HEIGHT) — replaced the circular crop July 12:
    ESPN's flag PNGs are letterboxed squares, so the circle showed blank space behind the flag.
    objectFit:cover on a 4:3 rect fills the chip edge-to-edge with actual flag. ── */
@@ -142,7 +142,7 @@ function RoundCard({ m, label, onOpen, gold = false, prob = null }) {
       boxShadow: tradeable ? `0 0 0 1px ${GOLD}, 0 0 18px ${GOLD}55, 0 3px 2px -2px rgba(0,0,0,0.25)` : gold ? "inset 0 1px 1px rgba(255,255,255,0.12), inset 0 0 18px rgba(255,238,160,0.10), 0 3px 2px -2px rgba(0,0,0,0.25)" : "inset 0 1px 1px rgba(255,255,255,0.05), 0 3px 2px -2px rgba(0,0,0,0.25)",
     }}>
       <RoundChip gold={gold}>{live ? "● LIVE" : label}</RoundChip>
-      {/* full-width + space-evenly so the team slots spread across the card — centered gap:10
+      {/* full-width + space-evenly so the team slots spread across the card - centered gap:10
           left the TBD "?" chips squeezed together in the middle of the wide FINAL/3RD cards */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-evenly", width: "100%" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
@@ -173,7 +173,7 @@ function WingPair({ m, onOpen }) {
     </div>
   );
   return (
-    <div onClick={() => onOpen?.(m)} title={`${m.away.name} vs ${m.home.name}${m.note ? " — " + m.note : ""}`}
+    <div onClick={() => onOpen?.(m)} title={`${m.away.name} vs ${m.home.name}${m.note ? " - " + m.note : ""}`}
       style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", padding: "10px 8px", borderRadius: 16, background: "rgba(23,24,28,0.8)", border: "1px solid rgba(255,255,255,0.04)", cursor: "pointer" }}>
       <Row t={m.home} />
       <Row t={m.away} />
@@ -200,7 +200,7 @@ function QfCard({ m, onOpen, prob = null }) {
   return (
     <div onClick={() => onOpen?.(m)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "12px 10px", borderRadius: 18, background: "rgba(30,31,36,0.9)", border: `1px solid ${tradeable ? GOLD : "rgba(255,255,255,0.06)"}`, cursor: "pointer", boxShadow: tradeable ? `0 0 0 1px ${GOLD}, 0 0 16px ${GOLD}55` : "inset 0 1px 1px rgba(255,255,255,0.05)" }}>
       <div style={{ display: "flex", gap: 18 }}><Col t={m.home} home /><Col t={m.away} /></div>
-      <span style={{ fontFamily: fb, fontSize: 11, color: live ? "#ff5247" : (tradeable && withinWindow) ? GOLD : "#8a93a6", fontWeight: 600 }}>{live ? "● LIVE — Trade" : (tradeable && withinWindow) ? "Trade Pre-Game →" : done ? "Full time" : fmtWhen(m.date).split(",")[0]}</span>
+      <span style={{ fontFamily: fb, fontSize: 11, color: live ? "#ff5247" : (tradeable && withinWindow) ? GOLD : "#8a93a6", fontWeight: 600 }}>{live ? "● LIVE - Trade" : (tradeable && withinWindow) ? "Trade Pre-Game →" : done ? "Full time" : fmtWhen(m.date).split(",")[0]}</span>
     </div>
   );
 }
@@ -270,7 +270,7 @@ function WCRail({ tab, onTab, liveWc, onOpenLive }) {
         ))}
       </div>
       {liveWc.length > 0 && (
-        <div onClick={() => onOpenLive(liveWc[0])} title={`${liveWc.length} live match${liveWc.length > 1 ? "es" : ""} — trade now`}
+        <div onClick={() => onOpenLive(liveWc[0])} title={`${liveWc.length} live match${liveWc.length > 1 ? "es" : ""} - trade now`}
           style={{ width: 36, borderRadius: 9999, padding: "10px 3px 8px", cursor: "pointer", display: "flex", flexDirection: "column", gap: 6, alignItems: "center",
             background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)), rgba(34,34,34,0.95)",
             boxShadow: "inset 0 1px 1px rgba(255,255,255,0.04), inset 0 0 0 0.5px rgba(255,255,255,0.05)" }}>
@@ -285,7 +285,7 @@ function WCRail({ tab, onTab, liveWc, onOpenLive }) {
           </div>
         </div>
       )}
-      {/* Bottom-left link stack: Parabolic logo → landing, docs, X — pinned to the rail's bottom */}
+      {/* Bottom-left link stack: Parabolic logo → landing, docs, X - pinned to the rail's bottom */}
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
         <a data-ungated="1" href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" title="parabolic.gg"
           style={{ width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", opacity: 0.55 }}
@@ -338,7 +338,7 @@ function CountdownRing({ nextMatch, live = false }) {
           </text>
         </svg>
         <img src={fifa26} alt="FIFA World Cup 26" style={{ position: "absolute", left: "50%", top: 96, transform: "translate(-50%,-50%)", width: 74, objectFit: "contain" }} />
-        {/* rect flags are wider than the old circles (4:3) — pull further out so they stay centered on the ring */}
+        {/* rect flags are wider than the old circles (4:3) - pull further out so they stay centered on the ring */}
         <div style={{ position: "absolute", left: -12, top: 88 }}><FlagRect src={nextMatch.away.logo} size={32} /></div>
         <div style={{ position: "absolute", right: -12, top: 88 }}><FlagRect src={nextMatch.home.logo} size={32} /></div>
       </div>
@@ -505,7 +505,7 @@ export function WorldCupPage({ lockedOut = false }) {
       if (res.status === 403 && /verify/i.test(d.error || "")) { track("wc_verify_shown"); setShowVerify(true); return; }
       if (res.status === 401) { setShowOnboard(true); return; }
       setJoinErr(d.error || "Could not join right now");
-    } catch { setJoinErr("Network error — try again"); }
+    } catch { setJoinErr("Network error - try again"); }
   }, [refresh]);
 
   const nextMatch = bracket.filter((m) => m.state === "pre" && !m.home.tbd).sort((a, b) => a.date - b.date)[0]
@@ -548,7 +548,7 @@ export function WorldCupPage({ lockedOut = false }) {
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: isMobile ? 520 : 640, overflow: "hidden", pointerEvents: "none" }}>
         <img src={stadiumBg} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 76%" }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(4,5,7,0.4) 0%, rgba(4,5,7,0.16) 32%, rgba(4,5,7,0.3) 62%, rgba(6,7,10,0.82) 86%, #06070a 99%)" }} />
-        {/* corner vignette — masks a generation artifact in the photo's top-left */}
+        {/* corner vignette - masks a generation artifact in the photo's top-left */}
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(42% 52% at 0% 0%, rgba(4,5,7,0.96) 0%, rgba(4,5,7,0.75) 45%, rgba(4,5,7,0) 75%)" }} />
       </div>
 
@@ -586,11 +586,11 @@ export function WorldCupPage({ lockedOut = false }) {
                     </div>
                   ))}
                 </div>
-                {/* Pregame nudge: the wcup window opens 24h out — between matches, point entrants at it */}
+                {/* Pregame nudge: the wcup window opens 24h out - between matches, point entrants at it */}
                 {!liveMatch && nextMatch && probs[nextMatch.backendId] != null && new Date(nextMatch.date).getTime() - Date.now() < 24 * 3600e3 && (
                   <div style={{ marginTop: 14 }}>
                     <button onClick={() => openMatch(nextMatch)} style={{ padding: "11px 20px", borderRadius: 999, border: `1px solid ${GREEN}55`, cursor: "pointer", fontFamily: fb, fontWeight: 700, fontSize: 13.5, background: `${GREEN}18`, color: GREEN, backdropFilter: "blur(6px)" }}>
-                      ⚡ {nextMatch.home.name} vs {nextMatch.away.name} is open — set a pregame position
+                      ⚡ {nextMatch.home.name} vs {nextMatch.away.name} is open - set a pregame position
                     </button>
                   </div>
                 )}
@@ -600,7 +600,7 @@ export function WorldCupPage({ lockedOut = false }) {
                   Join Championship &amp; Get $10,000
                 </button>
                 {joinErr && <div style={{ color: "#ff5247", fontSize: 13, marginTop: 12 }}>{joinErr}</div>}
-                <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12.5, marginTop: 12, textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>One entry per person — email + phone verification keeps the prizes fair.</div>
+                <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12.5, marginTop: 12, textShadow: "0 2px 12px rgba(0,0,0,0.6)" }}>One entry per person - email + phone verification keeps the prizes fair.</div>
               </div>)}
         </div>
 
@@ -609,14 +609,14 @@ export function WorldCupPage({ lockedOut = false }) {
             ? <Bracket matches={bracket} onOpen={openMatch} isMobile={isMobile} probs={probs} />
             : loadState === "loading"
               ? <BracketSkeleton isMobile={isMobile} />
-              : <ErrorStrip onRetry={refresh}>Couldn't load the bracket — check your connection and try again.</ErrorStrip>}
+              : <ErrorStrip onRetry={refresh}>Couldn't load the bracket - check your connection and try again.</ErrorStrip>}
         </div>
 
         <p style={{ textAlign: "center", color: "#4a4f58", fontSize: 11.5, lineHeight: 1.8, maxWidth: 780, margin: "70px auto 0" }}>
           World Cup Cash is competition play money, fully separate from your Parabolic paper balance. Your account here IS your
-          Parabolic account — same login everywhere. Prizes require verified identity; accounts showing manipulation may be voided.
+          Parabolic account - same login everywhere. Prizes require verified identity; accounts showing manipulation may be voided.
         </p>
-        {/* mobile bottom-left links (logo → landing · docs · X) — desktop pins these on the nav rail */}
+        {/* mobile bottom-left links (logo → landing · docs · X) - desktop pins these on the nav rail */}
         {isMobile && (
           <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 18, padding: "18px 4px 8px" }}>
             <a data-ungated="1" href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" style={{ display: "flex", alignItems: "center", opacity: 0.55 }}>
@@ -683,7 +683,7 @@ export function WorldCupPage({ lockedOut = false }) {
 
     return (
       <div style={{ position: "relative", minHeight: "100%", background: "#050506" }}>
-        {/* stadium backdrop — Figma 142-17157: the exported design layer (its dark treatment is
+        {/* stadium backdrop - Figma 142-17157: the exported design layer (its dark treatment is
             baked into the image), pitch centered behind the podium; a slim bottom fade blends the
             band into the page so the lower rows sit on solid black */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: isMobile ? 640 : 900, overflow: "hidden", pointerEvents: "none" }}>
@@ -726,11 +726,11 @@ export function WorldCupPage({ lockedOut = false }) {
               </div>
             ) : loadState === "error" ? (
               <div style={{ paddingTop: 80 }}>
-                <ErrorStrip onRetry={refresh}>Couldn't load the leaderboard — check your connection and try again.</ErrorStrip>
+                <ErrorStrip onRetry={refresh}>Couldn't load the leaderboard - check your connection and try again.</ErrorStrip>
               </div>
             ) : (
               <div style={{ textAlign: "center", color: "#8a93a6", fontSize: 13, padding: "60px 0" }}>
-                {meta?.live ? "No entrants yet — be first on the board." : "The board opens with the competition."}
+                {meta?.live ? "No entrants yet - be first on the board." : "The board opens with the competition."}
               </div>
             )
           )}
@@ -803,7 +803,7 @@ export function WorldCupPage({ lockedOut = false }) {
           </div>
           {/* Plain function calls (not <HomeTab/>): inline-defined components get a NEW type
               identity on every parent render, so React would unmount + remount the whole tab
-              subtree each time state changes. Calling them inlines their JSX — no boundary. */}
+              subtree each time state changes. Calling them inlines their JSX - no boundary. */}
           {tab === "home" && HomeTab()}
           {tab === "bets" && <div style={{ padding: isMobile ? "64px 4px 10px" : "64px 16px 10px" }}><ActiveBetsPage eventOnly liveGames={wcLive} onTrade={openGame} showMarkets={isMobile} /></div>}
           {tab === "news" && <div style={{ paddingTop: 56 }}><NewsPage onOpenUser={(id) => setViewUser(id)} /></div>}

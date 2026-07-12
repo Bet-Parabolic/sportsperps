@@ -62,7 +62,7 @@ export function WaitlistForm({ onClose, onDone, heading = true }) {
       if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || "Something went wrong"); }
       setDone(true); onDone?.();
     } catch (e) {
-      setError(e.message || "Could not submit — try again");
+      setError(e.message || "Could not submit - try again");
     } finally { setSubmitting(false); }
   }
 
@@ -109,7 +109,7 @@ export function WaitlistForm({ onClose, onDone, heading = true }) {
           <div style={{ fontSize: 44, marginBottom: 10 }}>✓</div>
           <h3 style={{ fontFamily: fd, fontSize: 24, fontWeight: 700, margin: "0 0 8px", color: "#fff" }}>You're on the list</h3>
           <p style={{ color: B.dim, fontSize: 14.5, lineHeight: 1.6, margin: "0 0 22px" }}>
-            Thanks — we'll reach out {emailOk ? "by email" : "on X"} with early access.
+            Thanks - we'll reach out {emailOk ? "by email" : "on X"} with early access.
           </p>
           <button onClick={() => (onClose ? onClose() : (window.location.href = "https://parabolic.gg"))}
             style={{ padding: "12px 30px", border: "none", cursor: "pointer", fontFamily: fb,
@@ -133,7 +133,7 @@ export function WaitlistForm({ onClose, onDone, heading = true }) {
             ))}
           </div>
 
-          {/* STEP 0 — kind */}
+          {/* STEP 0 - kind */}
           {step === 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
               {[["user", "I'm a trader", "Retail / individual trader"], ["mm", "I'm a market maker", "Firm / liquidity provider"]].map(([k, t, s]) => (
@@ -149,7 +149,7 @@ export function WaitlistForm({ onClose, onDone, heading = true }) {
             </div>
           )}
 
-          {/* STEP 1 — questions */}
+          {/* STEP 1 - questions */}
           {step === 1 && kind === "user" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <Question q="Have you ever traded perps?"><YesNo value={tradedPerps} set={setTradedPerps} /></Question>
@@ -183,7 +183,7 @@ export function WaitlistForm({ onClose, onDone, heading = true }) {
             </div>
           )}
 
-          {/* STEP 2 — contact */}
+          {/* STEP 2 - contact */}
           {step === 2 && (
             <div>
               <div style={label}>Email</div>

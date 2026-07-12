@@ -3,7 +3,7 @@ import { API_URL } from "./constants.js";
 import { subscribeLive, lastMessageAt } from "./liveSocket.js";
 
 /* ─────────────────────────────────────────────────────────────
-   useLiveGames — real-time games list over the shared WebSocket.
+   useLiveGames - real-time games list over the shared WebSocket.
 
    Listens to the backend WS via the shared liveSocket:
      { type:"init", games:[...] }       on connect
@@ -28,7 +28,7 @@ export function useLiveGames() {
         const data = await res.json();
         gamesRef.current = new Map((data.games || []).map((g) => [g.id, g]));
         publish();
-      } catch { /* offline — keep last known state */ }
+      } catch { /* offline - keep last known state */ }
     };
 
     restPoll();

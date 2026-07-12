@@ -11,7 +11,7 @@ export function WaitlistPage() {
 
   return (
     <div style={{ background: "#030303", minHeight: "100vh", fontFamily: fb, color: "#fff", position: "relative", overflow: "hidden" }}>
-      {/* ambient background — matches the landing page */}
+      {/* ambient background - matches the landing page */}
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none" }}>
         <svg viewBox="0 0 1440 900" style={{ width: "100%", height: "100%", position: "absolute" }} preserveAspectRatio="xMidYMid slice">
           <defs>

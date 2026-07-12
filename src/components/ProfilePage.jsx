@@ -87,7 +87,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
   const username = profile?.username || "trader";
   const joined = profile?.createdAt
     ? new Date(profile.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })
-    : "—";
+    : "-";
   const returnPct = profile?.returnPct ?? 0;
   const wins = trades.filter((t) => t.pnl > 0).length;
   const winRate = trades.length ? Math.round((wins / trades.length) * 100) : 0;
@@ -174,7 +174,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
   const isWide = typeof window !== "undefined" && window.innerWidth >= 980;
   return (
     <div style={wrap}><div style={wideInner}>
-      {/* Header — title + card + gear (settings) */}
+      {/* Header - title + card + gear (settings) */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 2px 14px" }}>
         <button onClick={onClose} style={iconBtn} title="Close">✕</button>
         <div style={{ fontFamily: fd, fontSize: 16, fontWeight: 700, color: B.white }}>My profile</div>
@@ -190,9 +190,9 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: isWide ? "380px 1fr" : "1fr", gap: 24, alignItems: "start" }}>
-        {/* LEFT column — identity, discipline, stats, open positions */}
+        {/* LEFT column - identity, discipline, stats, open positions */}
         <div>
-          {/* Identity — no standalone pfp; the member card below carries the avatar */}
+          {/* Identity - no standalone pfp; the member card below carries the avatar */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
               <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ddd", background: "#1a1d22", padding: "3px 9px", borderRadius: 999 }}>★ {points.toLocaleString()}</span>
@@ -205,13 +205,13 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
             </div>
           </div>
 
-          {/* Member card — always visible; click for the full overlay (flip/QR/share) */}
+          {/* Member card - always visible; click for the full overlay (flip/QR/share) */}
           <div onClick={() => setShowCard(true)} style={{ cursor: "pointer", marginBottom: 12 }} title="Open my card">
             <StatCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={memberCard.avatar} signature={memberCard.signature} referralCode={referralCodeFor(userId)} />
             <div style={{ fontSize: 11, color: B.dim, marginTop: 6, textAlign: "center" }}>Tap the card to share</div>
           </div>
 
-          {/* Stat grid — All-time P&L / ROI / Win rate / Volume (matches the design's 2x2) */}
+          {/* Stat grid - All-time P&L / ROI / Win rate / Volume (matches the design's 2x2) */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
             <StatBox label={worldcup ? "Competition P&L" : "All-time P&L"} value={`${(profile?.closedPnl ?? 0) >= 0 ? "+" : ""}${fmtUsd(profile?.closedPnl ?? 0)}`} color={(profile?.closedPnl ?? 0) >= 0 ? B.primary : B.red} />
             <StatBox label="ROI" value={fmtPct(returnPct)} color={returnPct >= 0 ? B.primary : B.red} />
@@ -235,7 +235,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
             </div>
           ))}
 
-        {/* worldcup silo: no settings page — account controls live on the main profile */}
+        {/* worldcup silo: no settings page - account controls live on the main profile */}
         {worldcup && (
           <div style={{ marginTop: 18 }}>
             <SectionTitle>Account</SectionTitle>
@@ -253,7 +253,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
         </div>
         </div>
 
-        {/* RIGHT column — Bets | Badges */}
+        {/* RIGHT column - Bets | Badges */}
         <div>
           <div style={{ display: "flex", gap: 20, margin: "2px 4px 12px" }}>
             {["bets", "badges"].map((t) => (
@@ -289,12 +289,12 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
                     <div>
                       <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: fm, letterSpacing: "0.1em", color: B.dim, marginBottom: 4 }}>{lg.emoji} {lg.label}</div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: B.white, textTransform: t.teamName ? "none" : "capitalize" }}>{t.teamName || t.side} · {t.leverage}x</div>
-                      <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{(t.entryPx * 100).toFixed(0)}¢ → {t.exitPx != null ? (t.exitPx * 100).toFixed(0) + "¢" : "—"}</div>
+                      <div style={{ fontSize: 12, color: B.dim, fontFamily: fm }}>{(t.entryPx * 100).toFixed(0)}¢ → {t.exitPx != null ? (t.exitPx * 100).toFixed(0) + "¢" : "-"}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontFamily: fm, fontWeight: 700, color: win ? B.primary : B.red }}>{win ? "+" : ""}{fmtUsd(t.pnl)}</div>
                       <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                        {/* HOW it ended — always shown: TP/SL fired, liquidated, closed by the
+                        {/* HOW it ended - always shown: TP/SL fired, liquidated, closed by the
                             user, or held all the way to settlement. */}
                         {(() => {
                           const ct = t.closeType || "CLOSED";
@@ -367,14 +367,14 @@ function FeedbackWidget({ userId, worldcup }) {
         body: JSON.stringify({ userId, token: authToken(), message: text.trim(), context: worldcup ? "worldcup" : "app" }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error || "Couldn't send — try again");
+      if (!res.ok) throw new Error(d.error || "Couldn't send - try again");
       setState("sent"); setText("");
     } catch (e) { setState("error"); setErr(e.message); }
   };
   if (state === "sent") {
     return (
       <div style={{ ...card, textAlign: "center", padding: "18px 16px" }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: B.white }}>Thanks — we read every one. 🙏</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: B.white }}>Thanks - we read every one. 🙏</div>
         <div style={{ fontSize: 12.5, color: B.dim, marginTop: 4 }}>Your feedback shapes what we build next.</div>
       </div>
     );
@@ -382,7 +382,7 @@ function FeedbackWidget({ userId, worldcup }) {
   return (
     <div style={{ ...card, padding: "14px 16px" }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: B.white, marginBottom: 4 }}>Feedback</div>
-      <div style={{ fontSize: 12, color: B.dim, marginBottom: 8 }}>Spotted a bug? Want a feature? Tell us — it goes straight to the team.</div>
+      <div style={{ fontSize: 12, color: B.dim, marginBottom: 8 }}>Spotted a bug? Want a feature? Tell us - it goes straight to the team.</div>
       <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 2000))} rows={3} placeholder="What should we know?"
         style={{ width: "100%", boxSizing: "border-box", background: B.bg, border: `1px solid ${B.border2}`, borderRadius: 12, padding: "10px 12px", color: B.white, fontSize: 16, fontFamily: fb, outline: "none", resize: "vertical" }} />
       {err && <div style={{ color: B.red, fontSize: 12.5, marginTop: 6 }}>{err}</div>}
@@ -465,7 +465,7 @@ function Referrals() {
     <div>
       <div style={{ ...card, textAlign: "center", padding: "26px 16px" }}>
         <div style={{ fontFamily: fd, fontSize: 18, fontWeight: 700, color: B.white }}>Invite friends</div>
-        <div style={{ color: B.dim, fontSize: 13, margin: "8px 0 0" }}>Referral program coming soon — you and your friends will both earn rewards when they start trading.</div>
+        <div style={{ color: B.dim, fontSize: 13, margin: "8px 0 0" }}>Referral program coming soon - you and your friends will both earn rewards when they start trading.</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <StatBox label="Friends joined" value="0" />
@@ -595,7 +595,7 @@ function PrivacyRow({ userId, profile, onSaved }) {
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "15px 16px" }}>
       <div>
         <div style={{ color: B.white, fontSize: 15 }}>Profile privacy</div>
-        <div style={{ color: B.mute, fontSize: 12, marginTop: 2 }}>{isPublic ? "Public — others can view your profile" : "Private — hidden from others"}</div>
+        <div style={{ color: B.mute, fontSize: 12, marginTop: 2 }}>{isPublic ? "Public - others can view your profile" : "Private - hidden from others"}</div>
       </div>
       <div onClick={toggle} style={{ width: 46, height: 27, borderRadius: 999, background: isPublic ? B.primary : B.border2, position: "relative", cursor: "pointer", transition: "background .15s", flexShrink: 0 }}>
         <div style={{ position: "absolute", top: 3, left: isPublic ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />

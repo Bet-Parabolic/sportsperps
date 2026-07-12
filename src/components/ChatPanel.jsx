@@ -60,7 +60,7 @@ export function ChatPanel({ gameId, userId, homeShort = "Home", awayShort = "Awa
   return (
     <div style={{ display: "flex", flexDirection: "column", height: fill ? "100%" : 300, ...(fill ? { flex: 1, minHeight: 0, padding: "12px 14px" } : {}) }}>
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, paddingRight: 4 }}>
-        {messages.length === 0 && <div style={{ textAlign: "center", fontSize: 13, color: "#555", padding: "28px 0" }}>💬 No messages yet — say something.</div>}
+        {messages.length === 0 && <div style={{ textAlign: "center", fontSize: 13, color: "#555", padding: "28px 0" }}>💬 No messages yet - say something.</div>}
         {messages.map((m) => m.type === "bet" ? <BetRow key={m.id} m={m} teamOf={teamOf} teamColor={teamColor} /> : <UserRow key={m.id} m={m} mine={m.userId === userId} teamOf={teamOf} teamColor={teamColor} />)}
       </div>
 

@@ -114,7 +114,7 @@ export function StatCard({ width = 336, username, avatar, rank = null, roiPct = 
             {username}
           </div>
 
-          {/* bottom-right — context swap: leaderboard/share show rank+ROI+trades; profile/onboarding
+          {/* bottom-right - context swap: leaderboard/share show rank+ROI+trades; profile/onboarding
               show the drawn signature. ROI takes precedence if both are somehow supplied. */}
           {roiPct != null ? (
             <div style={{ position: "absolute", right: 22 * k, bottom: 22 * k, textAlign: "right" }}>
@@ -271,7 +271,7 @@ export function CardShareModal({ userId, username, avatar, rank = null, roiPct =
     ? `Rank #${st.rank} in the World Cup Trading Competition on @betparabolic (${fmtRoi(st.roiPct)} ROI) 🏆`
     : `Trading live win probability on @betparabolic 🏆`;
   const shareX = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, "_blank");
-  const copyLink = async () => { try { await navigator.clipboard.writeText(shareUrl); say("Link copied"); } catch { say("Couldn't copy — " + shareUrl); } };
+  const copyLink = async () => { try { await navigator.clipboard.writeText(shareUrl); say("Link copied"); } catch { say("Couldn't copy - " + shareUrl); } };
   const download = () => downloadCardPng({ username, avatar, rank: st.rank, roiPct: st.roiPct, trades: st.trades }).catch(() => say("Couldn't render the image"));
 
   const circleBtn = { width: 44, height: 44, borderRadius: "50%", border: "none", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };

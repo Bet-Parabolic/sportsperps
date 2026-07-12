@@ -40,7 +40,7 @@ export function FloatingChat({ gameId, userId, homeShort, awayShort, onRequireAu
         <div style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 700, color: "#fff" }}>Live chat</div>
         <button onClick={onClose} onPointerDown={(e) => e.stopPropagation()} style={{ background: "none", border: "none", color: "#9aa0a8", fontSize: 16, cursor: "pointer", padding: 4 }}>✕</button>
       </div>
-      {/* body — the existing per-game chat */}
+      {/* body - the existing per-game chat */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <ChatPanel gameId={gameId} userId={userId} homeShort={homeShort} awayShort={awayShort} onRequireAuth={onRequireAuth} fill />
       </div>

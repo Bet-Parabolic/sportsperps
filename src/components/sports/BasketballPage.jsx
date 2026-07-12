@@ -126,7 +126,7 @@ export function BasketballPage({ liveGames, onTrade }) {
         </h2>
         <p style={{fontSize:13,color:"#666",lineHeight:1.6}}>
           {hasGames
-            ? `${live.length + sched.length + final.length} game${live.length + sched.length + final.length !== 1 ? "s" : ""} — live data from ESPN via Parabolic backend`
+            ? `${live.length + sched.length + final.length} game${live.length + sched.length + final.length !== 1 ? "s" : ""} - live data from ESPN via Parabolic backend`
             : "Connecting to backend…"}
         </p>
       </div>
@@ -143,10 +143,10 @@ export function BasketballPage({ liveGames, onTrade }) {
         </div>
       )}
 
-      {/* Pregame — open for wagering */}
+      {/* Pregame - open for wagering */}
       {pregame.length > 0 && (
         <div style={{marginBottom:32}}>
-          <div style={{fontSize:11,fontWeight:700,color:B.primaryLight,letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>◷ PREGAME — OPEN FOR WAGERING</div>
+          <div style={{fontSize:11,fontWeight:700,color:B.primaryLight,letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>◷ PREGAME - OPEN FOR WAGERING</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
             {pregame.map(g => <GameCard key={g.id} g={g}/>)}
           </div>
@@ -163,7 +163,7 @@ export function BasketballPage({ liveGames, onTrade }) {
         </div>
       )}
 
-      {/* Final — only shown within 6 hours of game start */}
+      {/* Final - only shown within 6 hours of game start */}
       {final.length > 0 && (
         <div style={{marginBottom:32}}>
           <div style={{fontSize:11,fontWeight:700,color:"#555",letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>FINAL</div>

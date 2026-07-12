@@ -68,14 +68,14 @@ function NewsFeed() {
           <div style={{ fontSize: 14.5, fontWeight: 700, color: "#fff", marginBottom: 5 }}>
             {failed ? "Couldn't load the news feed" : "No stories yet"}
           </div>
-          <div style={{ fontSize: 12.5, color: "#8a8f98" }}>{failed ? "Check your connection — retrying automatically." : "Fresh World Cup coverage lands here every few minutes."}</div>
+          <div style={{ fontSize: 12.5, color: "#8a8f98" }}>{failed ? "Check your connection - retrying automatically." : "Fresh World Cup coverage lands here every few minutes."}</div>
         </div>
       )}
       {items.map((n) => {
         const chip = CATEGORY_CHIP[n.category];
         return (
           <a key={n.url} href={n.url} target="_blank" rel="noopener noreferrer"
-            style={{ display: "flex", gap: 14, padding: "14px 6px", borderBottom: "1px solid rgba(255,255,255,0.05)", textDecoration: "none", alignItems: "flex-start" }}>
+            style={{ display: "flex", gap: 14, background: "#101114", border: "1px solid #1c1e24", borderRadius: 14, padding: "14px 16px", marginBottom: 8, textDecoration: "none", alignItems: "flex-start" }}>
             {n.image && (
               <img src={n.image} alt="" loading="lazy"
                 style={{ width: 108, height: 68, objectFit: "cover", borderRadius: 10, flexShrink: 0, background: "#14161a" }}
@@ -132,7 +132,7 @@ function FollowingFeed({ onOpenUser }) {
           <div style={{ fontSize: 14.5, fontWeight: 700, color: "#fff", marginBottom: 5 }}>Nothing here yet</div>
           <div style={{ fontSize: 12.5, color: "#8a8f98", lineHeight: 1.6 }}>
             {authed
-              ? "Open a public trader's profile from the leaderboard and hit Follow — their opens, cash-outs, TP/SL hits and liquidations land here with PnL."
+              ? "Open a public trader's profile from the leaderboard and hit Follow - their opens, cash-outs, TP/SL hits and liquidations land here with PnL."
               : "Log in, then follow traders from the leaderboard to build your feed."}
           </div>
         </div>
@@ -141,7 +141,7 @@ function FollowingFeed({ onOpenUser }) {
         const av = parseAvatar(e.avatar);
         const pnlish = e.pnl != null && e.type !== "open";
         return (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: "#101114", border: "1px solid #1c1e24", borderRadius: 14, padding: "14px 16px", marginBottom: 8 }}>
             {/* Avatar + name open the trader's profile */}
             <div onClick={() => onOpenUser?.(e.userId)} title="View profile"
               style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", background: "#1d2026", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: onOpenUser ? "pointer" : "default" }}>
@@ -175,7 +175,7 @@ export function NewsPage({ onOpenUser }) {
   const [localUser, setLocalUser] = useState(null);
   const openUser = onOpenUser || ((id) => setLocalUser(id));
   return (
-    <div style={{ flex: 1, overflow: "auto", background: "#0a0a0a", padding: "32px 40px 60px", display: "flex", flexDirection: "column", fontFamily: fb }}>
+    <div style={{ flex: 1, overflow: "auto", background: "#0a0a0a", padding: "32px 40px", display: "flex", flexDirection: "column", fontFamily: fb }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
         <Newspaper size={18} color={B.primary} />
         <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.12em", fontFamily: fm }}>NEWS</div>

@@ -99,7 +99,7 @@ export function BaseballPage({ data={events:[],loading:true,error:false}, onTrad
           MLB
         </h2>
         <p style={{fontSize:13,color:"#666",lineHeight:1.6}}>
-          {data.loading ? "Loading games…" : data.error ? "Could not reach ESPN — try again shortly." : `${games.length} game${games.length!==1?"s":""} today · live data from ESPN`}
+          {data.loading ? "Loading games…" : data.error ? "Could not reach ESPN - try again shortly." : `${games.length} game${games.length!==1?"s":""} today · live data from ESPN`}
         </p>
       </div>
 
@@ -131,10 +131,10 @@ export function BaseballPage({ data={events:[],loading:true,error:false}, onTrad
         </div>
       )}
 
-      {/* Pregame — open for wagering */}
+      {/* Pregame - open for wagering */}
       {pregame.length > 0 && (
         <div style={{marginBottom:32}}>
-          <div style={{fontSize:11,fontWeight:700,color:B.primaryLight,letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>◷ PREGAME — OPEN FOR WAGERING</div>
+          <div style={{fontSize:11,fontWeight:700,color:B.primaryLight,letterSpacing:"0.1em",fontFamily:fm,marginBottom:12}}>◷ PREGAME - OPEN FOR WAGERING</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))",gap:12}}>
             {pregame.map(g=><GameCard key={g.id} g={g}/>)}
           </div>
