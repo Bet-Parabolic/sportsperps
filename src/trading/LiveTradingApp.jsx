@@ -1835,13 +1835,20 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 </div>
                 <div style={{color:'#333',fontSize:14,fontWeight:700,paddingBottom:11,textAlign:'center'}}>⇄</div>
                 <div>
-                  <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Margin</div>
+                  <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Bet Size (Dollars)</div>
                   <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:10,padding:'9px 10px',display:'flex',alignItems:'center',gap:3}}>
                     <span style={{color:'#555',fontSize:12,fontWeight:600}}>$</span>
                     <input type="number" inputMode="decimal" value={Math.round(eM)} min={0} onChange={e=>setOrderMargin(Math.min(Math.max(0,+e.target.value),balance))}
                       style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:16,fontWeight:700,fontFamily:fm}}/>
                   </div>
                 </div>
+              </div>
+              {/* quick bet-size presets (desktop) */}
+              <div style={{display:'flex',gap:6,marginBottom:10}}>
+                {[50,100,500,1000].map(v=>(
+                  <button key={v} onClick={()=>setOrderMargin(Math.min(v,balance))} style={{flex:1,padding:'9px 0',fontSize:12.5,fontWeight:700,border:'none',cursor:'pointer',fontFamily:fm,borderRadius:9,
+                    background:Math.round(eM)===v?'#2a2a2a':'#151515',color:Math.round(eM)===v?'#fff':'#777'}}>{v>=1000?'$'+(v/1000)+'k':'$'+v}</button>
+                ))}
               </div>
               <div style={{fontSize:10,color:'#555',textAlign:'center',marginBottom:12}}>@ {(entryP*100).toFixed(1)}¢ per share</div>
               {/* Leverage slider - progress-bar track, cap-aware (see LevSlider) */}
