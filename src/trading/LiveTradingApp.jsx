@@ -1823,34 +1823,24 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                   background:orderType===t?'#2a2a2a':'transparent',color:orderType===t?'#fff':'#666'}}>{l}</button>
               ))}
             </div>
-            {/* Shares ⇄ Margin */}
+            {/* Wager Size */}
             <div style={{marginBottom:12}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:6,alignItems:'end',marginBottom:6}}>
-                <div>
-                  <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Shares</div>
-                  <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:10,padding:'9px 10px'}}>
-                    <input type="number" inputMode="decimal" value={shareCount} min={0} onChange={e=>{const s=Math.max(0,+e.target.value);setOrderMargin(Math.min(Math.max(0,(s*entryP)/eL),balance));}}
-                      style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:16,fontWeight:700,fontFamily:fm}}/>
-                  </div>
-                </div>
-                <div style={{color:'#333',fontSize:14,fontWeight:700,paddingBottom:11,textAlign:'center'}}>⇄</div>
-                <div>
-                  <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Bet Size (Dollars)</div>
-                  <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:10,padding:'9px 10px',display:'flex',alignItems:'center',gap:3}}>
-                    <span style={{color:'#555',fontSize:12,fontWeight:600}}>$</span>
-                    <input type="number" inputMode="decimal" value={Math.round(eM)} min={0} onChange={e=>setOrderMargin(Math.min(Math.max(0,+e.target.value),balance))}
-                      style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:16,fontWeight:700,fontFamily:fm}}/>
-                  </div>
+              <div style={{marginBottom:6}}>
+                <div style={{fontSize:10,color:'#555',fontWeight:600,marginBottom:4}}>Wager Size</div>
+                <div style={{background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:10,padding:'11px 12px',display:'flex',alignItems:'center',gap:4}}>
+                  <span style={{color:'#555',fontSize:14,fontWeight:600}}>$</span>
+                  <input type="number" inputMode="decimal" value={Math.round(eM)} min={0} onChange={e=>setOrderMargin(Math.min(Math.max(0,+e.target.value),balance))}
+                    style={{width:'100%',background:'transparent',border:'none',outline:'none',color:'#fff',fontSize:18,fontWeight:700,fontFamily:fm}}/>
                 </div>
               </div>
-              {/* quick bet-size presets (desktop) */}
+              {/* quick wager-size presets (desktop) */}
               <div style={{display:'flex',gap:6,marginBottom:10}}>
                 {[50,100,500,1000].map(v=>(
                   <button key={v} onClick={()=>setOrderMargin(Math.min(v,balance))} style={{flex:1,padding:'9px 0',fontSize:12.5,fontWeight:700,border:'none',cursor:'pointer',fontFamily:fm,borderRadius:9,
                     background:Math.round(eM)===v?'#2a2a2a':'#151515',color:Math.round(eM)===v?'#fff':'#777'}}>{v>=1000?'$'+(v/1000)+'k':'$'+v}</button>
                 ))}
               </div>
-              <div style={{fontSize:10,color:'#555',textAlign:'center',marginBottom:12}}>@ {(entryP*100).toFixed(1)}¢ per share</div>
+              <div style={{fontSize:10,color:'#555',textAlign:'center',marginBottom:12}}>≈ {fmtShares(shareCount)} shares @ {(entryP*100).toFixed(1)}¢</div>
               {/* Leverage slider - progress-bar track, cap-aware (see LevSlider) */}
               <LevSlider eL={eL} ml={ml} onChange={setOrderLev} liq={levLiq} cap={{ px: oPrice }}/>
             </div>

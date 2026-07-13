@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { B, fd, fb, fm } from "../lib/theme.js";
 import { fmtUsd, fmtPct } from "../lib/helpers.js";
 import { API_URL } from "../lib/constants.js";
@@ -6,7 +6,8 @@ import { currentUserId, authToken, getAuth, setAuth, logout as doLogout } from "
 import { CardShareModal } from "./CardShareModal.jsx";
 import { AvatarCircle } from "./onboarding/MemberCard.jsx";
 import { StatCard } from "./CardShareModal.jsx";
-import { loadCard, referralCodeFor, reconcileAvatarWithAccount } from "../lib/onboarding.js";
+import { loadCard, referralCodeFor, reconcileAvatarWithAccount, resizeAvatar, serializeAvatar, serializeSignature } from "../lib/onboarding.js";
+import { SignaturePad } from "./onboarding/SignaturePad.jsx";
 import { webNotifyState, enableWebNotify, disableWebNotify } from "../lib/webNotify.js";
 
 // League metadata for bet cards + the favorite-discipline card (league comes from gameId prefix).
@@ -44,6 +45,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
   const [betFilter, setBetFilter] = useState("all"); // 'all' | 'wins' | 'loses'
   const [view, setView] = useState("main");     // 'main' | 'settings' | 'account' | 'transactions' | 'referrals' | 'help'
   const [showCard, setShowCard] = useState(false); // member-card overlay (front/QR back)
+  const [showEdit, setShowEdit] = useState(false); // edit-profile modal (avatar/username/signature)
   const [memberCard, setMemberCard] = useState(() => loadCard()); // device-local card (sport/avatar/signature)
   const [loading, setLoading] = useState(true);
 
@@ -192,6 +194,16 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
           roiPct={returnPct} trades={trades.length}
           onClose={() => setShowCard(false)} />
       )}
+      {showEdit && (
+        <EditProfileModal userId={userId} currentUsername={profile?.username || ""} card={memberCard}
+          onClose={() => setShowEdit(false)}
+          onSaved={(nextCard, nextUsername) => {
+            setMemberCard(nextCard);
+            if (nextUsername) { const a = getAuth(); if (a) setAuth({ ...a, username: nextUsername }); }
+            load();
+            setShowEdit(false);
+          }} />
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: isWide ? "380px 1fr" : "1fr", gap: 24, alignItems: "start" }}>
         {/* LEFT column - identity, discipline, stats, open positions */}
@@ -203,7 +215,13 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
               <span style={{ fontSize: 10, fontWeight: 800, fontFamily: fm, letterSpacing: "0.08em", color: tier.color, background: tier.color + "1c", padding: "3px 9px", borderRadius: 6 }}>{tier.name}</span>
               {profile?.streak > 0 && <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ff9f1c", background: "#ff9f1c18", padding: "3px 9px", borderRadius: 999 }}>🔥 {profile.streak}</span>}
             </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: B.white, fontFamily: fd, letterSpacing: "-0.02em" }}>{username}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: B.white, fontFamily: fd, letterSpacing: "-0.02em" }}>{username}</div>
+              <button onClick={() => setShowEdit(true)} style={{ display: "flex", alignItems: "center", gap: 5, background: "#1a1d22", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 999, padding: "5px 12px", color: "#c8ccd2", fontFamily: fb, fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                Edit profile
+              </button>
+            </div>
             <div style={{ fontSize: 12, color: B.dim, marginTop: 2 }}>
               Joined {joined} · <span style={{ color: "#c8ccd2", fontWeight: 600 }}>{profile?.followers ?? 0}</span> follower{(profile?.followers ?? 0) === 1 ? "" : "s"} · <span style={{ color: "#c8ccd2", fontWeight: 600 }}>{profile?.following ?? 0}</span> following
             </div>
@@ -637,6 +655,112 @@ function StatBox({ label, value, color = "#eef1f6" }) {
     <div style={card}>
       <div style={{ fontSize: 12, color: B.dim, marginBottom: 6 }}>{label}</div>
       <div style={{ fontFamily: fm, fontSize: 20, fontWeight: 800, color }}>{value}</div>
+    </div>
+  );
+}
+
+/* ── Edit profile: change avatar / username / signature any time. Writes the account (PUT /profile)
+   AND the device-local member card, so every own-avatar surface updates immediately. ── */
+const SIG_W = 340, SIG_H = 170;
+function EditProfileModal({ userId, currentUsername, card, onClose, onSaved }) {
+  const [avatar, setAvatar] = useState(card?.avatar || null);
+  const [username, setUsername] = useState(currentUsername || "");
+  const [sigD, setSigD] = useState(card?.signature?.d || null);
+  const [sigTouched, setSigTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const fileRef = useRef(null);
+  const padRef = useRef(null);
+
+  const onFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => resizeAvatar(reader.result).then((uri) => setAvatar({ kind: "photo", uri }));
+    reader.readAsDataURL(f);
+  };
+
+  const nameChanged = username.trim() !== (currentUsername || "");
+  const nameValid = !nameChanged || /^[a-zA-Z0-9_]{3,20}$/.test(username.trim());
+
+  const save = async () => {
+    if (busy) return;
+    if (!nameValid) { setErr("Username must be 3-20 characters (letters, numbers, underscores)."); return; }
+    setBusy(true); setErr("");
+    // Signature: keep the existing one untouched unless the user redrew/cleared it in this session.
+    const nextSig = sigTouched ? (sigD ? { d: sigD, w: SIG_W, h: SIG_H } : null) : (card?.signature || null);
+    const body = { token: authToken(), avatar: serializeAvatar(avatar), signature: serializeSignature(nextSig) };
+    if (nameChanged) body.username = username.trim();
+    try {
+      const res = await fetch(`${API_URL}/profile/${userId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(res.status === 409 ? (/taken/i.test(e.error || "") ? "That username is already taken." : (e.error || "Username unavailable.")) : (e.error || "Couldn't save changes."));
+      }
+      const nextCard = { ...(loadCard() || {}), avatar, signature: nextSig };
+      try { localStorage.setItem("parabolic_card", JSON.stringify(nextCard)); } catch { /* cosmetic */ }
+      onSaved(nextCard, nameChanged ? username.trim() : null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save changes.");
+    } finally { setBusy(false); }
+  };
+
+  const overlay = { position: "fixed", inset: 0, zIndex: 960, background: "rgba(4,4,6,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, fontFamily: fb };
+  const panel = { width: "min(420px, 96vw)", maxHeight: "92vh", overflowY: "auto", background: B.card, border: `1px solid ${B.border}`, borderRadius: 20, padding: 22 };
+  const label = { fontSize: 12.5, fontWeight: 700, color: "#c8ccd2", marginBottom: 8 };
+  const inputStyle = { width: "100%", background: "#131519", border: "1px solid #23262c", borderRadius: 12, padding: "12px 14px", color: "#fff", fontSize: 15, fontWeight: 600, fontFamily: fb, outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div style={panel}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <div style={{ fontFamily: fd, fontSize: 20, fontWeight: 800, color: B.white }}>Edit profile</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#8a8f98", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* avatar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+          <div onClick={() => fileRef.current?.click()} style={{ width: 72, height: 72, borderRadius: "50%", background: "#131519", border: "1px solid #23262c", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", flexShrink: 0 }}>
+            {avatar ? <AvatarCircle avatar={avatar} size={72} /> : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8a8f98" strokeWidth="1.6"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5-9 9"/></svg>}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={label}>Profile picture</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => fileRef.current?.click()} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 999, padding: "8px 15px", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: fb }}>Upload image</button>
+              {avatar && <button onClick={() => setAvatar(null)} style={{ background: "none", border: "none", color: "#8a8f98", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: fb }}>Remove</button>}
+            </div>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
+        </div>
+
+        {/* username */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={label}>Username</div>
+          <input value={username} onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20))} placeholder="username" style={inputStyle} />
+          {nameChanged && !nameValid && <div style={{ fontSize: 12, color: B.red, marginTop: 6 }}>3-20 characters · letters, numbers, underscores</div>}
+        </div>
+
+        {/* signature */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <div style={label}>Signature</div>
+            <button onClick={() => { padRef.current?.clear(); setSigD(null); setSigTouched(true); }} style={{ background: "none", border: "none", color: "#8a8f98", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: fb }}>Clear</button>
+          </div>
+          <div style={{ background: "#131519", border: "1px solid #23262c", borderRadius: 12, overflow: "hidden", touchAction: "none" }}>
+            <SignaturePad ref={padRef} width={SIG_W} height={SIG_H} onChange={(d) => { setSigD(d); setSigTouched(true); }} />
+          </div>
+          <div style={{ fontSize: 11, color: B.dim, marginTop: 6 }}>Drawn on your member card. Draw above to change it.</div>
+        </div>
+
+        {err && <div style={{ background: "rgba(255,82,71,0.12)", color: B.red, borderRadius: 10, padding: "9px 12px", fontSize: 12.5, marginBottom: 14 }}>{err}</div>}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} disabled={busy} style={{ flex: 1, padding: "13px 0", borderRadius: 12, border: "1px solid #23262c", background: "transparent", color: "#c8ccd2", fontFamily: fb, fontWeight: 700, fontSize: 14, cursor: busy ? "default" : "pointer" }}>Cancel</button>
+          <button onClick={save} disabled={busy || !nameValid} style={{ flex: 2, padding: "13px 0", borderRadius: 12, border: "none", background: B.primary, color: "#000", fontFamily: fb, fontWeight: 800, fontSize: 14, cursor: busy || !nameValid ? "default" : "pointer", opacity: busy || !nameValid ? 0.55 : 1 }}>{busy ? "Saving…" : "Save changes"}</button>
+        </div>
+      </div>
     </div>
   );
 }
