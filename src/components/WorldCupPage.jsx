@@ -701,7 +701,7 @@ export function WorldCupPage({ lockedOut = false }) {
               {/* your card on its lanyard, hanging from the top of the page */}
               <LanyardStrap strapH={isMobile ? 66 : 92} width={32} />
               <div onClick={() => setShowShareCard(true)} style={{ cursor: "pointer", marginTop: -7 }} title="Share my card">
-                <StatCard width={336} username={me.username || "you"} avatar={memberCard?.avatar} rank={me.rank} roiPct={me.roiPct} trades={me.trades} />
+                <StatCard width={336} username={me.username || "you"} avatar={memberCard?.avatar} signature={memberCard?.signature} rank={me.rank} roiPct={me.roiPct} trades={me.trades} />
               </div>
               <button onClick={() => setShowShareCard(true)} style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 18, background: "#1b1b1e", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 999, padding: "9px 16px", color: "#fff", fontFamily: fb, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 20h16"/></svg>
@@ -831,7 +831,7 @@ export function WorldCupPage({ lockedOut = false }) {
       {showShareCard && (() => {
         const meLb = lb.find((e) => e.userId === userId);
         return (
-          <CardShareModal userId={userId} username={meLb?.username || auth?.username || "you"} avatar={memberCard?.avatar}
+          <CardShareModal userId={userId} username={meLb?.username || auth?.username || "you"} avatar={memberCard?.avatar} signature={memberCard?.signature}
             rank={meLb?.rank} roiPct={meLb?.roiPct} trades={meLb?.trades}
             onClose={() => setShowShareCard(false)} />
         );

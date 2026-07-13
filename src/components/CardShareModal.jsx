@@ -110,26 +110,29 @@ export function StatCard({ width = 336, username, avatar, rank = null, roiPct = 
           <div style={{ position: "absolute", left: 22 * k, top: 88 * k }}>
             <AvatarCircle avatar={avatar} size={40 * k} />
           </div>
-          <div style={{ position: "absolute", left: 22 * k, bottom: 20 * k, maxWidth: 190 * k, fontFamily: fb, fontWeight: 700, fontSize: 19 * k, color: placeholder ? "rgba(255,255,255,0.35)" : "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {username}
+
+          {/* bottom-left: username + ROI/trades stacked beneath it */}
+          <div style={{ position: "absolute", left: 22 * k, bottom: 20 * k, maxWidth: 200 * k }}>
+            <div style={{ fontFamily: fb, fontWeight: 700, fontSize: 19 * k, color: placeholder ? "rgba(255,255,255,0.35)" : "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {username}
+            </div>
+            {roiPct != null && (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 7 * k, marginTop: 4 * k }}>
+                <span style={{ fontFamily: fb, fontWeight: 700, fontSize: 16 * k, color: roiPct >= 0 ? GREEN : "#ff5247" }}>{fmtRoi(roiPct)}</span>
+                {trades != null && <span style={{ fontFamily: fb, fontSize: 12.5 * k, color: "#a7abb3" }}>{trades} trade{trades === 1 ? "" : "s"}</span>}
+              </div>
+            )}
           </div>
 
-          {/* bottom-right - context swap: leaderboard/share show rank+ROI+trades; profile/onboarding
-              show the drawn signature. ROI takes precedence if both are somehow supplied. */}
-          {roiPct != null ? (
-            <div style={{ position: "absolute", right: 22 * k, bottom: 22 * k, textAlign: "right" }}>
-              <div style={{ fontFamily: fb, fontWeight: 700, fontSize: 17 * k, color: roiPct >= 0 ? GREEN : "#ff5247" }}>{fmtRoi(roiPct)}</div>
-              {trades != null && <div style={{ fontFamily: fb, fontSize: 13 * k, color: "#a7abb3", marginTop: 2 * k }}>{trades} trade{trades === 1 ? "" : "s"}</div>}
-            </div>
-          ) : signature?.d ? (
+          {/* bottom-right: the drawn signature; falls back to barcode + PARABOLIC MEMBER when the
+              member hasn't drawn one yet (so the corner never reads blank). */}
+          {signature?.d ? (
             <div style={{ position: "absolute", right: 14 * k, bottom: 14 * k, opacity: 0.95, pointerEvents: "none" }}>
-              <svg width={150 * k} height={82 * k} viewBox={`0 0 ${signature.w} ${signature.h}`} preserveAspectRatio="xMidYMax meet">
+              <svg width={150 * k} height={72 * k} viewBox={`0 0 ${signature.w} ${signature.h}`} preserveAspectRatio="xMaxYMax meet">
                 <path d={signature.d} stroke="#fff" strokeWidth={Math.max(3, signature.w / 55)} fill="none" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
           ) : (
-            // No ROI + no signature (profile/onboarding before a signature is drawn) → the corner would
-            // read as blank, so fall back to the barcode + PARABOLIC MEMBER (as the old member card had).
             <div style={{ position: "absolute", right: 20 * k, bottom: 20 * k, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 * k, pointerEvents: "none" }}>
               <div style={{ display: "flex", gap: 1.4 * k, alignItems: "flex-end" }}>
                 {BARCODE_WIDTHS.map((w, i) => (
@@ -153,7 +156,7 @@ const loadImg = (src) => new Promise((res) => {
   i.src = src;
 });
 
-async function downloadCardPng({ username, avatar, rank, roiPct, trades }) {
+async function renderShareCanvas({ username, avatar, rank, roiPct, trades, signature }) {
   const W = 1296, H = 1156, R = 48;      // 2× the modal's 648×578 stadium panel
   const CW = 860, CH = 486, P = 56;      // card size + inner padding
   const c = document.createElement("canvas"); c.width = W; c.height = H;
@@ -225,27 +228,57 @@ async function downloadCardPng({ username, avatar, rank, roiPct, trades }) {
     ctx.font = "54px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(avatar.emoji, ax, ay + 4); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   } else { ctx.fillStyle = "#26262a"; ctx.fillRect(ax - ar, ay - ar, ar * 2, ar * 2); }
   ctx.restore();
-  // username
-  ctx.fillStyle = "#fff"; ctx.font = "700 46px system-ui, sans-serif"; ctx.fillText(username, P, CH - P);
-  // ROI + trades
+  // bottom-left: username, with ROI + trades stacked beneath it
   if (roiPct != null) {
-    ctx.textAlign = "right";
-    ctx.fillStyle = roiPct >= 0 ? GREEN : "#ff5247"; ctx.font = "700 42px system-ui, sans-serif";
-    ctx.fillText(fmtRoi(roiPct), CW - P, CH - P - 46);
-    if (trades != null) { ctx.fillStyle = "#a7abb3"; ctx.font = "400 30px system-ui, sans-serif"; ctx.fillText(`${trades} trades`, CW - P, CH - P); }
-    ctx.textAlign = "left";
+    ctx.fillStyle = "#fff"; ctx.font = "700 44px system-ui, sans-serif"; ctx.fillText(username, P, CH - P - 44);
+    ctx.fillStyle = roiPct >= 0 ? GREEN : "#ff5247"; ctx.font = "700 36px system-ui, sans-serif";
+    const roiText = fmtRoi(roiPct);
+    ctx.fillText(roiText, P, CH - P);
+    if (trades != null) {
+      const rw = ctx.measureText(roiText).width;
+      ctx.fillStyle = "#a7abb3"; ctx.font = "400 28px system-ui, sans-serif";
+      ctx.fillText(`${trades} trade${trades === 1 ? "" : "s"}`, P + rw + 18, CH - P);
+    }
+  } else {
+    ctx.fillStyle = "#fff"; ctx.font = "700 46px system-ui, sans-serif"; ctx.fillText(username, P, CH - P);
+  }
+
+  // bottom-right: drawn signature (SVG path via Path2D), right/bottom aligned
+  if (signature?.d && typeof Path2D === "function") {
+    try {
+      const boxW = 300, boxH = 150, right = CW - P, bottom = CH - 34;
+      const s = Math.min(boxW / signature.w, boxH / signature.h);
+      ctx.save();
+      ctx.translate(right - signature.w * s, bottom - signature.h * s);
+      ctx.scale(s, s);
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(3, signature.w / 55); ctx.lineJoin = "round"; ctx.lineCap = "round";
+      ctx.stroke(new Path2D(signature.d));
+      ctx.restore();
+    } catch { /* bad path — skip signature */ }
   }
   ctx.restore(); // card coords
   ctx.restore(); // panel clip
+  return c;
+}
 
+async function downloadCardPng(opts) {
+  const c = await renderShareCanvas(opts);
   const a = document.createElement("a");
   a.href = c.toDataURL("image/png");
-  a.download = `${username}-parabolic-card.png`;
+  a.download = `${opts.username}-parabolic-card.png`;
   a.click();
 }
 
+/** Render the share composition to a PNG File for the Web Share API (X + native share sheet). */
+async function renderShareFile(opts) {
+  const c = await renderShareCanvas(opts);
+  const blob = await new Promise((res) => c.toBlob(res, "image/png"));
+  if (!blob) return null;
+  return new File([blob], `${opts.username || "parabolic"}-card.png`, { type: "image/png" });
+}
+
 /* ── fullscreen share view (157:24098) ── */
-export function CardShareModal({ userId, username, avatar, rank = null, roiPct = null, trades = null, onClose }) {
+export function CardShareModal({ userId, username, avatar, signature = null, rank = null, roiPct = null, trades = null, onClose }) {
   const [st, setSt] = useState({ rank, roiPct, trades });
   const [toast, setToast] = useState("");
   const timer = useRef(null);
@@ -270,9 +303,26 @@ export function CardShareModal({ userId, username, avatar, rank = null, roiPct =
   const shareText = st.rank != null
     ? `Rank #${st.rank} in the World Cup Trading Competition on @betparabolic (${fmtRoi(st.roiPct)} ROI) 🏆`
     : `Trading live win probability on @betparabolic 🏆`;
-  const shareX = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, "_blank");
+  const cardOpts = { username, avatar, signature, rank: st.rank, roiPct: st.roiPct, trades: st.trades };
+  const openXIntent = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, "_blank");
+
+  // Share on X WITH the card image. Twitter's intent URL can't carry media, so use the Web Share
+  // API (native sheet → X app attaches the file). Where files can't be shared (most desktop
+  // browsers), download the PNG + open the X composer so the user can attach the saved image.
+  const shareX = async () => {
+    try {
+      const file = await renderShareFile(cardOpts);
+      if (file && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text: `${shareText} ${shareUrl}` });
+        return;
+      }
+    } catch (e) { if (e?.name === "AbortError") return; /* user cancelled */ }
+    try { await downloadCardPng(cardOpts); say("Card image saved - attach it to your post"); }
+    catch { say("Couldn't render the image"); }
+    openXIntent();
+  };
   const copyLink = async () => { try { await navigator.clipboard.writeText(shareUrl); say("Link copied"); } catch { say("Couldn't copy - " + shareUrl); } };
-  const download = () => downloadCardPng({ username, avatar, rank: st.rank, roiPct: st.roiPct, trades: st.trades }).catch(() => say("Couldn't render the image"));
+  const download = () => downloadCardPng(cardOpts).catch(() => say("Couldn't render the image"));
 
   const circleBtn = { width: 44, height: 44, borderRadius: "50%", border: "none", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
   const panelW = isMobile ? "94vw" : "min(648px, 90vw)";
@@ -289,7 +339,7 @@ export function CardShareModal({ userId, username, avatar, rank = null, roiPct =
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
             <LanyardStrap strapH={isMobile ? 90 : 150} width={36} />
             <div style={{ marginTop: -8 }}>
-              <StatCard width={isMobile ? 300 : 430} username={username} avatar={avatar} rank={st.rank} roiPct={st.roiPct} trades={st.trades} variant="barcode" />
+              <StatCard width={isMobile ? 300 : 430} username={username} avatar={avatar} signature={signature} rank={st.rank} roiPct={st.roiPct} trades={st.trades} variant="barcode" />
             </div>
           </div>
         </div>

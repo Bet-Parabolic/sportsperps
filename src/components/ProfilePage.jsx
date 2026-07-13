@@ -188,7 +188,7 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
         </div>
       </div>
       {showCard && (
-        <CardShareModal userId={userId} username={username} avatar={memberCard.avatar}
+        <CardShareModal userId={userId} username={username} avatar={memberCard.avatar} signature={memberCard.signature}
           roiPct={returnPct} trades={trades.length}
           onClose={() => setShowCard(false)} />
       )}

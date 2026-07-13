@@ -108,55 +108,77 @@ export function resizeAvatar(dataUrl, px = 128) {
   });
 }
 
-const SYNC_KEY = 'parabolic_avatar_synced';
-const syncSig = (userId, ser) => `${userId}:${ser.length}:${ser.slice(0, 40)}`;
+/* Signature ↔ backend: the card's drawn signature is {d,w,h}; the backend stores it as a JSON
+   string. These translate to/from that shape. */
+export function serializeSignature(sig) {
+  if (!sig || !sig.d) return null;
+  return JSON.stringify({ d: sig.d, w: sig.w, h: sig.h });
+}
+export function parseSignature(s) {
+  if (!s || typeof s !== 'string') return null;
+  try { const o = JSON.parse(s); return o?.d ? o : null; } catch { return null; }
+}
 
 /**
- * Avatar reconcile between the device-local member card and the account.
- * Rule: if the account HAS an avatar, it wins — the local card is overwritten to match, no
- * device ever auto-uploads over it. A device only uploads when the account has NO avatar yet
- * (the one legitimate case: this device just finished onboarding). This is deliberately
- * one-directional — an earlier "authoring device re-uploads" variant let two devices with
- * different local cards ping-pong the account image forever.
- * Returns the resolved {kind,...} avatar (or null), already saved into the local card.
+ * Reconcile the device-local member card (avatar + signature) with the account.
+ * Rule per field: if the ACCOUNT has a value, it wins — the local card is overwritten to match,
+ * and no device ever auto-uploads over it. A device only uploads a field when the account has
+ * NONE yet (the one legitimate case: the device that just onboarded seeding an empty account).
+ * This is deliberately one-directional — an "authoring device re-uploads" variant let two devices
+ * with different local cards ping-pong the account value forever. To make a specific device
+ * authoritative, clear the account field server-side, then open that device first.
+ * Returns the resolved local card, already persisted.
  */
-export async function reconcileAvatarWithAccount({ apiUrl, userId, token }) {
+export async function reconcileCardWithAccount({ apiUrl, userId, token }) {
   try {
     if (!userId || !token) return null;
     const card = loadCard();
 
     const res = await fetch(`${apiUrl}/profile/${userId}?token=${encodeURIComponent(token)}`);
-    if (!res.ok) return card.avatar || null; // offline/authfail - change nothing
-    const server = (await res.json())?.avatar || null;
+    if (!res.ok) return card; // offline/authfail — change nothing
+    const p = await res.json();
 
-    if (server) { // account wins, unconditionally
-      const avatar = parseAvatar(server);
-      if (avatar && serializeAvatar(card.avatar) !== server) {
-        card.avatar = avatar;
-        try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* cosmetic */ }
+    let changed = false;
+    const upload = {}; // fields the account is missing that this device can seed
+
+    // ── avatar ──
+    const srvAvatar = p?.avatar || null;
+    if (srvAvatar) {
+      const a = parseAvatar(srvAvatar);
+      if (a && serializeAvatar(card.avatar) !== srvAvatar) { card.avatar = a; changed = true; }
+    } else {
+      let ser = serializeAvatar(card.avatar);
+      if (ser && ser.startsWith('data:') && ser.length > 80_000) { // pre-resize-era photos can be huge
+        ser = await resizeAvatar(ser);
+        if (ser.length > 80_000) ser = null; // still too big — skip, never block
+        else { card.avatar = { kind: 'photo', uri: ser }; changed = true; }
       }
-      try { localStorage.setItem(SYNC_KEY, syncSig(userId, server)); } catch { /* cosmetic */ }
-      return avatar || card.avatar || null;
+      if (ser) upload.avatar = ser;
     }
 
-    // account has no avatar — first upload from the device that onboarded
-    let ser = serializeAvatar(card.avatar);
-    if (!ser) return null;
-    if (ser.startsWith('data:') && ser.length > 80_000) { // pre-resize-era photos can be huge
-      ser = await resizeAvatar(ser);
-      if (ser.length > 80_000) return null; // still too big — skip, never block
-      card.avatar = { kind: 'photo', uri: ser };
-      try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* ignore */ }
+    // ── signature ──
+    const srvSig = p?.signature || null;
+    if (srvSig) {
+      const parsed = parseSignature(srvSig);
+      if (parsed && serializeSignature(card.signature) !== srvSig) { card.signature = parsed; changed = true; }
+    } else {
+      const ser = serializeSignature(card.signature);
+      if (ser) upload.signature = ser;
     }
-    const r = await fetch(`${apiUrl}/profile/${userId}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ avatar: ser, token }),
-    });
-    if (r.ok) { try { localStorage.setItem(SYNC_KEY, syncSig(userId, ser)); } catch { /* ignore */ } }
-    return card.avatar;
+
+    if (changed) { try { localStorage.setItem(CARD_KEY, JSON.stringify(card)); } catch { /* cosmetic */ } }
+
+    if (Object.keys(upload).length) {
+      await fetch(`${apiUrl}/profile/${userId}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...upload, token }),
+      });
+    }
+    return card;
   } catch { return null; }
 }
 
-/** Back-compat wrappers — both halves now route through the single reconcile. */
-export async function syncAvatarToBackend(opts) { return reconcileAvatarWithAccount(opts); }
-export async function hydrateAvatarFromBackend(opts) { return reconcileAvatarWithAccount(opts); }
+/** Back-compat wrappers — every avatar/card sync call routes through the single reconcile. */
+export async function reconcileAvatarWithAccount(opts) { return reconcileCardWithAccount(opts); }
+export async function syncAvatarToBackend(opts) { return reconcileCardWithAccount(opts); }
+export async function hydrateAvatarFromBackend(opts) { return reconcileCardWithAccount(opts); }
