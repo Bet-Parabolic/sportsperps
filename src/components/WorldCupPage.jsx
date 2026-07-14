@@ -647,8 +647,9 @@ export function WorldCupPage({ lockedOut = false }) {
   /* ── LEADERBOARD (Figma 157-23575: black bg, lanyard card + Share card, laurel podium, rows) ── */
   const LeaderboardTab = () => {
     const me = lb.find((e) => e.userId === userId);
+    const LB_CAP = 25; // only the top 25 are shown publicly (your own card up top always shows your rank)
     const top3 = lb.slice(0, 3);
-    const rest = lb.slice(3, 50);
+    const rest = lb.slice(3, LB_CAP);
     const roi = (v) => `${v >= 0 ? "+" : ""}${Number(v ?? 0).toFixed(2)}%`;
     const medal = (rank) => rank === 1
       ? "linear-gradient(180deg,#cf7b0e,#9f5a00)" : rank === 2
@@ -759,6 +760,11 @@ export function WorldCupPage({ lockedOut = false }) {
                   </div>
                 );
               })}
+            </div>
+          )}
+          {lb.length > LB_CAP && (
+            <div style={{ maxWidth: 560, margin: "18px auto 0", textAlign: "center", fontFamily: fb, fontSize: 12.5, color: "#8a93a6" }}>
+              Only the top {LB_CAP} are shown on the leaderboard. Your own rank always appears on your card above.
             </div>
           )}
         </div>
