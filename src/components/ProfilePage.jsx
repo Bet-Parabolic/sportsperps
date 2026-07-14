@@ -65,14 +65,16 @@ export function ProfilePage({ userId: userIdProp, onClose, onLoggedOut, worldcup
         if (worldcup) {
           // WC surface: EVERY money stat comes from the event ledger — mixing main-ledger ROI/volume
           // with event PnL showed contradictory numbers (+P&L, 0% ROI, $0 volume — July 11 UI audit
-          // P0-1). ROI = (equity − $10k grant) / grant, the same definition the leaderboard uses.
-          const margins = (b?.openPositions || []).reduce((s, x) => s + (x.margin || 0), 0);
-          const equity = (b?.balance ?? 0) + margins + (b?.unrealizedPnl ?? 0);
+          // P0-1). ROI = (realized + unrealized P&L) / $10k grant, computed straight from PnL — the
+          // SAME definition the leaderboard uses. NOT equity-derived: equity-based ROI was inflated
+          // by a free-balance/margin drift in the fill path; PnL-based is immune and matches what
+          // the trader sees (fees + closed PnL + open PnL).
+          const pnl = (b?.closedPnl ?? 0) + (b?.unrealizedPnl ?? 0);
           setProfile({
             ...p,
             closedPnl: b?.closedPnl ?? 0,
             totalVolume: b?.totalVolume ?? 0,
-            returnPct: b ? ((equity - 10000) / 10000) * 100 : 0,
+            returnPct: b ? (pnl / 10000) * 100 : 0,
           });
         } else setProfile(p);
       }
