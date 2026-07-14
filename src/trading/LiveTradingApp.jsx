@@ -1148,10 +1148,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
   // TP/SL levels → dotted lines (TP blue, SL yellow). tp/sl are stored in the position's own
   // side scale, so convert away-side levels to home-prob terms (same as liq/entry).
   const tpLines = useMemo(() => gamePositions.filter(p=>p.tp!=null).map(pos => ({
-    id:pos.id, priceOnChart: pos.side==='home' ? pos.tp : 1-pos.tp,
+    id:pos.id, side:pos.side, priceOnChart: pos.side==='home' ? pos.tp : 1-pos.tp,
   })), [gamePositions]);
   const slLines = useMemo(() => gamePositions.filter(p=>p.sl!=null).map(pos => ({
-    id:pos.id, priceOnChart: pos.side==='home' ? pos.sl : 1-pos.sl,
+    id:pos.id, side:pos.side, priceOnChart: pos.side==='home' ? pos.sl : 1-pos.sl,
   })), [gamePositions]);
 
   // Raw scoring plays from the play log, with the scoring side + raw game-time. Side comes

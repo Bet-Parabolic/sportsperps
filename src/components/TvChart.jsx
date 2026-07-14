@@ -121,10 +121,19 @@ export const TvChart = forwardRef(function TvChart(
     if (!chart || !home || !layer || !el) return;
     layer.innerHTML = "";
     const items = [];
-    const pushI = (price, text, color) => { const y = home.priceToCoordinate(price); if (y != null) items.push({ y, text, color }); };
-    riskRef.current.tp.forEach((p) => pushI(p, "TP " + Math.round(p * 100) + "%", "#3b82f6"));
-    riskRef.current.sl.forEach((p) => pushI(p, "SL " + Math.round(p * 100) + "%", "#facc15"));
-    riskRef.current.liq.forEach((p) => pushI(p, "LIQ " + Math.round(p * 100) + "%", B.red));
+    const { homeLabel, awayLabel } = labelsRef.current;
+    // y-position uses the chart-axis price; the label shows the level in the position's own side
+    // terms (away = 1 − chart price) + that side's short name, so it matches what the user entered.
+    const pushI = (item, kind, color) => {
+      const price = item.price, side = item.side;
+      const y = home.priceToCoordinate(price); if (y == null) return;
+      const disp = side === "home" ? price : 1 - price;
+      const short = side === "home" ? homeLabel : awayLabel;
+      items.push({ y, text: kind + " " + Math.round(disp * 100) + "% " + short, color });
+    };
+    riskRef.current.tp.forEach((it) => pushI(it, "TP", "#3b82f6"));
+    riskRef.current.sl.forEach((it) => pushI(it, "SL", "#facc15"));
+    riskRef.current.liq.forEach((it) => pushI(it, "LIQ", B.red));
     if (!items.length) return;
     // Obstacles: where the home/away last-value tags sit on the axis (win probabilities).
     const obs = [];
@@ -434,10 +443,13 @@ export const TvChart = forwardRef(function TvChart(
     // Take-profit → blue dotted; stop-loss → yellow dotted (levels already in home-prob terms).
     tpLines.forEach((t) => add(t.priceOnChart, "#3b82f6", "", LineStyle.Dotted, 1, false));
     slLines.forEach((s) => add(s.priceOnChart, "#facc15", "", LineStyle.Dotted, 1, false));
+    // Store the chart-axis price (for y-position) AND the position's side, so the label overlay
+    // can show the level in the trader's OWN side terms (an away SL entered as 35% must read
+    // "35%", not the mirrored 65% home value where the line sits on the home-prob axis).
     riskRef.current = {
-      liq: liqLines.map((l) => l.liqOnChart),
-      tp: tpLines.map((t) => t.priceOnChart),
-      sl: slLines.map((s) => s.priceOnChart),
+      liq: liqLines.map((l) => ({ price: l.liqOnChart, side: l.side })),
+      tp: tpLines.map((t) => ({ price: t.priceOnChart, side: t.side })),
+      sl: slLines.map((s) => ({ price: s.priceOnChart, side: s.side })),
     };
     placeRiskLabels();
   }, [oPrice, liqLines, limitOrders, entryLines, tpLines, slLines]);
