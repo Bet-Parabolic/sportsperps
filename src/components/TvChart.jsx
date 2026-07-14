@@ -121,15 +121,13 @@ export const TvChart = forwardRef(function TvChart(
     if (!chart || !home || !layer || !el) return;
     layer.innerHTML = "";
     const items = [];
-    const { homeLabel, awayLabel } = labelsRef.current;
     // y-position uses the chart-axis price; the label shows the level in the position's own side
-    // terms (away = 1 − chart price) + that side's short name, so it matches what the user entered.
+    // terms (away = 1 − chart price), so it matches the value the user entered.
     const pushI = (item, kind, color) => {
       const price = item.price, side = item.side;
       const y = home.priceToCoordinate(price); if (y == null) return;
       const disp = side === "home" ? price : 1 - price;
-      const short = side === "home" ? homeLabel : awayLabel;
-      items.push({ y, text: kind + " " + Math.round(disp * 100) + "% " + short, color });
+      items.push({ y, text: kind + " " + Math.round(disp * 100) + "%", color });
     };
     riskRef.current.tp.forEach((it) => pushI(it, "TP", "#3b82f6"));
     riskRef.current.sl.forEach((it) => pushI(it, "SL", "#facc15"));
