@@ -1265,6 +1265,54 @@ function ShadowMMPanel() {
   );
 }
 
+// ─── Event-vault shadow hedge — net delta the WC vault carries per game + the offsetting position
+// it WOULD place on Polymarket/Kalshi to flatten (zero capital, measurement only). ───────────────
+function WCShadowHedgePanel() {
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    let live = true;
+    const load = () => adminFetch("/admin/event/shadow").then((r) => { if (live) setD(r); }).catch(() => {});
+    load();
+    const iv = setInterval(load, 15_000);
+    return () => { live = false; clearInterval(iv); };
+  }, []);
+  const cur = d?.current || [];
+  const th = { textAlign: "left", color: C.mut, fontWeight: 600, padding: "6px 8px", borderBottom: "1px solid " + C.border, whiteSpace: "nowrap" };
+  const td = { padding: "6px 8px", borderBottom: "1px solid " + C.border, whiteSpace: "nowrap" };
+  const pct = (v) => (v == null ? "-" : (v * 100).toFixed(1) + "%");
+  const cents = (v) => (v == null ? "-" : (v * 100).toFixed(1) + "¢");
+  return (
+    <Panel title={<span>Shadow hedge <span style={{ color: C.mut, fontWeight: 400 }}>· net delta the event vault would flatten (zero capital, no orders)</span></span>}>
+      {!d ? <div style={{ color: C.mut, fontSize: 13 }}>Loading…</div> : cur.length === 0 ? (
+        <div style={{ color: C.mut, fontSize: 13 }}>No live event-game inventory right now. Populates during World Cup matches (the vault carries net delta only while positions are open).</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead><tr>{["Game", "Net home Δ (contracts)", "Would-be hedge", "Oracle", "Best venue", "Venue px", "Basis P / K", "Covered"].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+            <tbody>
+              {cur.map((g) => (
+                <tr key={g.gameId}>
+                  <td style={td}>{(g.gameId || "").replace("wcup_", "")}</td>
+                  <td style={{ ...td, color: (g.netHomeDelta || 0) >= 0 ? C.primaryLt : C.red }}>{Math.round(g.netHomeDelta || 0).toLocaleString()}</td>
+                  <td style={td}>{g.hedge && g.hedge.contracts ? `${g.hedge.side} × ${Math.round(g.hedge.contracts).toLocaleString()}` : "-"}</td>
+                  <td style={td}>{pct(g.oraclePx)}</td>
+                  <td style={td}>{g.bestVenue || "-"}</td>
+                  <td style={td}>{cents(g.bestVenuePx)}</td>
+                  <td style={td}>{cents(g.basisPoly)} / {cents(g.basisKalshi)}</td>
+                  <td style={{ ...td, color: g.covered ? C.primaryLt : C.red }}>{g.covered ? "yes" : "no"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ color: C.mut, fontSize: 11, marginTop: 8 }}>
+            Measurement only — no capital, no orders. "Would-be hedge" is the offsetting position (side × contracts) that would flatten the vault's net delta on Polymarket/Kalshi; "Basis" is venue price − our oracle (the cost of crossing to hedge). This is what a real hedge would have offset against the vault's inventory loss.
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 // ─── Users tab — account directory: contact fields for winner payouts + support. ────────────────
 function UsersTab({ data }) {
   const [q, setQ] = useState("");
@@ -1579,7 +1627,7 @@ export function DashboardPage() {
       {tab === "feedback" && <FeedbackTab data={feedbackData} />}
 
       {/* WC competition - EVENT ledger only, isolated from the main-ledger Vault/Economics tabs */}
-      {tab === "wcvault" && <VaultTab vault={wcVaultData} history={[]} hedge={null} />}
+      {tab === "wcvault" && <><VaultTab vault={wcVaultData} history={[]} hedge={null} /><WCShadowHedgePanel /></>}
 
       {tab === "wcecon" && <WCEconTab data={wcEconData} />}
 
