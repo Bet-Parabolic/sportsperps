@@ -46,8 +46,14 @@ async function post(path, body) {
 }
 
 export async function register(username, password) {
-  const data = await post("/auth/register", { username, password, claimUserId: onboardingStagingId() });
+  // Referral attribution (rewards engine): /r/<code> on the rewards app stashes the code in
+  // localStorage; sending it here ties the new account to its referrer. One-shot — cleared on
+  // success so a later second account on the same browser isn't silently attributed.
+  let referredBy = null;
+  try { referredBy = localStorage.getItem("parabolic_ref") || null; } catch { /* storage blocked */ }
+  const data = await post("/auth/register", { username, password, claimUserId: onboardingStagingId(), referredBy });
   setAuth(data);
+  try { localStorage.removeItem("parabolic_ref"); } catch { /* noop */ }
   return data;
 }
 

@@ -23,6 +23,18 @@
     {
       "source": "/worldcup/(.*)",
       "destination": "/worldcup.html"
+    },
+    {
+      "source": "/rewards",
+      "destination": "https://parabolic-rewards.vercel.app/rewards/"
+    },
+    {
+      "source": "/rewards/(.*)",
+      "destination": "https://parabolic-rewards.vercel.app/rewards/$1"
+    },
+    {
+      "source": "/r/(.*)",
+      "destination": "https://parabolic-rewards.vercel.app/rewards/"
     }
   ]
 }
