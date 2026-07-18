@@ -1044,7 +1044,7 @@ function WCEconTab({ data }) {
   return (
     <>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-        <Stat label="Competition" value={data.live ? "LIVE" : "CLOSED"} color={data.live ? C.primaryLt : C.mut} />
+        <Stat label="Competition" value={data.live ? "LIVE" : "CLOSED"} valueColor={data.live ? C.primaryLt : C.mut} />
         <Stat label="Participants" value={data.participants ?? 0} sub={`$${(data.grantPer || 10000).toLocaleString()} grant each`} />
         <Stat label="WC Cash granted" value={fmtUsd(data.granted)} />
         <Stat label="Active traders" value={`${data.traders?.active ?? 0} / ${data.traders?.total ?? 0}`} sub="placed ≥1 trade" />
@@ -1074,9 +1074,11 @@ function WCEconTab({ data }) {
             ["Vault unrealized (open inventory)", fmtSigned(v.unrealizedPnl), sign(v.unrealizedPnl)],
             ["Short liability", fmtUsd(v.liability), null],
             ["Funding collected", fmtSigned(v.fundingCollected), sign(v.fundingCollected)],
+            ["Vault bad debt (backstopped)", fmtUsd(v.badDebt), (v.badDebt || 0) > 0 ? C.red : null],
             ["Taker fees / maker rebates", `${fmtUsd(data.fees?.takerFees)} / ${fmtUsd(data.fees?.makerRebates)}`, null],
             ["Insurance fund", fmtUsd(data.insurance?.balance), null],
             ["House realized (PnL+funding+fees)", fmtSigned(data.houseRealized), sign(data.houseRealized)],
+            ["House net (after bad debt + payouts)", fmtSigned(data.houseNet), sign(data.houseNet)],
           ].map(([k, val, clr]) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 2px", borderBottom: "1px solid " + C.border, fontSize: 13 }}>
               <span style={{ color: C.mut }}>{k}</span><span style={{ color: clr || C.text, fontWeight: 700 }}>{val}</span>
@@ -1087,7 +1089,7 @@ function WCEconTab({ data }) {
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
         <Stat label="Open interest" value={fmtUsd(data.openInterest)} sub={`${data.openPositions ?? 0} open positions`} />
-        <Stat label="Conservation drift" value={fmtSigned(data.conservationDrift)} color={driftBig ? C.red : C.mut}
+        <Stat label="Conservation drift" value={fmtSigned(data.conservationDrift)} valueColor={driftBig ? C.red : C.mut}
           sub={data.openPositions > 0 || data.vaultInventoryOpen ? "open inventory in flight - closes at settlement" : driftBig ? "⚠ should be $0 with all books flat" : "money conserves"} />
       </div>
 
@@ -1146,8 +1148,8 @@ function FinalSnapshotPanel() {
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
             <Stat label="Frozen snapshot" value={snap ? new Date(snap.ts).toLocaleString() : "None yet"}
-              sub={snap ? `${snap.kind} · ${snap.participants} entrants` : "capture at the final whistle"} color={snap ? C.text : C.mut} />
-            {snap && <Stat label="Conservation at capture" value={fmtSigned(meta.conservationDrift)} color={driftBig ? C.red : C.mut}
+              sub={snap ? `${snap.kind} · ${snap.participants} entrants` : "capture at the final whistle"} valueColor={snap ? C.text : C.mut} />
+            {snap && <Stat label="Conservation at capture" value={fmtSigned(meta.conservationDrift)} valueColor={driftBig ? C.red : C.mut}
               sub={driftBig ? "⚠ ledger not balanced" : "balanced"} />}
             <Stat label="Reviewing" value={!snap ? "LIVE standings" : "frozen snapshot"} sub="winner identity check" />
           </div>
@@ -1220,12 +1222,12 @@ function ShadowMMPanel() {
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
             <Stat label="Would-be liquidations" value={rep.wouldBeLiquidations ?? 0} sub={`at MM ${mm}`} />
-            <Stat label="Insurance fund gain" value={fmtUsd(rep.insuranceFundGain)} sub="penalties the scenario collects" color={C.primaryLt} />
+            <Stat label="Insurance fund gain" value={fmtUsd(rep.insuranceFundGain)} sub="penalties the scenario collects" valueColor={C.primaryLt} />
             <Stat label="Equity returned to traders" value={fmtUsd(rep.equityReturnedToTraders)} sub="what they'd walk away with" />
-            <Stat label="Traders vs scenario" value={fmtSigned(rep.traderNetVsScenario)} color={sign(rep.traderNetVsScenario)}
+            <Stat label="Traders vs scenario" value={fmtSigned(rep.traderNetVsScenario)} valueColor={sign(rep.traderNetVsScenario)}
               sub={`MM=0 has ${(rep.traderNetVsScenario || 0) >= 0 ? "helped" : "hurt"} them (${rep.outcomesKnown ?? 0} outcomes known)`} />
-            <Stat label="Vault vs scenario" value={fmtSigned(rep.vaultNetVsScenario)} color={sign(rep.vaultNetVsScenario)}
-              sub="mirror of the traders' delta" />
+            <Stat label="Vault vs scenario" value={fmtSigned(rep.vaultNetVsScenario)} valueColor={sign(rep.vaultNetVsScenario)}
+              sub="mirror of the traders' delta (excl. penalties → insurance)" />
             <Stat label="After the trigger" value={`${rep.stillOpen ?? 0} open · ${rep.closedLater ?? 0} closed`} sub="what actually happened" />
           </div>
           {(rep.rows || []).length > 0 && (
@@ -1271,43 +1273,72 @@ function WCShadowHedgePanel() {
   const [d, setD] = useState(null);
   useEffect(() => {
     let live = true;
-    const load = () => adminFetch("/admin/event/shadow").then((r) => { if (live) setD(r); }).catch(() => {});
+    // ?recent pulls the DURABLE shadow_hedge log (1 row/game/min, survives settlement + redeploys).
+    // The old fetch only rendered `current` (live in-memory view), which empties after every game
+    // settles or the backend restarts — the log looked like it didn't exist.
+    const load = () => adminFetch("/admin/event/shadow?recent=150").then((r) => { if (live) setD(r); }).catch(() => {});
     load();
     const iv = setInterval(load, 15_000);
     return () => { live = false; clearInterval(iv); };
   }, []);
   const cur = d?.current || [];
+  const log = (d?.recent || []).slice().reverse(); // newest first
+  const sum = d?.summary || {};
   const th = { textAlign: "left", color: C.mut, fontWeight: 600, padding: "6px 8px", borderBottom: "1px solid " + C.border, whiteSpace: "nowrap" };
   const td = { padding: "6px 8px", borderBottom: "1px solid " + C.border, whiteSpace: "nowrap" };
   const pct = (v) => (v == null ? "-" : (v * 100).toFixed(1) + "%");
   const cents = (v) => (v == null ? "-" : (v * 100).toFixed(1) + "¢");
+  const HedgeTable = ({ rows, withTime }) => (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead><tr>{[...(withTime ? ["When"] : []), "Game", "Net home Δ (contracts)", "Would-be hedge", "Oracle", "Best venue", "Venue px", "Basis P / K", "Covered"].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((g, i) => (
+            <tr key={(g.gameId || "") + (g.ts || i)}>
+              {withTime && <td style={{ ...td, color: C.mut }}>{g.ts ? new Date(g.ts).toLocaleString() : "-"}</td>}
+              <td style={td}>{(g.gameId || "").replace("wcup_", "")}</td>
+              <td style={{ ...td, color: (g.netHomeDelta || 0) >= 0 ? C.primaryLt : C.red }}>{Math.round(g.netHomeDelta || 0).toLocaleString()}</td>
+              <td style={td}>{g.hedge && g.hedge.contracts ? `${g.hedge.side} × ${Math.round(g.hedge.contracts).toLocaleString()}` : "-"}</td>
+              <td style={td}>{pct(g.oraclePx)}</td>
+              <td style={td}>{g.bestVenue || "-"}</td>
+              <td style={td}>{cents(g.bestVenuePx)}</td>
+              <td style={td}>{cents(g.basisPoly)} / {cents(g.basisKalshi)}</td>
+              <td style={{ ...td, color: g.covered ? C.primaryLt : C.red }}>{g.covered ? "yes" : "no"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
   return (
     <Panel title={<span>Shadow hedge <span style={{ color: C.mut, fontWeight: 400 }}>· net delta the event vault would flatten (zero capital, no orders)</span></span>}>
-      {!d ? <div style={{ color: C.mut, fontSize: 13 }}>Loading…</div> : cur.length === 0 ? (
-        <div style={{ color: C.mut, fontSize: 13 }}>No live event-game inventory right now. Populates during World Cup matches (the vault carries net delta only while positions are open).</div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-            <thead><tr>{["Game", "Net home Δ (contracts)", "Would-be hedge", "Oracle", "Best venue", "Venue px", "Basis P / K", "Covered"].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
-            <tbody>
-              {cur.map((g) => (
-                <tr key={g.gameId}>
-                  <td style={td}>{(g.gameId || "").replace("wcup_", "")}</td>
-                  <td style={{ ...td, color: (g.netHomeDelta || 0) >= 0 ? C.primaryLt : C.red }}>{Math.round(g.netHomeDelta || 0).toLocaleString()}</td>
-                  <td style={td}>{g.hedge && g.hedge.contracts ? `${g.hedge.side} × ${Math.round(g.hedge.contracts).toLocaleString()}` : "-"}</td>
-                  <td style={td}>{pct(g.oraclePx)}</td>
-                  <td style={td}>{g.bestVenue || "-"}</td>
-                  <td style={td}>{cents(g.bestVenuePx)}</td>
-                  <td style={td}>{cents(g.basisPoly)} / {cents(g.basisKalshi)}</td>
-                  <td style={{ ...td, color: g.covered ? C.primaryLt : C.red }}>{g.covered ? "yes" : "no"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ color: C.mut, fontSize: 11, marginTop: 8 }}>
-            Measurement only — no capital, no orders. "Would-be hedge" is the offsetting position (side × contracts) that would flatten the vault's net delta on Polymarket/Kalshi; "Basis" is venue price − our oracle (the cost of crossing to hedge). This is what a real hedge would have offset against the vault's inventory loss.
+      {!d ? <div style={{ color: C.mut, fontSize: 13 }}>Loading…</div> : (
+        <>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+            <Stat label="Samples (lifetime)" value={(sum.samples ?? 0).toLocaleString()} sub="durable log, 1/game/min" />
+            <Stat label="Coverage" value={sum.coverageRate != null ? (sum.coverageRate * 100).toFixed(0) + "%" : "-"} sub="a hedgeable venue existed"
+              valueColor={sum.coverageRate == null ? C.mut : sum.coverageRate >= 0.9 ? C.primary : sum.coverageRate >= 0.6 ? C.amber : C.red} />
+            <Stat label="Avg |basis| Poly" value={cents(sum.avgBasisPoly)} sub="cost of crossing to hedge" />
+            <Stat label="Avg |basis| Kalshi" value={cents(sum.avgBasisKalshi)} />
           </div>
-        </div>
+          {cur.length > 0 ? (
+            <>
+              <div style={{ color: C.mut, fontSize: 11, margin: "2px 0 6px", fontWeight: 700 }}>LIVE — current net delta per open game</div>
+              <HedgeTable rows={cur} withTime={false} />
+            </>
+          ) : (
+            <div style={{ color: C.mut, fontSize: 13, marginBottom: 8 }}>No live event-game inventory right now (the vault carries net delta only while positions are open).</div>
+          )}
+          {log.length > 0 && (
+            <>
+              <div style={{ color: C.mut, fontSize: 11, margin: "12px 0 6px", fontWeight: 700 }}>LOG — persisted snapshots (survives settlement &amp; redeploys), newest first</div>
+              <HedgeTable rows={log} withTime={true} />
+            </>
+          )}
+          <div style={{ color: C.mut, fontSize: 11, marginTop: 8 }}>
+            Measurement only — no capital, no orders. "Would-be hedge" is the offsetting position (side × contracts) that would flatten the vault's net delta on Polymarket/Kalshi; "Basis" is venue price − our oracle (the cost of crossing to hedge). No hedge PnL is simulated for event games (the Phase-2a paper hedge is main-vault/MLB only) — the log holds the per-minute delta + executable venue price series a backtest would need.
+          </div>
+        </>
       )}
     </Panel>
   );

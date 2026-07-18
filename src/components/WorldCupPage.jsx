@@ -654,9 +654,14 @@ export function WorldCupPage({ lockedOut = false }) {
     const medal = (rank) => rank === 1
       ? "linear-gradient(180deg,#cf7b0e,#9f5a00)" : rank === 2
       ? "linear-gradient(180deg,#9aa0a8,#5c6167)" : "linear-gradient(180deg,#a06a3c,#6d4426)";
+    // Every row opens the profile page — no client-side privacy gate. The old
+    // `profilePublic !== false` guard made rows silently unclickable for accounts whose DB row
+    // had been stamped private by a legacy write path (profiles that never synced an avatar were
+    // the visible symptom). The backend stays the privacy authority: PublicProfilePage renders
+    // "This profile is private." on a 403, so a genuinely private account reveals nothing.
     const openUser = (e) => {
       if (e.userId === userId) { setShowProfile(true); return; }
-      if (e.profilePublic !== false) setViewUser(e.userId);
+      setViewUser(e.userId);
     };
     const lbAvatar = (e) => (e.userId === userId && memberCard?.avatar) ? memberCard.avatar : parseAvatar(e.avatar);
     const Podium = ({ e, big = false }) => {
@@ -664,7 +669,7 @@ export function WorldCupPage({ lockedOut = false }) {
       const wreathW = big ? 100 : 82, wreathH = big ? 90 : 74, av = big ? 64 : 52;
       const pav = lbAvatar(e);
       return (
-        <div onClick={() => openUser(e)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, width: 130, marginTop: big ? 0 : 26, cursor: e.profilePublic !== false || e.userId === userId ? "pointer" : "default" }}>
+        <div onClick={() => openUser(e)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, width: 130, marginTop: big ? 0 : 26, cursor: "pointer" }}>
           <div style={{ position: "relative", width: wreathW, height: wreathH + 10 }}>
             <img src={laurelPodium} alt="" style={{ position: "absolute", left: 0, top: 0, width: wreathW, height: wreathH, objectFit: "contain", filter: e.rank === 1 ? "none" : "grayscale(0.75) brightness(1.08)" }} />
             <div style={{ position: "absolute", left: "50%", top: (wreathH - av) / 2 - 2, transform: "translateX(-50%)", width: av, height: av, borderRadius: "50%", background: "#23262c", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -747,7 +752,7 @@ export function WorldCupPage({ lockedOut = false }) {
                 const isMe = e.userId === userId;
                 const rav = lbAvatar(e);
                 return (
-                  <div key={e.userId} onClick={() => openUser(e)} style={{ display: "flex", alignItems: "center", gap: 14, height: 62, borderBottom: "1px solid rgba(255,255,255,0.06)", background: isMe ? "rgba(94,216,126,0.05)" : "transparent", borderRadius: isMe ? 10 : 0, padding: "0 10px", cursor: e.profilePublic !== false || isMe ? "pointer" : "default" }}>
+                  <div key={e.userId} onClick={() => openUser(e)} style={{ display: "flex", alignItems: "center", gap: 14, height: 62, borderBottom: "1px solid rgba(255,255,255,0.06)", background: isMe ? "rgba(94,216,126,0.05)" : "transparent", borderRadius: isMe ? 10 : 0, padding: "0 10px", cursor: "pointer" }}>
                     <span style={{ fontFamily: fb, fontWeight: 500, fontSize: 14, color: "#8a93a6", width: 22 }}>{e.rank}</span>
                     <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#23262c", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                       {rav ? <AvatarCircle avatar={rav} size={28} /> : <span style={{ fontFamily: fd, fontWeight: 700, fontSize: 12, color: "#cfd4dc" }}>{(e.username || "?").charAt(0).toUpperCase()}</span>}
