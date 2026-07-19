@@ -9,7 +9,7 @@ import { B, fd, fb, fm } from "../lib/theme.js";
 import { fmtUsd, fmtPct } from "../lib/helpers.js";
 import { API_URL } from "../lib/constants.js";
 import { getAuth, authToken, currentUserId } from "../lib/auth.js";
-import { parseAvatar } from "../lib/onboarding.js";
+import { parseAvatar, parseSignature } from "../lib/onboarding.js";
 import { StatCard } from "./CardShareModal.jsx";
 
 const GREEN = "#5ed87e";
@@ -60,12 +60,16 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
       // WC surface → stats/positions/trades come from the EVENT ledger (competition-only
       // traders have empty main-app numbers).
       const r = await fetch(`${API_URL}/profile/${targetId}/public${worldcup ? "?ledger=wc" : ""}`);
-      if (r.status === 403) { setErr("This profile is private."); return; }
       if (!r.ok) { setErr("Profile not found."); return; }
-      setP(await r.json());
+      const data = await r.json();
+      setP(data);
       fetch(`${API_URL}/event/standing/${targetId}`).then((x) => (x.ok ? x.json() : null)).then(setWc).catch(() => {});
-      const tradesUrl = worldcup ? `${API_URL}/event/profile/${targetId}/trades?limit=50` : `${API_URL}/profile/${targetId}/trades?limit=50`;
-      fetch(tradesUrl).then((x) => (x.ok ? x.json() : null)).then((d) => setTrades(d?.trades || [])).catch(() => {});
+      // July 19 policy: private profiles show identity/card/stats — only their BETS are withheld
+      // (the trades routes 403 for them anyway; don't bother asking).
+      if (!data.private) {
+        const tradesUrl = worldcup ? `${API_URL}/event/profile/${targetId}/trades?limit=50` : `${API_URL}/profile/${targetId}/trades?limit=50`;
+        fetch(tradesUrl).then((x) => (x.ok ? x.json() : null)).then((d) => setTrades(d?.trades || [])).catch(() => {});
+      }
       if (me && getAuth()) {
         fetch(`${API_URL}/follows/${me}?token=${encodeURIComponent(authToken() || "")}`)
           .then((x) => (x.ok ? x.json() : null))
@@ -101,8 +105,10 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
   const points = p?.points ?? 0;
   const tier = tierOf(points);
   const positions = p?.openPositions || [];
+  const isPrivate = !!p?.private;
   const wins = trades.filter((t) => t.pnl > 0).length;
-  const winRate = trades.length ? Math.round((wins / trades.length) * 100) : 0;
+  // Server-computed win rate covers private profiles (their trade rows are withheld).
+  const winRate = p?.winRate ?? (trades.length ? Math.round((wins / trades.length) * 100) : 0);
   const filteredTrades = trades.filter((t) => betFilter === "all" ? true : betFilter === "wins" ? t.pnl >= 0 : t.pnl < 0);
   const isWide = typeof window !== "undefined" && window.innerWidth >= 980;
 
@@ -140,9 +146,9 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
                 </div>
               </div>
 
-              {/* Member card (avatar synced from their account; no signature - device-local) */}
+              {/* Member card — avatar + signature both synced from their account */}
               <div style={{ marginBottom: 12 }}>
-                <StatCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={avatar} signature={null} />
+                <StatCard width={isWide ? 348 : Math.min((typeof window !== "undefined" ? window.innerWidth : 380) - 80, 348)} username={username} avatar={avatar} signature={parseSignature(p?.signature)} />
               </div>
 
               {wc?.rank != null && (
@@ -161,7 +167,9 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
               </div>
 
               <SectionTitle>Open positions</SectionTitle>
-              {positions.length === 0 ? (
+              {isPrivate ? (
+                <div style={{ ...card, color: B.dim, fontSize: 14 }}>🔒 This trader keeps their bets private.</div>
+              ) : positions.length === 0 ? (
                 <div style={{ ...card, color: B.dim, fontSize: 14 }}>No open positions.</div>
               ) : positions.map((pos, i) => (
                 <div key={i} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
@@ -188,6 +196,12 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
                   <div style={{ fontSize: 30, marginBottom: 8 }}>🏅</div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: B.white, marginBottom: 4 }}>Badges are coming soon</div>
                   <div style={{ fontSize: 12.5, color: B.dim, lineHeight: 1.5 }}>Milestone badges for wins, streaks, and volume land with the next points update.</div>
+                </div>
+              ) : isPrivate ? (
+                <div style={{ ...card, textAlign: "center", padding: "40px 20px" }}>
+                  <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: B.white, marginBottom: 4 }}>Bets are private</div>
+                  <div style={{ fontSize: 12.5, color: B.dim, lineHeight: 1.5 }}>This trader shares their stats and card, but keeps their open bets and history hidden.</div>
                 </div>
               ) : (
                 <>
