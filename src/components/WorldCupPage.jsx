@@ -33,6 +33,9 @@ const OnboardingFlow = lazy(() => import("./onboarding/OnboardingFlow.jsx").then
 const ESPN_WC = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260704-20260721";
 const GOLD = "#ffad0a";
 const GREEN = "#5ed87e";
+// Competition concluded July 19, 2026 (Spain beat Argentina in the final). The surface stays up
+// as a recap: final bracket + leaderboard remain browsable, but joining/wagering CTAs are gone.
+const EVENT_ENDED = true;
 
 function parseMatch(e) {
   const c = e.competitions?.[0] || {};
@@ -570,9 +573,20 @@ export function WorldCupPage({ lockedOut = false }) {
         </div>
 
         <div style={{ textAlign: "center", maxWidth: 1253, margin: "0 auto" }}>
+          {EVENT_ENDED && (
+            <div style={{ display: "inline-block", padding: "8px 18px", borderRadius: 999, background: "rgba(31,209,130,0.12)", border: "1px solid rgba(31,209,130,0.4)", color: GREEN, fontFamily: fm, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.16em", marginBottom: 16, backdropFilter: "blur(6px)" }}>
+              🏆 COMPETITION ENDED
+            </div>
+          )}
           <h1 style={{ fontFamily: fd, fontWeight: 800, textTransform: "uppercase", color: "#fff", fontSize: isMobile ? 40 : "min(5.4vw, 74px)", lineHeight: 1.05, letterSpacing: "-0.01em", margin: 0, textShadow: "0 4px 30px rgba(0,0,0,0.55)" }}>
             The World Cup<br />Trading Competition
           </h1>
+          {EVENT_ENDED ? (
+            <p style={{ fontFamily: fb, color: "rgba(255,255,255,0.88)", fontSize: isMobile ? 13.5 : 15, lineHeight: 1.6, maxWidth: 640, margin: "16px auto 0", textShadow: "0 2px 14px rgba(0,0,0,0.6)" }}>
+              That's a wrap. Thank you to everyone who competed, and congratulations to our champions.<br />
+              We will see you this Fall when Parabolic officially launches.
+            </p>
+          ) : (
           <p style={{ fontFamily: fb, color: "rgba(255,255,255,0.88)", fontSize: isMobile ? 13.5 : 15, lineHeight: 1.5, maxWidth: 640, margin: "16px auto 0", textShadow: "0 2px 14px rgba(0,0,0,0.6)" }}>
             $10,000 World Cup Cash per entrant, trade live win probability through the bracket.<br />
             Cash prizes $2,000 · $1,000 · $500{" · "}
@@ -580,6 +594,7 @@ export function WorldCupPage({ lockedOut = false }) {
               Rules
             </button>
           </p>
+          )}
 
           {meta?.live && (joined
             ? <div style={{ marginTop: 20 }}>
@@ -600,7 +615,7 @@ export function WorldCupPage({ lockedOut = false }) {
                   </div>
                 )}
               </div>
-            : <div style={{ marginTop: 20 }}>
+            : EVENT_ENDED ? null : <div style={{ marginTop: 20 }}>
                 <button onClick={join} style={{ padding: "13px 22px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: fb, fontWeight: 700, fontSize: 15, background: "#fff", color: "#0a0a0a", boxShadow: "0 10px 34px rgba(255,255,255,0.15)" }}>
                   Join Championship &amp; Get $10,000
                 </button>
@@ -713,8 +728,13 @@ export function WorldCupPage({ lockedOut = false }) {
             </div>
           )}
 
+          {EVENT_ENDED && top3.length > 0 && (
+            <div style={{ textAlign: "center", marginTop: me ? 46 : 80 }}>
+              <span style={{ display: "inline-block", padding: "7px 16px", borderRadius: 999, background: "rgba(31,209,130,0.12)", border: "1px solid rgba(31,209,130,0.4)", color: GREEN, fontFamily: fm, fontSize: 11, fontWeight: 700, letterSpacing: "0.16em" }}>🏆 FINAL STANDINGS</span>
+            </div>
+          )}
           {top3.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? 10 : 50, marginTop: me ? 60 : 90 }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: isMobile ? 10 : 50, marginTop: EVENT_ENDED ? 20 : me ? 60 : 90 }}>
               <Podium e={top3[1]} />
               <Podium e={top3[0]} big />
               <Podium e={top3[2]} />
