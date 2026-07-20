@@ -66,6 +66,8 @@ const REJECT_COPY = {
   userNotFound: 'Account not found - try refreshing the page',
   badAloPxRejected: 'Post-only order would cross the market',
   joinRequired: 'Join the championship to trade this match',
+  marginCapRejected: 'Per-game limit reached - max 25% of your equity (up to $50k) in one game',
+  marketHalted: 'Market paused - price sources are down. Closing positions is still allowed.',
 };
 
 function LevSlider({ eL, ml, onChange, compact = false, liq = null, cap = null }) {
