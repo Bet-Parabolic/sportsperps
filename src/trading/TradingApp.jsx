@@ -129,8 +129,8 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           {/* Desktop: home/bets/news/leaderboard live on the left rail - the top bar is sports only.
               Mobile: no rail, so Bets/News fold into the scrollable tab bar. */}
           {(isMobile
-            ? ["Home","Bets","News","World Cup","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"]
-            : ["World Cup","Basketball","Football","Baseball","Soccer","Hockey","MMA"]).map((sport)=>{
+            ? ["Home","Bets","News","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"]
+            : ["Basketball","Football","Baseball","Soccer","Hockey","MMA"]).map((sport)=>{
             const pageOf = {Home:"home",Bets:"bets",News:"news","World Cup":"wcup",Basketball:"basketball",Football:"nfl",Baseball:"baseball",Soccer:"soccer",Hockey:"hockey",MMA:"mma",Leaderboard:"leaderboard"};
             const isActive = terminalPage===pageOf[sport];
             return (
