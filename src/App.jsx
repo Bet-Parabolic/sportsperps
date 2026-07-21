@@ -37,58 +37,6 @@ const Splash = () => (
   </div>
 );
 
-/* ── Competition gate — during the World Cup event the MAIN terminal on app.parabolic.gg is
-   team-only: stray visitors get funneled to /worldcup (the actual product right now), the team
-   unlocks with the dash password (verified against the backend admin login - no secret in the
-   bundle). SOFT gate by design: it prevents accidental use, it is not a security boundary. ── */
-const GATE_KEY = "parabolic_team_gate";
-function TeamGate({ onUnlock }) {
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [showPw, setShowPw] = useState(false);
-  const tryUnlock = async (e) => {
-    e?.preventDefault();
-    if (!pw || busy) return;
-    setBusy(true); setErr("");
-    try {
-      const { API_URL } = await import("./lib/constants.js");
-      const r = await fetch(`${API_URL}/admin/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: pw }) });
-      if (r.ok) { try { localStorage.setItem(GATE_KEY, "1"); } catch { /* storage blocked */ } onUnlock(); }
-      else setErr("Wrong password");
-    } catch { setErr("Network error - try again"); }
-    setBusy(false);
-  };
-  return (
-    <div style={{ minHeight: "100vh", background: "#06070a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Hanken Grotesk', sans-serif", textAlign: "center" }}>
-      <img src={LOGO_MARK} alt="Parabolic" style={{ width: 56, height: 56, marginBottom: 22 }} />
-      <h1 style={{ color: "#fff", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 10 }}>The World Cup Trading Competition is live</h1>
-      <p style={{ color: "#8a93a6", fontSize: 14.5, lineHeight: 1.6, maxWidth: 420, marginBottom: 24 }}>
-        The main Parabolic terminal is closed while the competition runs. Join the championship - free entry, $10,000 World Cup Cash, real cash prizes.
-      </p>
-      <a href="/worldcup" style={{ display: "inline-block", padding: "14px 28px", borderRadius: 999, background: "#fff", color: "#0a0a0a", fontWeight: 700, fontSize: 15, textDecoration: "none", boxShadow: "0 10px 34px rgba(255,255,255,0.15)" }}>
-        Enter the Competition →
-      </a>
-      <form onSubmit={tryUnlock} style={{ marginTop: 44, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-        {!showPw ? (
-          <button type="button" onClick={() => setShowPw(true)} style={{ background: "none", border: "none", color: "#3a4150", fontSize: 12, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}>Team access</button>
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Team password" autoFocus
-                style={{ background: "#101114", border: "1px solid #1c1e24", borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none", width: 200 }} />
-              <button type="submit" disabled={busy} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#1fd182", color: "#000", fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: busy ? 0.6 : 1 }}>
-                {busy ? "…" : "Unlock"}
-              </button>
-            </div>
-            {err && <div style={{ color: "#ff5247", fontSize: 12.5 }}>{err}</div>}
-          </>
-        )}
-      </form>
-    </div>
-  );
-}
-
 /* ═══════════════════════════════════════════════════════════
    ROOT - page router + global styles
    ═══════════════════════════════════════════════════════════ */
@@ -118,24 +66,13 @@ export default function App() {
     try { sessionStorage.removeItem("parabolic_post_logout_auth"); } catch { /* noop */ }
   }, []);
 
-  // Competition gate: the main terminal on app.parabolic.gg is team-only while the WC event
-  // runs — everyone else belongs on /worldcup. Only the app domain is gated (marketing landing,
-  // /worldcup, /dash, /waitlist, localhost/vercel previews all stay open).
-  const [gateOpen, setGateOpen] = useState(() => {
-    try { return localStorage.getItem(GATE_KEY) === "1"; } catch { return false; }
-  });
-  const gated = isAppDomain && !isWorldCup && !isDash && !isWaitlist && !gateOpen;
-  // Gated visitors go straight to the competition; the team unlocks at app.parabolic.gg/?team
-  // (the gate page with the password prompt only renders there).
-  const isTeamEntry = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("team");
-  useEffect(() => {
-    if (gated && !isTeamEntry) window.location.replace("/worldcup");
-  }, [gated, isTeamEntry]);
+  // (The World Cup competition gate — TeamGate + the app-domain redirect to /worldcup — was
+  // removed July 20, 2026 after the event closed. app.parabolic.gg boots the terminal again.)
 
-  // AUTH GATE (guests eliminated, July 12): a logged-out visitor can only VIEW the World Cup page;
-  // any interaction there opens onboarding (WorldCupPage handles the click-capture on its own auth
-  // state, so the lock lifts the moment they register/login). Every other route/page requires an
-  // account. /dash keeps its own admin password; /waitlist stays public.
+  // AUTH GATE (guests eliminated, July 12): a logged-out visitor on the app domain gets the
+  // sign-in/sign-up flow (OnboardingFlow — it carries both paths); on /worldcup they can still
+  // VIEW the recap page with the click-to-onboard lock. /dash keeps its own admin password;
+  // /waitlist stays public; the marketing landing is open to everyone.
   const loggedOut = !getAuth();
   // The MARKETING domain (parabolic.gg) is exempt — it shows the landing page to everyone
   // (July 12 fix: the gate was funneling parabolic.gg visitors to /worldcup too, making the
@@ -206,11 +143,11 @@ export default function App() {
         : isWaitlist
         ? <Suspense fallback={<Splash/>}><WaitlistPage/></Suspense>
         : authGate
-        // Logged out → World Cup page only, with a click-to-onboard lock (the page lifts it once
-        // the visitor registers/logs in). No terminal, no landing, no guest browsing.
-        ? <Suspense fallback={<Splash/>}><WorldCupPage lockedOut /></Suspense>
-        : gated
-        ? (isTeamEntry ? <TeamGate onUnlock={() => setGateOpen(true)} /> : <Splash/>)
+        // Logged out: /worldcup stays viewable (click-to-onboard lock lifts on register/login);
+        // everywhere else on the app domain boots the sign-in/sign-up flow. No guest browsing.
+        ? (isWorldCup
+            ? <Suspense fallback={<Splash/>}><WorldCupPage lockedOut /></Suspense>
+            : <Suspense fallback={<Splash/>}><OnboardingFlow onDone={()=>setPage("trading")} onGuest={()=>setPage("trading")}/></Suspense>)
         : isWorldCup
         ? <Suspense fallback={<Splash/>}><WorldCupPage/></Suspense>
         : page==="onboarding"
