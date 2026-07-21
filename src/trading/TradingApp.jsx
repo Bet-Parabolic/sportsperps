@@ -186,7 +186,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
       {/* BODY */}
       <div style={{display:"flex",height:isMobile?"auto":"calc(100vh - 56px)",flexDirection:isMobile?"column":"row",minHeight:isMobile?"calc(100vh - 56px)":"auto"}}>
         {!isMobile && <NavRail active={terminalPage} onNav={setTerminalPage} liveGames={liveGames}
-          onLiveClick={()=>{ setHomeCat("live"); setTerminalPage("home"); }}/>}
+          onLiveClick={()=>{ setHomeCat("live"); setTerminalPage("home"); }} onGameClick={onTrade}/>}
         {terminalPage==="bets"?<ActiveBetsPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="news"?<NewsPage/>
         :terminalPage==="bookmarks"?<BookmarksPage liveGames={liveGames} onTrade={onTrade}/>

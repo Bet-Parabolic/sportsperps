@@ -21,8 +21,9 @@ import { currentUserId, authToken } from "../../lib/auth.js";
 
 const START_BALANCE = 10000; // every paper account starts here — the ROI + chart baseline
 
-// Category registry for the games browser (order = display order).
-const CATS = [
+// Category registry for the games browser (order = display order). Exported for the trading
+// terminal's market-nav column (July 21 reconcile) so both surfaces share one sport taxonomy.
+export const CATS = [
   { key: "nfl", label: "Football", emoji: "🏈", leagues: ["nfl"] },
   { key: "nba", label: "Basketball", emoji: "🏀", leagues: ["nba", "ncaam"] },
   { key: "soccer", label: "Soccer", emoji: "⚽", leagues: ["mls", "wcup"] },

@@ -18,11 +18,11 @@ import { track } from "../lib/track.js";
 import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
 import { parseAvatar } from "../lib/onboarding.js";
 import { loadCard, reconcileAvatarWithAccount } from "../lib/onboarding.js";
-import { DepositModal } from "../components/DepositModal.jsx";
 import { NavRail } from "../components/NavRail.jsx";
 import { FloatingChat } from "../components/FloatingChat.jsx";
 import { isBookmarked, syncBookmarks, toggleBookmark as toggleBookmarkStore } from "../lib/bookmarks.js";
-import { MessageCircle, Bookmark, Share2, BarChart3, Zap, Briefcase, Mic, Home, Ticket, Newspaper, Trophy } from "lucide-react";
+import { MessageCircle, Bookmark, Share2, BarChart3, Zap, Briefcase, Mic, Home, Ticket, Newspaper, Trophy, Bell, Gift, ChevronDown } from "lucide-react";
+import { CATS as SPORT_CATS } from "../components/sports/HomePage.jsx";
 import { webNotify } from "../lib/webNotify.js";
 
 // Accurate, user-facing labels for the backend oracle source names.
@@ -137,6 +137,74 @@ function LevSlider({ eL, ml, onChange, compact = false, liq = null, cap = null }
   );
 }
 
+/**
+ * MarketNav — the terminal's left column (July 21 reconcile): the home page's sport-category
+ * navigation, accordion-style. Click a sport → its TRADEABLE markets (live first, then pregame)
+ * drop down; click a market → switch the terminal to it. Replaces both the old live/pregame
+ * sidebar AND the header sport tabs. The current market is pinned open + highlighted.
+ */
+function MarketNav({ liveGames, current, onTrade }) {
+  const isLive = (g) => g.status === "live" || g.status === "halftime";
+  const tradeable = (g) => isLive(g) || (g.pregame && g.status === "scheduled");
+  const catOf = (g) => SPORT_CATS.find((c) => c.leagues.includes(g.league || "nba"))?.key ?? null;
+  const markets = liveGames.filter(tradeable);
+  const currentCat = current ? catOf(current) : null;
+  const [open, setOpen] = useState(currentCat);
+  useEffect(() => { if (currentCat) setOpen(currentCat); }, [currentCat]);
+
+  return (
+    <div style={{ width: 250, borderRight: "1px solid #1a1a1a", overflow: "auto", flexShrink: 0, padding: "14px 10px" }} className="mob-nav">
+      {SPORT_CATS.map((c) => {
+        const inCat = markets.filter((g) => c.leagues.includes(g.league || "nba"))
+          .sort((a, b) => (isLive(b) - isLive(a)) || (new Date(a.startTime || 0) - new Date(b.startTime || 0)));
+        const isOpen = open === c.key;
+        const liveN = inCat.filter(isLive).length;
+        return (
+          <div key={c.key} style={{ marginBottom: 4 }}>
+            <button onClick={() => setOpen(isOpen ? null : c.key)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 12px", borderRadius: 10, border: "none", cursor: "pointer", background: isOpen ? "#15171c" : "transparent", fontFamily: fb }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, fontWeight: isOpen ? 700 : 500, color: isOpen ? "#fff" : "#aeb4bd" }}>
+                <span style={{ fontSize: 15 }}>{c.emoji}</span>{c.label}
+                {liveN > 0 && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "pulse 1.6s infinite" }} />}
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, fontFamily: fm, color: "#7a828c" }}>{inCat.length}</span>
+                <ChevronDown size={14} color="#5b616b" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+              </span>
+            </button>
+            {isOpen && inCat.length === 0 && (
+              <div style={{ padding: "8px 12px 12px", fontSize: 11.5, color: "#5b616b" }}>No open markets right now.</div>
+            )}
+            {isOpen && inCat.map((lg) => {
+              const viewing = current && lg.id === current.id;
+              const lv = isLive(lg);
+              return (
+                <div key={lg.id} onClick={!viewing && onTrade ? () => onTrade(lg) : undefined}
+                  style={{ padding: "9px 11px", margin: "4px 2px", background: viewing ? B.primary + "12" : "#101114", borderRadius: 10, border: `1px solid ${viewing ? B.primary + "40" : "#1a1c21"}`, fontSize: 11, fontFamily: fm, cursor: viewing ? "default" : "pointer" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                    <span style={{ color: "#fff", fontWeight: 700 }}>{lg.away?.abbreviation || "AWY"} <span style={{ color: "#555" }}>@</span> {lg.home?.abbreviation || "HOM"}</span>
+                    <span style={{ color: lv ? B.green : B.primaryLight, fontSize: 10, fontWeight: 700 }}>
+                      {lv ? (periodLabel(lg.league, lg.period, lg.clock, lg.statusDetail) || "LIVE") : (startsInLabel(lg.startTime) || "PREGAME")}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#888" }}>{lv ? `${lg.away?.score ?? 0} – ${lg.home?.score ?? 0}` : ""}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {lg.oracle?.indexPrice != null && <span style={{ color: B.primary, fontWeight: 700 }}>{(lg.oracle.indexPrice * 100).toFixed(0)}%</span>}
+                      {viewing
+                        ? <span style={{ fontSize: 9, color: B.primary, fontWeight: 800, letterSpacing: "0.06em" }}>VIEWING</span>
+                        : <span style={{ fontSize: 9, color: "#444" }}>{lv ? "Trade →" : "Pre-Game →"}</span>}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo, onTrade, onOnboard, worldcup = false }) {
 
   // ── auth/userId: guest UUID until the user signs up; auth session adds username/token ──
@@ -209,7 +277,15 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     reconcileAvatarWithAccount({ apiUrl: API_URL, userId, token: authToken() })
       .then(() => setCardAvatar(loadCard().avatar));
   }, [userId]);
-  const [showDeposit, setShowDeposit] = useState(false); // deposit/withdrawal coming-soon modal
+  // Header bell (July 21 reconcile) — placeholder dropdown until a real per-user feed exists.
+  const [showBellT, setShowBellT] = useState(false);
+  const bellTRef = useRef(null);
+  useEffect(() => {
+    if (!showBellT) return;
+    const close = (e) => { if (!bellTRef.current?.contains(e.target)) setShowBellT(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showBellT]);
   // Chat popout (draggable window) + unread dot; bookmark is device-local like the mobile app.
   const [showChatPop, setShowChatPop] = useState(false);
   const showChatPopRef = useRef(false); showChatPopRef.current = showChatPop;
@@ -315,15 +391,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     setMarkers(prev => [...prev, {t: +chartT.toFixed(2), p, markerType: mt, line: side||'home'}]);
   }, []);
 
-  // Sidebar games: single source = backend liveGames (no more ESPN-direct duplication).
-  // Split into Pregame (markets about to open) and Live, each excluding the current game.
-  const sidebarLive = useMemo(() => (
-    liveGames.filter(lg => lg.id !== initGame.id && (lg.status === 'live' || lg.status === 'halftime'))
-  ), [liveGames, initGame.id]);
-  const sidebarPregame = useMemo(() => (
-    liveGames.filter(lg => lg.id !== initGame.id && lg.pregame && lg.status !== 'live' && lg.status !== 'halftime')
-              .sort((a, b) => new Date(a.startTime || 0) - new Date(b.startTime || 0))
-  ), [liveGames, initGame.id]);
+  // (The old live/pregame sidebar lists were replaced by MarketNav — July 21 reconcile.)
 
   // Sport counts for nav tabs — backend covers all 7 leagues (NBA, NCAAM, MLB, NFL, NHL, MLS, WCUP)
   const sportCounts = useMemo(() => {
@@ -1280,17 +1348,13 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               : <img src={LOGO_WORDMARK} style={{height:30,width:'auto'}} alt="Parabolic"/>}
           </button>
         </div>
-        {/* CENTER - sport tabs (hidden on the World Cup surface: single-sport event) */}
-        {worldcup ? <div /> : <div className="mob-nav" style={{display:'flex',gap:isMobile?2:4,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
-          {[['home','Home',sportCounts.live],['basketball','Basketball',sportCounts.nba],['nfl','Football',sportCounts.nfl],['baseball','Baseball',sportCounts.mlb],['soccer','Soccer',sportCounts.soccer],['hockey','Hockey',sportCounts.nhl],['mma','MMA',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
-            <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'6px 14px',fontSize:12,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666'}}>
-              {tab==='home'
-                ? <span style={{display:'flex',alignItems:'center',gap:5}}>
-                    {sportCounts.live>0&&<span style={{width:6,height:6,borderRadius:'50%',background:'#ef4444',display:'inline-block',animation:'pulse 1.5s infinite',flexShrink:0}}/>}
-                    Home
-                  </span>
-                : label}
-              {cnt>0&&<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({cnt})</span>}
+        {/* CENTER — sport tabs retired July 21: game discovery lives in the MarketNav column +
+            the home games browser. Mobile keeps a slim Home/Bets/News/Leaderboard bar. */}
+        {worldcup || !isMobile ? <div /> : <div className="mob-nav" style={{display:'flex',gap:2,background:'#111',borderRadius:10,padding:3,overflowX:'auto',justifySelf:'center',maxWidth:'100%',minWidth:0,marginLeft:8,marginRight:8}}>
+          {[['home','Home',sportCounts.live],['bets','Bets',null],['news','News',null],['leaderboard','Leaderboard',null]].map(([tab,label,cnt])=>(
+            <button key={tab} onClick={()=>onNavTo?onNavTo(tab):onBack&&onBack()} style={{padding:'5px 12px',fontSize:11,fontWeight:400,border:'none',cursor:'pointer',fontFamily:fb,borderRadius:8,background:'transparent',color:'#666',display:'flex',alignItems:'center',gap:5}}>
+              {tab==='home'&&cnt>0&&<span style={{width:6,height:6,borderRadius:'50%',background:'#ef4444',display:'inline-block',animation:'pulse 1.5s infinite',flexShrink:0}}/>}
+              {label}
             </button>
           ))}
         </div>}
@@ -1307,6 +1371,21 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             {!worldcup && <button onClick={shareMarket} title="Share this market" style={{width:34,height:34,borderRadius:'50%',border:'none',background:'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
               <Share2 size={16} color='#9aa0a8'/>
             </button>}
+            {!worldcup && <div ref={bellTRef} style={{position:'relative'}}>
+              <button onClick={()=>setShowBellT(v=>!v)} title="Notifications" aria-label="Notifications" style={{width:34,height:34,borderRadius:'50%',border:'none',background:showBellT?'#22252b':'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <Bell size={16} color={showBellT?'#fff':'#9aa0a8'}/>
+              </button>
+              {showBellT && (
+                <div style={{position:'absolute',top:42,right:0,width:250,background:'#101114',border:'1px solid #23262c',borderRadius:14,padding:'16px 16px',zIndex:60,boxShadow:'0 16px 40px rgba(0,0,0,0.5)'}}>
+                  <div style={{fontSize:12.5,fontWeight:800,color:'#fff',marginBottom:6,fontFamily:fb}}>Notifications</div>
+                  <div style={{fontSize:12,color:'#79808a',lineHeight:1.5}}>Nothing new yet — fills, liquidations, TP/SL triggers and settlements will show up here (live ones land in the activity tray below the wager panel).</div>
+                </div>
+              )}
+            </div>}
+            {!worldcup && <a data-ungated="1" href="https://app.parabolic.gg/rewards" target="_blank" rel="noopener noreferrer" title="Rewards" aria-label="Rewards"
+              style={{width:34,height:34,borderRadius:'50%',border:'1px solid #2b2413',background:'#171307',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <Gift size={16} color='#eab308'/>
+            </a>}
           </div>}
           {!isMobile&&<span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 10px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>
@@ -1320,8 +1399,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
                 : '$'+balance.toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2})}
             </div>
           </div>
-          {/* Deposit button removed on the WC surface (no deposits during the paper competition). */}
-          {!worldcup&&<button onClick={()=>setShowDeposit(true)} style={{padding:'8px 20px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#1fd182,#1fd182)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:fb}}>Deposit</button>}
+          {/* Deposit button removed July 21 — deposits/withdrawals live in the home hero now. */}
           <div onClick={()=>setShowProfile(true)} style={{width:32,height:32,borderRadius:'50%',background:'#222',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:14,overflow:'hidden'}}>
             {cardAvatar ? <AvatarCircle avatar={cardAvatar} size={32}/> : '👤'}
           </div>
@@ -1330,52 +1408,12 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
 
       {/* BODY */}
       <div style={{display:'flex',height:isMobile?'auto':'calc(100vh - 56px)',flexDirection:isMobile?'column':'row',minHeight:isMobile?'calc(100vh - 56px)':'auto'}}>
-        {!isMobile && <NavRail active={null} onNav={(tab)=>onNavTo?.(tab)} liveGames={liveGames} onTrade={onTrade} hide={worldcup ? ["bookmarks"] : []}/>}
+        {!isMobile && <NavRail active={null} onNav={(tab)=>onNavTo?.(tab)} liveGames={liveGames} onGameClick={onTrade} onLiveClick={()=>onNavTo?.('home')} hide={worldcup ? ["bookmarks"] : []}/>}
 
-        {/* LEFT SIDEBAR - hidden on the World Cup surface: single-event, only ever one game live,
-            so the "other markets" column is noise (the chart takes the space instead). */}
-        {!isMobile&&!worldcup&&<div style={{width:260,borderRight:'1px solid #1a1a1a',overflow:'auto',flexShrink:0,padding:'16px 0'}}>
-          {/* Viewing Now */}
-          <div style={{margin:'0 16px 16px',padding:'12px 14px',background:B.primary+'12',borderRadius:12,border:'1px solid '+B.primary+'25'}}>
-            <div style={{fontSize:10,color:B.primary,fontWeight:700,marginBottom:6,fontFamily:fm,letterSpacing:'0.08em'}}>LIVE NOW</div>
-            <div style={{fontSize:13,fontWeight:700,color:'#fff',marginBottom:2}}>{HOME.name}</div>
-            <div style={{fontSize:11,color:'#666',marginBottom:8}}>vs {AWAY.name}</div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontSize:22,fontWeight:900,fontFamily:fm,color:'#fff'}}>{g.home.score ?? '–'} <span style={{color:'#333',fontSize:14}}>–</span> {g.away.score ?? '–'}</span>
-              <span style={{fontSize:10,color:B.green,fontWeight:700,fontFamily:fm}}>
-                {g.status==='halftime'?'HALF':g.period?periodLabel(g.league, g.period, g.clock, g.statusDetail):g.statusDetail||''}
-              </span>
-            </div>
-          </div>
-
-          {/* Other markets - split into Pregame + Live */}
-          {(sidebarPregame.length > 0 || sidebarLive.length > 0) && (
-            <div style={{padding:'0 16px'}}>
-              {[
-                { label: 'LIVE', games: sidebarLive, color: B.green, pre: false },
-                { label: 'PREGAME', games: sidebarPregame, color: B.primaryLight, pre: true },
-              ].filter(s => s.games.length > 0).map(section => (
-                <div key={section.label} style={{marginBottom:14}}>
-                  <div style={{fontSize:10,color:'#555',fontWeight:700,letterSpacing:'0.08em',fontFamily:fm,marginBottom:8}}>{section.label} ({section.games.length})</div>
-                  {section.games.map(lg=>(
-                    <div key={lg.id} onClick={()=>onTrade&&onTrade(lg)}
-                      style={{padding:'10px 12px',marginBottom:6,background:'#111',borderRadius:10,border:'1px solid #1f1f1f',fontSize:11,fontFamily:fm,cursor:onTrade?'pointer':'default'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                        <span style={{color:'#fff',fontWeight:600}}>{lg._emoji?lg._emoji+' ':''}{lg.home.abbreviation||lg.home.name?.slice(0,3).toUpperCase()||'HOME'} <span style={{color:'#555'}}>vs</span> {lg.away.abbreviation||lg.away.name?.slice(0,3).toUpperCase()||'AWAY'}</span>
-                        <span style={{color:section.color,fontSize:10}}>{section.pre?(startsInLabel(lg.startTime)||'PREGAME'):(periodLabel(lg.league||lg._sport, lg.period, lg.clock, lg.statusDetail)||'LIVE')}</span>
-                      </div>
-                      <div style={{display:'flex',justifyContent:'space-between'}}>
-                        <span style={{color:'#888'}}>{section.pre?'':((lg.home.score??0)+' – '+(lg.away.score??0))}</span>
-                        {lg.oracle?.indexPrice && <span style={{color:B.primary,fontWeight:700}}>{(lg.oracle.indexPrice*100).toFixed(0)}%</span>}
-                      </div>
-                      {onTrade&&<div style={{marginTop:3,fontSize:9,color:'#444',textAlign:'right'}}>{section.pre?'Trade Pre-Game →':'Trade →'}</div>}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>}
+        {/* LEFT COLUMN (July 21 reconcile) — the home page's sport-category nav, accordion of
+            tradeable markets. Replaces the old live/pregame sidebar + the header sport tabs.
+            Hidden on the World Cup surface (single-event: the chart takes the space instead). */}
+        {!isMobile&&!worldcup&&<MarketNav liveGames={liveGames} current={g} onTrade={onTrade}/>}
 
         {/* MAIN CONTENT */}
         <div style={{flex:1,minWidth:0,overflow:isMobile?'visible':'auto'}}>
@@ -2177,7 +2215,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
         <FloatingChat gameId={g.id} userId={userId} homeShort={HOME.short} awayShort={AWAY.short}
           onRequireAuth={()=>setShowAuth(true)} onClose={()=>setShowChatPop(false)}/>
       )}
-      {showDeposit && <DepositModal balance={balance} onClose={()=>setShowDeposit(false)}/>}
+
       {showVerify && (
         <VerifyModal
           userId={userId}
