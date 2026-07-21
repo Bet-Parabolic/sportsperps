@@ -6,9 +6,10 @@ import { Grid, SectionHeader, SkeletonCard } from "../../components/shared/Sport
 // Per-league emoji (used for the mixed "Live" section where cards span sports).
 const leagueEmoji = { nba: "🏀", ncaam: "🏀", mlb: "⚾", nfl: "🏈", nhl: "🏒", mls: "⚽", wcup: "🏆" };
 
-// Upcoming is grouped by sport in this fixed order — World Cup + Baseball first (in season now).
+// Upcoming is grouped by sport in this fixed order — Baseball first (in season now).
+// (World Cup group removed July 20, 2026 — tournament over; wcup games, if any ever
+//  reappear, would fall through to no group and simply not list here.)
 const SPORT_GROUPS = [
-  { key: "wcup", label: "World Cup",  emoji: "🏆", leagues: ["wcup"] },
   { key: "mlb",  label: "Baseball",   emoji: "⚾", leagues: ["mlb"] },
   { key: "nfl",  label: "Football",   emoji: "🏈", leagues: ["nfl"] },
   { key: "nba",  label: "Basketball", emoji: "🏀", leagues: ["nba", "ncaam"] },
@@ -86,7 +87,7 @@ export function HomePage({ liveGames = [], onTrade }) {
         </div>
       )}
 
-      {/* UPCOMING - one section per sport (World Cup + Baseball first) */}
+      {/* UPCOMING - one section per sport (Baseball first) */}
       {sections.map((s) => (
         <div key={s.key} style={{ marginBottom: 36 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14 }}>
