@@ -1,14 +1,18 @@
 /**
- * Left nav rail (ported from the mobile design — Frame 2147263018): icon destinations only —
- * home / active bets / news / bookmarks / leaderboard. Desktop only; on mobile these fold into
- * the top tab bar. (The live-markets pill was removed July 2026 — market counts live in the top
- * nav's per-sport badges, and saved markets get their own bookmarks page.)
+ * Left nav rail (July 21 2026 redesign — Figma Parabolic-7-21-26): icon destinations
+ * (home / active bets / news / bookmarks / leaderboard), a LIVE-GAMES bubble under the
+ * leaderboard icon (green dot + count + up to three sport mini-icons; click → the home
+ * page's live filter), and a bottom footer with the same three links the World Cup page
+ * carries: Parabolic mark → parabolic.gg, docs, X.
  */
-import { Home, Ticket, Newspaper, Bookmark, Trophy } from "lucide-react";
+import { Home, Ticket, Newspaper, Bookmark, Trophy, BookOpen } from "lucide-react";
+import { LOGO_MARK } from "../lib/logos.js";
 
 const RAIL_W = 76;
 
-export function NavRail({ active, onNav, hide = [] }) {
+const SPORT_EMOJI = { nba: "🏀", ncaam: "🏀", mlb: "⚾", nfl: "🏈", nhl: "🏒", mls: "⚽", wcup: "⚽" };
+
+export function NavRail({ active, onNav, hide = [], liveGames = [], onLiveClick }) {
   const items = [
     { key: "home", Icon: Home, label: "Home" },
     { key: "bets", Icon: Ticket, label: "Active bets" },
@@ -16,9 +20,13 @@ export function NavRail({ active, onNav, hide = [] }) {
     { key: "bookmarks", Icon: Bookmark, label: "Bookmarks" },
     { key: "leaderboard", Icon: Trophy, label: "Leaderboard" },
   ];
+  const live = liveGames.filter((g) => g.status === "live" || g.status === "halftime");
+  const miniIcons = [...new Set(live.map((g) => SPORT_EMOJI[g.league] || "🏟️"))].slice(0, 3);
+
+  const footLink = { display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 10, opacity: 0.5, transition: "opacity .15s" };
 
   return (
-    <div style={{ width: RAIL_W, flexShrink: 0, borderRight: "1px solid #16181d", background: "#0a0a0a", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0", gap: 6, overflowY: "auto", height: "100%" }} className="mob-nav">
+    <div style={{ width: RAIL_W, flexShrink: 0, borderRight: "1px solid #16181d", background: "#0a0a0a", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0 14px", gap: 6, overflowY: "auto", height: "100%" }} className="mob-nav">
       {items.filter(({ key }) => !hide.includes(key)).map(({ key, Icon, label }) => {
         const on = active === key;
         return (
@@ -30,6 +38,38 @@ export function NavRail({ active, onNav, hide = [] }) {
           </button>
         );
       })}
+
+      {/* live-games bubble — under the leaderboard icon (Figma 195-24094) */}
+      {live.length > 0 && (
+        <button onClick={onLiveClick} title={`${live.length} live game${live.length === 1 ? "" : "s"} — trade now`} style={{
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 6px",
+          borderRadius: 999, border: "1px solid #1d2026", background: "#101114", cursor: "pointer", flexShrink: 0, marginTop: 2,
+        }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", animation: "pulse 1.6s infinite" }} />
+          <span style={{ fontSize: 11.5, fontWeight: 800, color: "#e6e9ee", fontFamily: "inherit" }}>{live.length}</span>
+          {miniIcons.map((e, i) => (
+            <span key={i} style={{ width: 24, height: 24, borderRadius: "50%", background: "#181b20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{e}</span>
+          ))}
+        </button>
+      )}
+
+      {/* bottom footer — same trio as the World Cup page */}
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, paddingTop: 14 }}>
+        <a data-ungated="1" href="https://parabolic.gg" target="_blank" rel="noopener noreferrer" aria-label="Parabolic home" title="parabolic.gg" style={footLink}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)} onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}>
+          <img src={LOGO_MARK} alt="Parabolic" style={{ width: 18, height: 18, objectFit: "contain" }} />
+        </a>
+        <a data-ungated="1" href="https://docs.parabolic.gg/docs" target="_blank" rel="noopener noreferrer" aria-label="Parabolic docs" title="Docs" style={footLink}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)} onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}>
+          <BookOpen size={17} color="#aeb4bd" />
+        </a>
+        <a data-ungated="1" href="https://x.com/betparabolic" target="_blank" rel="noopener noreferrer" aria-label="Parabolic on X" title="@betparabolic on X" style={footLink}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)} onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#aeb4bd" aria-hidden="true">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+        </a>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { ChevronRight } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { ChevronRight, Bell, Gift } from "lucide-react";
 import { B, fb, fm } from "../lib/theme.js";
 import { API_URL, ESPN_SOURCES, LIVE_STATUS } from "../lib/constants.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
@@ -31,6 +31,17 @@ import { BookmarksPage } from "../components/BookmarksPage.jsx";
 export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, initialTab }) {
   const [terminalPage, setTerminalPage] = useState(initialTab || "home");
   const [showProfile, setShowProfile] = useState(false);
+  // Rail live-bubble → home with the Live filter preselected (July 21 redesign).
+  const [homeCat, setHomeCat] = useState(null);
+  // Notifications dropdown (header bell) — honest v1 placeholder until a per-user feed exists.
+  const [showBell, setShowBell] = useState(false);
+  const bellRef = useRef(null);
+  useEffect(() => {
+    if (!showBell) return;
+    const close = (e) => { if (!bellRef.current?.contains(e.target)) setShowBell(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [showBell]);
   // Account pfp mirrors the member-card avatar (re-read when the profile closes — onboarding/
   // card edits may have just changed it).
   const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
@@ -119,42 +130,54 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           </div>
         </div>
 
-        {/* CENTER - sport tabs (natural width, centered) */}
-        <div className="mob-nav" style={{display:"flex",gap:isMobile?2:4,background:"#111",borderRadius:10,padding:3,overflowX:"auto",justifySelf:"center",maxWidth:"100%",minWidth:0,marginLeft:isMobile?8:24,marginRight:isMobile?8:24}}>
-          {/* Desktop: home/bets/news/leaderboard live on the left rail - the top bar is sports only.
-              Mobile: no rail, so Bets/News fold into the scrollable tab bar. */}
-          {(isMobile
-            ? ["Home","Bets","News","Basketball","Football","Baseball","Soccer","Hockey","MMA","Leaderboard"]
-            : ["Basketball","Football","Baseball","Soccer","Hockey","MMA"]).map((sport)=>{
-            const pageOf = {Home:"home",Bets:"bets",News:"news","World Cup":"wcup",Basketball:"basketball",Football:"nfl",Baseball:"baseball",Soccer:"soccer",Hockey:"hockey",MMA:"mma",Leaderboard:"leaderboard"};
-            const isActive = terminalPage===pageOf[sport];
-            return (
-            <button key={sport} onClick={()=>setTerminalPage(pageOf[sport])} style={{padding:isMobile?"4px 8px":"6px 14px",fontSize:isMobile?10:12,fontWeight:isActive?600:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
-              background:isActive?B.primary+"20":"transparent",color:isActive?"#fff":"#666"}}>
-              {sport==="Home"
-                ? <span style={{display:"flex",alignItems:"center",gap:5}}>
-                    {sportCounts.live>0&&<span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite",flexShrink:0}}/>}
-                    Home
-                  </span>
-                : sport}{(() => {
-                  const c = sport==="Home"?sportCounts.live:sport==="World Cup"?sportCounts.wcup:sport==="Basketball"?sportCounts.nba:sport==="Football"?sportCounts.nfl:sport==="Baseball"?sportCounts.mlb:sport==="Hockey"?sportCounts.nhl:sport==="Soccer"?sportCounts.soccer:sport==="MMA"?sportCounts.ufc:null;
-                  return c>0?<span style={{marginLeft:4,fontSize:10,fontWeight:700,color:B.green,fontFamily:fm}}>({c})</span>:null;
-                })()}</button>
-          );})}
-        </div>
+        {/* CENTER — desktop: page label only (sport tabs retired July 21 — the home page's
+            category browser owns game discovery now). Mobile: no rail, so the four destinations
+            fold into a compact tab bar. */}
+        {isMobile ? (
+          <div className="mob-nav" style={{display:"flex",gap:2,background:"#111",borderRadius:10,padding:3,overflowX:"auto",justifySelf:"center",maxWidth:"100%",minWidth:0,marginLeft:8,marginRight:8}}>
+            {["Home","Bets","News","Leaderboard"].map((label)=>{
+              const pageOf = {Home:"home",Bets:"bets",News:"news",Leaderboard:"leaderboard"};
+              const isActive = terminalPage===pageOf[label];
+              return (
+                <button key={label} onClick={()=>setTerminalPage(pageOf[label])} style={{padding:"5px 12px",fontSize:11,fontWeight:isActive?700:400,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:8,
+                  background:isActive?B.primary+"20":"transparent",color:isActive?"#fff":"#666",display:"flex",alignItems:"center",gap:5}}>
+                  {label==="Home"&&sportCounts.live>0&&<span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulse 1.5s infinite",flexShrink:0}}/>}
+                  {label}
+                </button>
+              );})}
+          </div>
+        ) : (
+          <div style={{justifySelf:"start",marginLeft:20,fontSize:13.5,fontWeight:700,color:"#e6e9ee",fontFamily:fb}}>
+            {terminalPage==="home"?"Overview":terminalPage==="bets"?"Active bets":terminalPage==="news"?"News":terminalPage==="bookmarks"?"Bookmarks":terminalPage==="leaderboard"?"Leaderboard":""}
+          </div>
+        )}
 
-        {/* RIGHT - balance + deposit + profile */}
-        <div style={{display:"flex",alignItems:"center",gap:10,justifySelf:"end"}}>
+        {/* RIGHT — balance pill + notifications + rewards + profile avatar (July 21 redesign:
+            the Deposit button moved into the home hero; these three icons moved up from the
+            Figma rail's bottom-left). */}
+        <div style={{display:"flex",alignItems:"center",gap:isMobile?8:10,justifySelf:"end"}}>
           {balance != null && (
-            <div style={{padding:isMobile?"6px 10px":"7px 14px",borderRadius:10,background:"#111",border:"1px solid #1f1f1f",textAlign:"right"}}>
+            <div style={{padding:isMobile?"6px 10px":"7px 14px",borderRadius:999,background:"#111",border:"1px solid #1f1f1f",textAlign:"right"}}>
               {!isMobile && <div style={{fontSize:8.5,color:"#555",fontWeight:700,letterSpacing:"0.08em",fontFamily:fm,lineHeight:1.2}}>BALANCE</div>}
               <div style={{fontSize:isMobile?12:13,fontWeight:800,color:"#fff",fontFamily:fm,lineHeight:1.2}}>${balance.toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2})}</div>
             </div>
           )}
-          <button onClick={()=>setShowDeposit(true)} style={{padding:"8px 20px",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",fontFamily:fb,borderRadius:10,background:B.green,color:"#fff"}}>
-            Deposit
-          </button>
-          <div onClick={()=>setShowProfile(true)} style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden"}}>
+          <div ref={bellRef} style={{position:"relative"}}>
+            <button onClick={()=>setShowBell(v=>!v)} title="Notifications" aria-label="Notifications" style={{width:34,height:34,borderRadius:"50%",border:"1px solid #1f1f1f",background:"#111",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+              <Bell size={16} color="#aeb4bd"/>
+            </button>
+            {showBell && (
+              <div style={{position:"absolute",top:42,right:0,width:250,background:"#101114",border:"1px solid #23262c",borderRadius:14,padding:"16px 16px",zIndex:60,boxShadow:"0 16px 40px rgba(0,0,0,0.5)"}}>
+                <div style={{fontSize:12.5,fontWeight:800,color:"#fff",marginBottom:6,fontFamily:fb}}>Notifications</div>
+                <div style={{fontSize:12,color:"#79808a",lineHeight:1.5}}>Nothing new yet — fills, liquidations, TP/SL triggers and settlements will show up here.</div>
+              </div>
+            )}
+          </div>
+          <a data-ungated="1" href="https://app.parabolic.gg/rewards" target="_blank" rel="noopener noreferrer" title="Rewards" aria-label="Rewards"
+            style={{width:34,height:34,borderRadius:"50%",border:"1px solid #2b2413",background:"#171307",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <Gift size={16} color="#eab308"/>
+          </a>
+          <div onClick={()=>setShowProfile(true)} title="Profile" style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden"}}>
             {cardAvatar ? <AvatarCircle avatar={cardAvatar} size={34}/> : <span style={{fontSize:14,color:"#888"}}>👤</span>}
           </div>
         </div>
@@ -162,7 +185,8 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
 
       {/* BODY */}
       <div style={{display:"flex",height:isMobile?"auto":"calc(100vh - 56px)",flexDirection:isMobile?"column":"row",minHeight:isMobile?"calc(100vh - 56px)":"auto"}}>
-        {!isMobile && <NavRail active={terminalPage} onNav={setTerminalPage} liveGames={liveGames} onTrade={onTrade}/>}
+        {!isMobile && <NavRail active={terminalPage} onNav={setTerminalPage} liveGames={liveGames}
+          onLiveClick={()=>{ setHomeCat("live"); setTerminalPage("home"); }}/>}
         {terminalPage==="bets"?<ActiveBetsPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="news"?<NewsPage/>
         :terminalPage==="bookmarks"?<BookmarksPage liveGames={liveGames} onTrade={onTrade}/>
@@ -174,7 +198,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
         :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
         :terminalPage==="nfl"?<NFLPage data={espnData.nfl} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="leaderboard"?<LeaderboardPage userId={userId}/>
-        :<HomePage liveGames={liveGames} onTrade={onTrade}/>}
+        :<HomePage liveGames={liveGames} onTrade={onTrade} initialCategory={homeCat} onOpenDeposit={()=>setShowDeposit(true)}/>}
       </div>
 
       {showDeposit && <DepositModal balance={balance} onClose={()=>setShowDeposit(false)}/>}
