@@ -66,13 +66,8 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
   );
   useEffect(() => {
     const fetchAll = async () => {
-      // World Cup: ESPN's soccer scoreboard defaults to a ~1-day window, so tournament fixtures
-      // more than a day out vanish from the WC/Soccer tabs while the backend (Home page) still
-      // lists them. Ask for a rolling 8-day range so every upcoming knockout game shows.
-      const ymd = (d) => d.toISOString().slice(0, 10).replace(/-/g, "");
-      const wcupRange = `?dates=${ymd(new Date())}-${ymd(new Date(Date.now() + 8 * 86_400_000))}`;
       const results = await Promise.allSettled(
-        ESPN_SOURCES.map(s => fetch(s.key === "wcup" ? s.url + wcupRange : s.url).then(r=>r.json()).then(d=>({key:s.key, events:d.events||[], error:false})))
+        ESPN_SOURCES.map(s => fetch(s.url).then(r=>r.json()).then(d=>({key:s.key, events:d.events||[], error:false})))
       );
       setEspnData(prev => {
         const next = {...prev};
