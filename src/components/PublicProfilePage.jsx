@@ -11,6 +11,7 @@ import { API_URL } from "../lib/constants.js";
 import { getAuth, authToken, currentUserId } from "../lib/auth.js";
 import { parseAvatar, parseSignature } from "../lib/onboarding.js";
 import { StatCard } from "./CardShareModal.jsx";
+import { FollowListModal } from "./FollowListModal.jsx";
 
 const GREEN = "#5ed87e";
 const fmtRoi = (v) => `${v >= 0 ? "+" : ""}${Number(v ?? 0).toFixed(2)}%`;
@@ -33,6 +34,7 @@ function tierOf(points) {
   return { name: "ROOKIE", color: "#9aa4b2" };
 }
 
+const followPill = { display: "inline-flex", alignItems: "center", gap: 5, background: "#fff", color: "#0a0a0a", border: "none", borderRadius: 999, padding: "5px 12px", cursor: "pointer", fontFamily: fb, lineHeight: 1 };
 const card = { background: "#101216", border: "1px solid #1c2028", borderRadius: 14, padding: 16, marginBottom: 10 };
 const SectionTitle = ({ children }) => (
   <div style={{ fontFamily: fm, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: "#8a93a6", textTransform: "uppercase", margin: "18px 2px 8px" }}>{children}</div>
@@ -54,6 +56,8 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
   const [betFilter, setBetFilter] = useState("all");
   const [followingHim, setFollowingHim] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [followList, setFollowList] = useState(null); // null | 'followers' | 'following'
+  const [viewUser, setViewUser] = useState(null);     // userId → open that trader's profile (nested)
 
   const load = useCallback(async () => {
     try {
@@ -141,8 +145,16 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
                   {p.streak > 0 && <span style={{ fontSize: 11, fontWeight: 700, fontFamily: fm, color: "#ff9f1c", background: "#ff9f1c18", padding: "3px 9px", borderRadius: 999 }}>🔥 {p.streak}</span>}
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: B.white, fontFamily: fd, letterSpacing: "-0.02em" }}>{username}</div>
-                <div style={{ fontSize: 12, color: B.dim, marginTop: 2 }}>
-                  Joined {joined} · <span style={{ color: "#c8ccd2", fontWeight: 600 }}>{p.followers ?? 0}</span> follower{(p.followers ?? 0) === 1 ? "" : "s"} · <span style={{ color: "#c8ccd2", fontWeight: 600 }}>{p.following ?? 0}</span> following
+                <div style={{ fontSize: 12, color: B.dim, marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>Joined {joined}</span>
+                  <button onClick={() => setFollowList("followers")} style={followPill}>
+                    <span style={{ fontSize: 15, fontWeight: 800 }}>{p.followers ?? 0}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Followers</span>
+                  </button>
+                  <button onClick={() => setFollowList("following")} style={followPill}>
+                    <span style={{ fontSize: 15, fontWeight: 800 }}>{p.following ?? 0}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>Following</span>
+                  </button>
                 </div>
               </div>
 
@@ -240,6 +252,15 @@ export function PublicProfilePage({ targetId, onClose, worldcup = false }) {
           </div>
         )}
       </div>
+
+      {followList && (
+        <FollowListModal targetId={targetId} userId={targetId} kind={followList}
+          onOpenUser={(uid) => { setFollowList(null); if (uid !== targetId) setViewUser(uid); }}
+          onClose={() => setFollowList(null)} />
+      )}
+      {viewUser && (
+        <PublicProfilePage targetId={viewUser} worldcup={worldcup} onClose={() => setViewUser(null)} />
+      )}
     </div>
   );
 }

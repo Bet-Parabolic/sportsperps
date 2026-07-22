@@ -15,7 +15,7 @@ const SPORT_EMOJI = { nba: "🏀", ncaam: "🏀", mlb: "⚾", nfl: "🏈", nhl: 
 export function NavRail({ active, onNav, hide = [], liveGames = [], onLiveClick, onGameClick }) {
   const items = [
     { key: "home", Icon: Home, label: "Home" },
-    { key: "bets", Icon: Ticket, label: "Active bets" },
+    { key: "bets", Icon: Ticket, label: "Active Bets" },
     { key: "news", Icon: Newspaper, label: "News" },
     { key: "bookmarks", Icon: Bookmark, label: "Bookmarks" },
     { key: "leaderboard", Icon: Trophy, label: "Leaderboard" },

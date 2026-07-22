@@ -148,7 +148,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           </div>
         ) : (
           <div style={{justifySelf:"start",marginLeft:20,fontSize:13.5,fontWeight:700,color:"#e6e9ee",fontFamily:fb}}>
-            {terminalPage==="home"?"Overview":terminalPage==="bets"?"Active bets":terminalPage==="news"?"News":terminalPage==="bookmarks"?"Bookmarks":terminalPage==="leaderboard"?"Leaderboard":""}
+            {terminalPage==="home"?"Overview":terminalPage==="bets"?"Active Bets":terminalPage==="news"?"News":terminalPage==="bookmarks"?"Bookmarks":terminalPage==="leaderboard"?"Leaderboard":""}
           </div>
         )}
 
