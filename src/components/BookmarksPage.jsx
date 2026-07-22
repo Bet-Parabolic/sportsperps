@@ -23,7 +23,7 @@ export function BookmarksPage({ liveGames = [], onTrade }) {
           <Bookmark size={18} color={B.primary} />
           <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.12em", fontFamily: fm }}>BOOKMARKS</div>
         </div>
-        <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 6 }}>Saved markets</h2>
+        <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 6 }}>Saved Markets</h2>
         <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6 }}>Markets you've bookmarked from a game's header. Click one to jump back in.</p>
       </div>
 

@@ -179,7 +179,7 @@ export function ActiveBetsPage({ liveGames = [], onTrade, eventOnly = false, sho
           <Ticket size={18} color={B.primary} />
           <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.12em", fontFamily: fm }}>ACTIVE BETS</div>
         </div>
-        <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 6 }}>Your open positions</h2>
+        <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 6 }}>Your Open Positions</h2>
         <p style={{ fontSize: 13, color: "#666", lineHeight: 1.6 }}>Every live wager and resting order, across all games. Click one to jump into its market.</p>
       </div>
 
