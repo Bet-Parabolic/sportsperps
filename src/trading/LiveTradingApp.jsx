@@ -21,7 +21,8 @@ import { loadCard, reconcileAvatarWithAccount } from "../lib/onboarding.js";
 import { NavRail } from "../components/NavRail.jsx";
 import { FloatingChat } from "../components/FloatingChat.jsx";
 import { isBookmarked, syncBookmarks, toggleBookmark as toggleBookmarkStore } from "../lib/bookmarks.js";
-import { MessageCircle, Bookmark, Share2, BarChart3, Zap, Briefcase, Mic, Home, Ticket, Newspaper, Trophy, Bell, Gift, ChevronDown } from "lucide-react";
+import { MessageCircle, Bookmark, Share2, BarChart3, Zap, Briefcase, Mic, Home, Ticket, Newspaper, Trophy, Gift, ChevronDown } from "lucide-react";
+import { BellButton } from "../components/BellButton.jsx";
 import { CATS as SPORT_CATS } from "../components/sports/HomePage.jsx";
 import { webNotify } from "../lib/webNotify.js";
 
@@ -277,15 +278,6 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
     reconcileAvatarWithAccount({ apiUrl: API_URL, userId, token: authToken() })
       .then(() => setCardAvatar(loadCard().avatar));
   }, [userId]);
-  // Header bell (July 21 reconcile) — placeholder dropdown until a real per-user feed exists.
-  const [showBellT, setShowBellT] = useState(false);
-  const bellTRef = useRef(null);
-  useEffect(() => {
-    if (!showBellT) return;
-    const close = (e) => { if (!bellTRef.current?.contains(e.target)) setShowBellT(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [showBellT]);
   // Chat popout (draggable window) + unread dot; bookmark is device-local like the mobile app.
   const [showChatPop, setShowChatPop] = useState(false);
   const showChatPopRef = useRef(false); showChatPopRef.current = showChatPop;
@@ -1371,17 +1363,7 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
             {!worldcup && <button onClick={shareMarket} title="Share this market" style={{width:34,height:34,borderRadius:'50%',border:'none',background:'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
               <Share2 size={16} color='#9aa0a8'/>
             </button>}
-            {!worldcup && <div ref={bellTRef} style={{position:'relative'}}>
-              <button onClick={()=>setShowBellT(v=>!v)} title="Notifications" aria-label="Notifications" style={{width:34,height:34,borderRadius:'50%',border:'none',background:showBellT?'#22252b':'#17191d',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Bell size={16} color={showBellT?'#fff':'#9aa0a8'}/>
-              </button>
-              {showBellT && (
-                <div style={{position:'absolute',top:42,right:0,width:250,background:'#101114',border:'1px solid #23262c',borderRadius:14,padding:'16px 16px',zIndex:60,boxShadow:'0 16px 40px rgba(0,0,0,0.5)'}}>
-                  <div style={{fontSize:12.5,fontWeight:800,color:'#fff',marginBottom:6,fontFamily:fb}}>Notifications</div>
-                  <div style={{fontSize:12,color:'#79808a',lineHeight:1.5}}>Nothing new yet — fills, liquidations, TP/SL triggers and settlements will show up here (live ones land in the activity tray below the wager panel).</div>
-                </div>
-              )}
-            </div>}
+            {!worldcup && <BellButton userId={userId} variant="live"/>}
             {!worldcup && <a data-ungated="1" href="https://app.parabolic.gg/rewards" target="_blank" rel="noopener noreferrer" title="Rewards" aria-label="Rewards"
               style={{width:34,height:34,borderRadius:'50%',border:'1px solid #2b2413',background:'#171307',display:'flex',alignItems:'center',justifyContent:'center'}}>
               <Gift size={16} color='#eab308'/>

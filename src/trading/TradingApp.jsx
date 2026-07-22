@@ -1,17 +1,12 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { ChevronRight, Bell, Gift } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { ChevronRight, Gift } from "lucide-react";
+import { BellButton } from "../components/BellButton.jsx";
 import { B, fb, fm } from "../lib/theme.js";
 import { API_URL, ESPN_SOURCES, LIVE_STATUS } from "../lib/constants.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
 import { track } from "../lib/track.js";
 import { ProfilePage } from "../components/ProfilePage.jsx";
 import { LeaderboardPage } from "../components/LeaderboardPage.jsx";
-import { BasketballPage } from "../components/sports/BasketballPage.jsx";
-import { BaseballPage } from "../components/sports/BaseballPage.jsx";
-import { NFLPage } from "../components/sports/NFLPage.jsx";
-import { HockeyPage } from "../components/sports/HockeyPage.jsx";
-import { SoccerPage } from "../components/sports/SoccerPage.jsx";
-import { MMAPage } from "../components/sports/MMAPage.jsx";
 import { HomePage } from "../components/sports/HomePage.jsx";
 import { AvatarCircle } from "../components/onboarding/MemberCard.jsx";
 import { loadCard, reconcileAvatarWithAccount } from "../lib/onboarding.js";
@@ -33,15 +28,6 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
   const [showProfile, setShowProfile] = useState(false);
   // Rail live-bubble → home with the Live filter preselected (July 21 redesign).
   const [homeCat, setHomeCat] = useState(null);
-  // Notifications dropdown (header bell) — honest v1 placeholder until a per-user feed exists.
-  const [showBell, setShowBell] = useState(false);
-  const bellRef = useRef(null);
-  useEffect(() => {
-    if (!showBell) return;
-    const close = (e) => { if (!bellRef.current?.contains(e.target)) setShowBell(false); };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [showBell]);
   // Account pfp mirrors the member-card avatar (re-read when the profile closes — onboarding/
   // card edits may have just changed it).
   const [cardAvatar, setCardAvatar] = useState(() => loadCard().avatar);
@@ -162,17 +148,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
               <div style={{fontSize:isMobile?12:13,fontWeight:800,color:"#fff",fontFamily:fm,lineHeight:1.2}}>${balance.toLocaleString(undefined,{minimumFractionDigits:isMobile?0:2,maximumFractionDigits:isMobile?0:2})}</div>
             </div>
           )}
-          <div ref={bellRef} style={{position:"relative"}}>
-            <button onClick={()=>setShowBell(v=>!v)} title="Notifications" aria-label="Notifications" style={{width:34,height:34,borderRadius:"50%",border:"1px solid #1f1f1f",background:"#111",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-              <Bell size={16} color="#aeb4bd"/>
-            </button>
-            {showBell && (
-              <div style={{position:"absolute",top:42,right:0,width:250,background:"#101114",border:"1px solid #23262c",borderRadius:14,padding:"16px 16px",zIndex:60,boxShadow:"0 16px 40px rgba(0,0,0,0.5)"}}>
-                <div style={{fontSize:12.5,fontWeight:800,color:"#fff",marginBottom:6,fontFamily:fb}}>Notifications</div>
-                <div style={{fontSize:12,color:"#79808a",lineHeight:1.5}}>Nothing new yet — fills, liquidations, TP/SL triggers and settlements will show up here.</div>
-              </div>
-            )}
-          </div>
+          <BellButton userId={userId}/>
           <a data-ungated="1" href="https://app.parabolic.gg/rewards" target="_blank" rel="noopener noreferrer" title="Rewards" aria-label="Rewards"
             style={{width:34,height:34,borderRadius:"50%",border:"1px solid #2b2413",background:"#171307",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <Gift size={16} color="#eab308"/>
@@ -190,13 +166,6 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
         {terminalPage==="bets"?<ActiveBetsPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="news"?<NewsPage/>
         :terminalPage==="bookmarks"?<BookmarksPage liveGames={liveGames} onTrade={onTrade}/>
-        :terminalPage==="wcup"?<SoccerPage data={espnData.wcup} onTrade={onTrade} liveGames={liveGames.filter(g=>g.league==="wcup")}/>
-        :terminalPage==="basketball"?<BasketballPage liveGames={liveGames} onTrade={onTrade}/>
-        :terminalPage==="baseball"?<BaseballPage data={espnData.mlb} onTrade={onTrade} liveGames={liveGames}/>
-        :terminalPage==="soccer"?<SoccerPage data={espnData.wcup} onTrade={onTrade} liveGames={liveGames}/>
-        :terminalPage==="hockey"?<HockeyPage data={espnData.nhl} onTrade={onTrade} liveGames={liveGames}/>
-        :terminalPage==="mma"?<MMAPage data={espnData.ufc}/>
-        :terminalPage==="nfl"?<NFLPage data={espnData.nfl} onTrade={onTrade} liveGames={liveGames}/>
         :terminalPage==="leaderboard"?<LeaderboardPage userId={userId}/>
         :<HomePage liveGames={liveGames} onTrade={onTrade} initialCategory={homeCat} onOpenDeposit={()=>setShowDeposit(true)}/>}
       </div>
