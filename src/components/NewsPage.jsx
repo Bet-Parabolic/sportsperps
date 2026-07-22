@@ -1,7 +1,7 @@
 /**
  * News page (nav-rail newspaper icon) — two feeds:
- *   • World Cup — live headlines/injuries/lineups aggregated server-side (GET /api/news:
- *     ESPN WC news + BBC/Guardian/Sky RSS + optional X accounts), refreshed every 5 min.
+ *   • News — live ESPN headlines/injuries/lineups across ALL leagues we cover (GET /api/news,
+ *     sport-tagged), refreshed every 5 min, filterable by sport.
  *   • Following — trading activity of every trader you follow (opens, closes, TP/SL,
  *     liquidations, settlements with PnL).
  */
@@ -39,14 +39,16 @@ const CATEGORY_CHIP = {
   injury: { label: "INJURY", color: "#ff5247", bg: "rgba(255,82,71,0.14)" },
   lineup: { label: "LINEUPS", color: "#ffd98a", bg: "rgba(255,173,10,0.12)" },
 };
+const SPORT_EMOJI = { Football: "🏈", Basketball: "🏀", Baseball: "⚾", Hockey: "🏒", Soccer: "⚽" };
 
 function NewsFeed() {
   const [data, setData] = useState(null); // null = loading
   const [failed, setFailed] = useState(false);
+  const [sport, setSport] = useState("all");
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`${API_URL}/news?limit=60`);
+      const r = await fetch(`${API_URL}/news?limit=200`);
       if (!r.ok) throw new Error();
       setData(await r.json()); setFailed(false);
     } catch { setFailed(true); if (!data) setData({ items: [] }); }
@@ -54,9 +56,28 @@ function NewsFeed() {
 
   useEffect(() => { load(); const iv = setInterval(load, 60_000); return () => clearInterval(iv); }, [load]);
 
-  const items = data?.items || [];
+  const all = data?.items || [];
+  // Sports present in the feed, in a stable display order, each with a count for the filter chips.
+  const ORDER = ["Football", "Basketball", "Baseball", "Hockey", "Soccer"];
+  const counts = all.reduce((m, n) => { if (n.sport) m[n.sport] = (m[n.sport] || 0) + 1; return m; }, {});
+  const sportsPresent = ORDER.filter((s) => counts[s]);
+  const items = sport === "all" ? all : all.filter((n) => n.sport === sport);
+
   return (
     <div style={{ maxWidth: 680 }}>
+      {sportsPresent.length > 1 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+          {[["all", "All", all.length], ...sportsPresent.map((s) => [s, s, counts[s]])].map(([k, label, n]) => (
+            <button key={k} onClick={() => setSport(k)} style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "6px 13px", borderRadius: 999, cursor: "pointer", fontFamily: fb, fontSize: 12.5, fontWeight: 700,
+              border: `1px solid ${sport === k ? "transparent" : "#22252c"}`, background: sport === k ? "#fff" : "#101114", color: sport === k ? "#0a0a0a" : "#aeb4bd",
+            }}>
+              {k !== "all" && <span>{SPORT_EMOJI[k]}</span>}{label}
+              <span style={{ fontFamily: fm, fontSize: 10.5, opacity: 0.6 }}>{n}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {data == null && (
         <div style={{ display: "grid", gap: 12 }}>
           {[0, 1, 2, 3].map((i) => <div key={i} style={{ height: 84, borderRadius: 16, background: "rgba(255,255,255,0.05)", animation: "pulse 1.7s ease-in-out infinite" }} />)}
@@ -66,9 +87,9 @@ function NewsFeed() {
         <div style={{ border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 16, padding: "34px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 26, marginBottom: 10 }}>📰</div>
           <div style={{ fontSize: 14.5, fontWeight: 700, color: "#fff", marginBottom: 5 }}>
-            {failed ? "Couldn't load the news feed" : "No stories yet"}
+            {failed ? "Couldn't load the news feed" : sport === "all" ? "No stories yet" : `No ${sport} stories right now`}
           </div>
-          <div style={{ fontSize: 12.5, color: "#8a8f98" }}>{failed ? "Check your connection - retrying automatically." : "Fresh World Cup coverage lands here every few minutes."}</div>
+          <div style={{ fontSize: 12.5, color: "#8a8f98" }}>{failed ? "Check your connection - retrying automatically." : "Fresh sports coverage lands here every few minutes."}</div>
         </div>
       )}
       {items.map((n) => {
@@ -84,6 +105,7 @@ function NewsFeed() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                 <span style={{ fontFamily: fm, fontSize: 9.5, fontWeight: 800, letterSpacing: "0.1em", color: n.source.startsWith("@") ? "#8ecbff" : B.primaryLight }}>{n.source.toUpperCase()}</span>
+                {n.leagueLabel && <span style={{ fontFamily: fm, fontSize: 9, fontWeight: 800, letterSpacing: "0.06em", color: "#c8cdd5", background: "#ffffff10", padding: "2px 8px", borderRadius: 999 }}>{SPORT_EMOJI[n.sport] ? `${SPORT_EMOJI[n.sport]} ` : ""}{n.leagueLabel.toUpperCase()}</span>}
                 {chip && <span style={{ fontFamily: fm, fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", color: chip.color, background: chip.bg, padding: "2px 8px", borderRadius: 999 }}>{chip.label}</span>}
                 <span style={{ fontFamily: fm, fontSize: 10.5, color: "#6f7581" }}>{ago(n.publishedAt)}</span>
               </div>
@@ -181,11 +203,11 @@ export function NewsPage({ onOpenUser }) {
         <div style={{ fontSize: 11, fontWeight: 700, color: B.primary, letterSpacing: "0.12em", fontFamily: fm }}>NEWS</div>
       </div>
       <h2 style={{ fontFamily: fd, fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", color: "#fff", marginBottom: 14 }}>
-        {tab === "news" ? "World Cup" : "Following"}
+        {tab === "news" ? "Sports News" : "Following"}
       </h2>
 
       <div style={{ display: "inline-flex", background: "#111", border: "1px solid #1f1f1f", borderRadius: 999, padding: 3, gap: 3, marginBottom: 20, alignSelf: "flex-start" }}>
-        {[["news", "World Cup"], ["following", "Following"]].map(([k, label]) => (
+        {[["news", "News"], ["following", "Following"]].map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)} style={{
             padding: "7px 20px", borderRadius: 999, border: "none", cursor: "pointer", fontFamily: fd, fontWeight: 700, fontSize: 13,
             background: tab === k ? "#fff" : "transparent", color: tab === k ? "#0a0a0a" : "#888",
