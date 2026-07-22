@@ -48,7 +48,7 @@ const pnlClr = (v) => (v == null ? "#888" : v >= 0 ? B.green : "#ef4444");
 /* ── Hero balance/P&L chart — pure SVG, no dep. Points step at each closed trade; the walk is
    anchored backward from the CURRENT value so the right edge always matches the hero number. ── */
 const RANGES = [
-  { key: "12H", ms: 43200e3 }, { key: "1D", ms: 86400e3 },
+  { key: "1H", ms: 3600e3 }, { key: "12H", ms: 43200e3 }, { key: "1D", ms: 86400e3 },
   { key: "7D", ms: 7 * 86400e3 }, { key: "All", ms: null },
 ];
 function buildSeries(trades, endValue, rangeMs) {
@@ -70,22 +70,42 @@ function buildSeries(trades, endValue, rangeMs) {
   if (win.length < 2) return [{ t: from || now - 1, v: endValue }, { t: now, v: endValue }];
   return win;
 }
+// Compact axis money label, e.g. $10k / $1.2k / $250, signed in P&L mode (0 = "$0", no sign).
+function axisMoney(v, mode) {
+  const a = Math.abs(v);
+  const s = a >= 1000 ? `$${(a / 1000).toFixed(a >= 10000 ? 0 : 1).replace(/\.0$/, "")}k` : `$${Math.round(a)}`;
+  return mode === "pnl" ? (v > 0.005 ? "+" : v < -0.005 ? "−" : "") + s : s;
+}
+const AXIS_W = 54;
+
 function AreaChart({ series, height = 250, mode = "balance" }) {
   const W = 1000, H = height;
-  const wrapRef = useRef(null);
+  const wrapRef = useRef(null); // the PLOT area (svg parent) — hover math is relative to this
   const [hover, setHover] = useState(null); // { t, v, px, py, rectW }
   const vs = series.map((p) => p.v);
-  let lo = Math.min(...vs), hi = Math.max(...vs);
-  if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
+  // Y domain: balance auto-fits the values; P&L is SYMMETRIC around 0 so the midpoint is always
+  // zero and the curve reads clearly positive/negative.
+  let lo, hi;
+  if (mode === "pnl") {
+    const maxAbs = Math.max(1, ...vs.map((v) => Math.abs(v)));
+    hi = maxAbs; lo = -maxAbs;
+  } else {
+    lo = Math.min(...vs); hi = Math.max(...vs);
+    if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
+  }
   const pad = (hi - lo) * 0.15;
-  lo -= pad; hi += pad;
+  lo -= pad; hi += pad; // symmetric padding keeps 0 exactly centered in P&L mode
   const t0 = series[0].t, t1 = series[series.length - 1].t || t0 + 1;
   const x = (t) => ((t - t0) / (t1 - t0 || 1)) * W;
   const y = (v) => H - ((v - lo) / (hi - lo)) * H;
   const line = series.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
   const area = `${line} L${W},${H} L0,${H} Z`;
 
-  // value along the drawn line at time t (interpolated between the two bracketing points)
+  // 5 evenly-spaced ticks across the domain; in P&L mode the middle one is exactly 0.
+  const N = 4;
+  const ticks = Array.from({ length: N + 1 }, (_, i) => lo + (hi - lo) * (i / N));
+  const isZero = (v) => Math.abs(v) < (hi - lo) * 1e-3;
+
   const valueAt = (t) => {
     if (t <= series[0].t) return series[0].v;
     if (t >= series[series.length - 1].t) return series[series.length - 1].v;
@@ -108,28 +128,45 @@ function AreaChart({ series, height = 250, mode = "balance" }) {
   const fmtT = (t) => new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", width: "100%", height }}
-      onMouseMove={onMove} onMouseLeave={() => setHover(null)} onTouchMove={onMove} onTouchEnd={() => setHover(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height, display: "block" }}>
-        <defs>
-          <linearGradient id="homeBalFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8fc7ff" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#8fc7ff" stopOpacity="0.01" />
-          </linearGradient>
-        </defs>
-        <path d={area} fill="url(#homeBalFill)" />
-        <path d={line} fill="none" stroke="#a5cdf5" strokeWidth="2.2" vectorEffect="non-scaling-stroke" />
-      </svg>
-      {hover && (
-        <>
-          <div style={{ position: "absolute", top: 0, bottom: 0, left: hover.px, width: 1, background: "rgba(255,255,255,0.2)", pointerEvents: "none" }} />
-          <div style={{ position: "absolute", left: hover.px - 4.5, top: hover.py - 4.5, width: 9, height: 9, borderRadius: "50%", background: "#a5cdf5", border: "2px solid #0e0f12", pointerEvents: "none" }} />
-          <div style={{ position: "absolute", pointerEvents: "none", left: Math.min(Math.max(hover.px + 12, 4), Math.max(4, hover.rectW - 132)), top: Math.max(4, hover.py - 48), background: "#0a0c10", border: "1px solid #23262c", borderRadius: 9, padding: "6px 10px", boxShadow: "0 8px 24px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>
-            <div style={{ fontSize: 13.5, fontWeight: 800, fontFamily: fm, color: mode === "pnl" ? pnlClr(hover.v) : "#fff" }}>{fmtV(hover.v)}</div>
-            <div style={{ fontSize: 10.5, color: "#7a828c", fontFamily: fm, marginTop: 1 }}>{fmtT(hover.t)}</div>
+    <div style={{ display: "flex", width: "100%", height }}>
+      {/* Y AXIS gutter — value labels aligned to the gridlines */}
+      <div style={{ position: "relative", width: AXIS_W, height, flexShrink: 0 }}>
+        {ticks.map((tv, i) => (
+          <div key={i} style={{ position: "absolute", right: 8, top: Math.min(Math.max(y(tv) - 6, 0), H - 12), fontSize: 10, fontFamily: fm, fontWeight: isZero(tv) && mode === "pnl" ? 700 : 500, color: isZero(tv) && mode === "pnl" ? "#9aa1ab" : "#5b616b", whiteSpace: "nowrap" }}>
+            {axisMoney(tv, mode)}
           </div>
-        </>
-      )}
+        ))}
+      </div>
+
+      {/* PLOT area */}
+      <div ref={wrapRef} style={{ position: "relative", flex: 1, height, minWidth: 0 }}
+        onMouseMove={onMove} onMouseLeave={() => setHover(null)} onTouchMove={onMove} onTouchEnd={() => setHover(null)}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height, display: "block" }}>
+          <defs>
+            <linearGradient id="homeBalFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#8fc7ff" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="#8fc7ff" stopOpacity="0.01" />
+            </linearGradient>
+          </defs>
+          {ticks.map((tv, i) => (
+            <line key={i} x1="0" x2={W} y1={y(tv)} y2={y(tv)}
+              stroke={isZero(tv) && mode === "pnl" ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.05)"}
+              strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          ))}
+          <path d={area} fill="url(#homeBalFill)" />
+          <path d={line} fill="none" stroke="#a5cdf5" strokeWidth="2.2" vectorEffect="non-scaling-stroke" />
+        </svg>
+        {hover && (
+          <>
+            <div style={{ position: "absolute", top: 0, bottom: 0, left: hover.px, width: 1, background: "rgba(255,255,255,0.2)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: hover.px - 4.5, top: hover.py - 4.5, width: 9, height: 9, borderRadius: "50%", background: "#a5cdf5", border: "2px solid #0e0f12", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", pointerEvents: "none", left: Math.min(Math.max(hover.px + 12, 4), Math.max(4, hover.rectW - 132)), top: Math.max(4, hover.py - 48), background: "#0a0c10", border: "1px solid #23262c", borderRadius: 9, padding: "6px 10px", boxShadow: "0 8px 24px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, fontFamily: fm, color: mode === "pnl" ? pnlClr(hover.v) : "#fff" }}>{fmtV(hover.v)}</div>
+              <div style={{ fontSize: 10.5, color: "#7a828c", fontFamily: fm, marginTop: 1 }}>{fmtT(hover.t)}</div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
