@@ -12,7 +12,7 @@
  * Data: /balance (10s poll — includes openPositions w/ teamName), /profile/:id/trades (chart +
  * win rate), liveGames prop (WS-pushed backend games) for the browser + matchup context.
  */
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ArrowDown, ArrowUp, Search } from "lucide-react";
 import { B, fd, fb, fm } from "../../lib/theme.js";
 import { API_URL } from "../../lib/constants.js";
@@ -48,8 +48,8 @@ const pnlClr = (v) => (v == null ? "#888" : v >= 0 ? B.green : "#ef4444");
 /* ── Hero balance/P&L chart — pure SVG, no dep. Points step at each closed trade; the walk is
    anchored backward from the CURRENT value so the right edge always matches the hero number. ── */
 const RANGES = [
-  { key: "1H", ms: 3600e3 }, { key: "2H", ms: 7200e3 }, { key: "12H", ms: 43200e3 },
-  { key: "1D", ms: 86400e3 }, { key: "All", ms: null },
+  { key: "12H", ms: 43200e3 }, { key: "1D", ms: 86400e3 },
+  { key: "7D", ms: 7 * 86400e3 }, { key: "All", ms: null },
 ];
 function buildSeries(trades, endValue, rangeMs) {
   const now = Date.now();
@@ -70,8 +70,10 @@ function buildSeries(trades, endValue, rangeMs) {
   if (win.length < 2) return [{ t: from || now - 1, v: endValue }, { t: now, v: endValue }];
   return win;
 }
-function AreaChart({ series, height = 250 }) {
+function AreaChart({ series, height = 250, mode = "balance" }) {
   const W = 1000, H = height;
+  const wrapRef = useRef(null);
+  const [hover, setHover] = useState(null); // { t, v, px, py, rectW }
   const vs = series.map((p) => p.v);
   let lo = Math.min(...vs), hi = Math.max(...vs);
   if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
@@ -82,17 +84,53 @@ function AreaChart({ series, height = 250 }) {
   const y = (v) => H - ((v - lo) / (hi - lo)) * H;
   const line = series.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
   const area = `${line} L${W},${H} L0,${H} Z`;
+
+  // value along the drawn line at time t (interpolated between the two bracketing points)
+  const valueAt = (t) => {
+    if (t <= series[0].t) return series[0].v;
+    if (t >= series[series.length - 1].t) return series[series.length - 1].v;
+    for (let i = 1; i < series.length; i++) {
+      const a = series[i - 1], b = series[i];
+      if (t >= a.t && t <= b.t) return a.v + (b.v - a.v) * (b.t === a.t ? 0 : (t - a.t) / (b.t - a.t));
+    }
+    return series[series.length - 1].v;
+  };
+  const onMove = (e) => {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return;
+    const clientX = e.touches?.[0]?.clientX ?? e.clientX;
+    const xf = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const t = t0 + xf * (t1 - t0);
+    const v = valueAt(t);
+    setHover({ t, v, px: xf * rect.width, py: (y(v) / H) * rect.height, rectW: rect.width });
+  };
+  const fmtV = (v) => (mode === "pnl" ? signed(v) : `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  const fmtT = (t) => new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height, display: "block" }}>
-      <defs>
-        <linearGradient id="homeBalFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#8fc7ff" stopOpacity="0.16" />
-          <stop offset="100%" stopColor="#8fc7ff" stopOpacity="0.01" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#homeBalFill)" />
-      <path d={line} fill="none" stroke="#a5cdf5" strokeWidth="2.2" vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div ref={wrapRef} style={{ position: "relative", width: "100%", height }}
+      onMouseMove={onMove} onMouseLeave={() => setHover(null)} onTouchMove={onMove} onTouchEnd={() => setHover(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height, display: "block" }}>
+        <defs>
+          <linearGradient id="homeBalFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#8fc7ff" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="#8fc7ff" stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#homeBalFill)" />
+        <path d={line} fill="none" stroke="#a5cdf5" strokeWidth="2.2" vectorEffect="non-scaling-stroke" />
+      </svg>
+      {hover && (
+        <>
+          <div style={{ position: "absolute", top: 0, bottom: 0, left: hover.px, width: 1, background: "rgba(255,255,255,0.2)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", left: hover.px - 4.5, top: hover.py - 4.5, width: 9, height: 9, borderRadius: "50%", background: "#a5cdf5", border: "2px solid #0e0f12", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", pointerEvents: "none", left: Math.min(Math.max(hover.px + 12, 4), Math.max(4, hover.rectW - 132)), top: Math.max(4, hover.py - 48), background: "#0a0c10", border: "1px solid #23262c", borderRadius: 9, padding: "6px 10px", boxShadow: "0 8px 24px rgba(0,0,0,0.5)", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 13.5, fontWeight: 800, fontFamily: fm, color: mode === "pnl" ? pnlClr(hover.v) : "#fff" }}>{fmtV(hover.v)}</div>
+            <div style={{ fontSize: 10.5, color: "#7a828c", fontFamily: fm, marginTop: 1 }}>{fmtT(hover.t)}</div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -323,7 +361,7 @@ export function HomePage({ liveGames = [], onTrade, initialCategory = null, onOp
             </div>
           </div>
           <div style={{ flex: 1, minHeight: 220 }}>
-            {series ? <AreaChart series={series} height={236} /> : <div style={{ height: 236, display: "flex", alignItems: "center", justifyContent: "center", color: "#555", fontSize: 13 }}>Loading…</div>}
+            {series ? <AreaChart series={series} height={236} mode={chartMode} /> : <div style={{ height: 236, display: "flex", alignItems: "center", justifyContent: "center", color: "#555", fontSize: 13 }}>Loading…</div>}
           </div>
         </div>
       </div>
