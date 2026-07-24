@@ -208,7 +208,10 @@ export function RewardsPage({ userId }) {
 
   const flash = (msg) => { setClaimMsg(msg); setTimeout(() => setClaimMsg(""), 3500); };
 
-  // Instant quests (follow/like/repost): open the target + claim on the honor system.
+  // follow/like/repost: open the target, then claim. The backend attempts real X-API verification
+  // when configured — a clear match credits instantly (d.verified); anything it can't confirm right
+  // now (rate limit, private account, freshly-done-but-not-yet-indexed) queues for manual review
+  // (d.pending) instead of silently crediting OR silently rejecting.
   const claimInstant = async (t) => {
     if (t.targetUrl) window.open(t.targetUrl, "_blank", "noopener,noreferrer");
     try {
@@ -217,8 +220,10 @@ export function RewardsPage({ userId }) {
         body: JSON.stringify({ userId, token: authToken() }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { flash(`+${t.points} points — ${t.title}`); refresh(); }
-      else flash(d.error || "Couldn't claim — sign in first");
+      if (r.ok) {
+        flash(d.pending ? `Submitted — we'll confirm and credit ${t.points} points shortly` : `+${t.points} points — ${t.title}`);
+        refresh();
+      } else flash(d.error || "Couldn't claim — sign in first");
     } catch { flash("Network error"); }
   };
 
