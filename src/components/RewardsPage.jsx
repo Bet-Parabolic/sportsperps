@@ -8,7 +8,7 @@
  * as referredBy; App.jsx captures the ?ref= param on boot).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Flame, Users, Sparkles, Gift, Copy, Check, Send } from "lucide-react";
+import { Flame, Users, Sparkles, Copy, Check, Send, UserPlus, Heart, Repeat2, MessageCircle, PenLine, Layers, Clapperboard, ExternalLink } from "lucide-react";
 import { B, fd, fb, fm } from "../lib/theme.js";
 import { API_URL } from "../lib/constants.js";
 import { authToken, getAuth } from "../lib/auth.js";
@@ -16,6 +16,18 @@ import { ago } from "../lib/notifications.js";
 
 const GREEN = "#5ed87e";
 const CARD = { background: "#101114", border: "1px solid #1c2028", borderRadius: 16 };
+
+// Social quest kinds (mirrors backend TASK_KINDS): instant kinds claim on click; proof kinds ask
+// for the X post link that completes the quest (reviewed before points land).
+const KIND_META = {
+  follow:  { Icon: UserPlus,      label: "Follow" },
+  like:    { Icon: Heart,         label: "Like" },
+  repost:  { Icon: Repeat2,       label: "Repost" },
+  comment: { Icon: MessageCircle, label: "Reply" },
+  tweet:   { Icon: PenLine,       label: "Post" },
+  thread:  { Icon: Layers,        label: "Thread" },
+  video:   { Icon: Clapperboard,  label: "Video" },
+};
 
 // ── decorative background rings (Figma's faint ellipses) ─────────────────────
 function Rings() {
@@ -191,7 +203,13 @@ export function RewardsPage({ userId }) {
     try { navigator.clipboard.writeText(`https://${refLink}`); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ }
   };
 
-  const claimQuest = async (t) => {
+  const [proofFor, setProofFor] = useState(null);   // task id | 'ugc-post' | 'ugc-clip' — open proof input
+  const [proofUrl, setProofUrl] = useState("");
+
+  const flash = (msg) => { setClaimMsg(msg); setTimeout(() => setClaimMsg(""), 3500); };
+
+  // Instant quests (follow/like/repost): open the target + claim on the honor system.
+  const claimInstant = async (t) => {
     if (t.targetUrl) window.open(t.targetUrl, "_blank", "noopener,noreferrer");
     try {
       const r = await fetch(`${API_URL}/rewards/tasks/${t.id}/claim`, {
@@ -199,10 +217,35 @@ export function RewardsPage({ userId }) {
         body: JSON.stringify({ userId, token: authToken() }),
       });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { setClaimMsg(`+${t.points} points — ${t.title}`); refresh(); }
-      else setClaimMsg(d.error || "Couldn't claim — sign in first");
-    } catch { setClaimMsg("Network error"); }
-    setTimeout(() => setClaimMsg(""), 3000);
+      if (r.ok) { flash(`+${t.points} points — ${t.title}`); refresh(); }
+      else flash(d.error || "Couldn't claim — sign in first");
+    } catch { flash("Network error"); }
+  };
+
+  // Proof quests (comment/tweet/thread/video): submit the X post link → admin review queue.
+  const submitProof = async (t) => {
+    try {
+      const r = await fetch(`${API_URL}/rewards/tasks/${t.id}/claim`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, token: authToken(), proofUrl }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { flash("Submitted — points land after review"); setProofFor(null); setProofUrl(""); refresh(); }
+      else flash(d.error || "Couldn't submit — sign in first");
+    } catch { flash("Network error"); }
+  };
+
+  // Repeatable UGC quests (daily-capped): post about Parabolic / post a clip.
+  const submitUgc = async (kind) => {
+    try {
+      const r = await fetch(`${API_URL}/rewards/submit`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, token: authToken(), kind, url: proofUrl }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { flash(`Submitted — points land after review (${d.remainingToday} left today)`); setProofFor(null); setProofUrl(""); refresh(); }
+      else flash(d.error || "Couldn't submit — sign in first");
+    } catch { flash("Network error"); }
   };
 
   const statCard = (label, value, extra, highlight) => (
@@ -268,22 +311,74 @@ export function RewardsPage({ userId }) {
         {claimMsg && <div style={{ fontSize: 12.5, color: GREEN, textAlign: "center", padding: "6px 0", fontFamily: fb }}>{claimMsg}</div>}
 
         <div style={{ minHeight: 220, marginBottom: 64 }}>
-          {tab === "quests" && (
-            (st?.tasks?.length ?? 0) === 0
-              ? <div style={{ textAlign: "center", padding: "44px 0", color: "#565c68", fontSize: 13 }}>No open quests right now — check back soon.</div>
-              : st.tasks.map((t) => (
-                <div key={t.id} style={row}>
-                  <div style={rowIcon}>🎯</div>
+          {tab === "quests" && (() => {
+            const whiteBtn = { background: "#fff", color: "#0a0a0a", border: "none", borderRadius: 999, padding: "7px 14px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: fb, whiteSpace: "nowrap" };
+            const ghostBtn = { ...whiteBtn, background: "#1a1d22", color: "#e8ebf0", display: "inline-flex", alignItems: "center", gap: 5 };
+            const proofBox = (onSubmit) => (
+              <div style={{ display: "flex", gap: 8, padding: "2px 4px 14px 50px", borderBottom: "1px solid #16181d" }}>
+                <input value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} placeholder="Paste your X post link (x.com/…/status/…)"
+                  style={{ flex: 1, minWidth: 0, background: "#0d0e11", border: "1px solid #23252b", borderRadius: 10, padding: "9px 12px", fontSize: 12.5, color: "#e8ebf0", fontFamily: fm, outline: "none" }} />
+                <button onClick={onSubmit} disabled={!proofUrl.trim()} style={{ ...whiteBtn, opacity: proofUrl.trim() ? 1 : 0.45 }}>Submit</button>
+              </div>
+            );
+            const questRow = (key, Icon, title, sub, right, expanded) => (
+              <div key={key}>
+                <div style={{ ...row, borderBottom: expanded ? "none" : row.borderBottom }}>
+                  <div style={rowIcon}><Icon size={15} color="#aab0ba" /></div>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#e8ebf0" }}>{t.title}</div>
-                    <div style={{ fontSize: 11.5, color: "#8a93a6", fontFamily: fm, marginTop: 2 }}>Quest</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#e8ebf0" }}>{title}</div>
+                    <div style={{ fontSize: 11.5, color: "#8a93a6", fontFamily: fm, marginTop: 2 }}>{sub}</div>
                   </div>
-                  {t.claimed
-                    ? <span style={{ fontSize: 12.5, fontWeight: 700, color: "#565c68", fontFamily: fm }}>✓ Claimed</span>
-                    : <button onClick={() => claimQuest(t)} style={{ background: "#fff", color: "#0a0a0a", border: "none", borderRadius: 999, padding: "7px 14px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: fb }}>+{t.points} points</button>}
+                  {right}
                 </div>
-              ))
-          )}
+                {expanded}
+              </div>
+            );
+
+            const ugcQuests = [
+              { key: "ugc-post", kind: "post", Icon: PenLine, title: "Post about Parabolic on X", pts: st?.config?.POST_PTS ?? 25, used: st?.post?.usedToday ?? 0, cap: st?.post?.cap ?? 3 },
+              { key: "ugc-clip", kind: "clip", Icon: Clapperboard, title: "Post a highlight clip", pts: st?.config?.CLIP_PTS ?? 75, used: st?.clip?.usedToday ?? 0, cap: st?.clip?.cap ?? 2 },
+            ];
+
+            return (
+              <>
+                {st && !st.xHandle && (
+                  <div style={{ background: "#241a10", border: "1px solid #3a2a14", borderRadius: 12, padding: "10px 14px", fontSize: 12.5, color: "#f5a623", margin: "8px 0 4px", fontFamily: fb }}>
+                    Link your X handle in Profile → Account details to claim quests.
+                  </div>
+                )}
+
+                {/* repeatable dailies (UGC review queue) */}
+                {ugcQuests.map((q) => questRow(q.key, q.Icon, q.title,
+                  `Daily · ${Math.max(0, q.cap - q.used)}/${q.cap} left today · reviewed`,
+                  q.used >= q.cap
+                    ? <span style={{ fontSize: 12.5, fontWeight: 700, color: "#565c68", fontFamily: fm }}>Done today</span>
+                    : <button onClick={() => { setProofFor(proofFor === q.key ? null : q.key); setProofUrl(""); }} style={whiteBtn}>+{q.pts} points</button>,
+                  proofFor === q.key && proofBox(() => submitUgc(q.kind))))}
+
+                {/* one-time social quests */}
+                {(st?.tasks?.length ?? 0) === 0
+                  ? <div style={{ textAlign: "center", padding: "34px 0", color: "#565c68", fontSize: 13 }}>No open quests right now — check back soon.</div>
+                  : st.tasks.map((t) => {
+                    const meta = KIND_META[t.kind] || { Icon: Sparkles, label: "Quest" };
+                    const right = t.claimed
+                      ? <span style={{ fontSize: 12.5, fontWeight: 700, color: "#565c68", fontFamily: fm }}>✓ Claimed</span>
+                      : t.pending
+                      ? <span style={{ fontSize: 11.5, fontWeight: 800, color: "#f5a623", background: "#241a10", border: "1px solid #3a2a14", borderRadius: 999, padding: "4px 10px", fontFamily: fm }}>Pending review</span>
+                      : t.proof
+                      ? <div style={{ display: "flex", gap: 6 }}>
+                          <a data-ungated="1" href={t.targetUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                            <span style={ghostBtn}>Start <ExternalLink size={11} /></span>
+                          </a>
+                          <button onClick={() => { setProofFor(proofFor === t.id ? null : t.id); setProofUrl(""); }} style={whiteBtn}>+{t.points} points</button>
+                        </div>
+                      : <button onClick={() => claimInstant(t)} style={whiteBtn}>+{t.points} points</button>;
+                    return questRow(t.id, meta.Icon, t.title, `${meta.label} · ${t.proof ? "reviewed" : "instant"}`,
+                      right, proofFor === t.id && proofBox(() => submitProof(t)));
+                  })}
+              </>
+            );
+          })()}
           {tab === "milestones" && (
             <>
               {milestones.map(([day, bonus]) => {
@@ -325,10 +420,14 @@ export function RewardsPage({ userId }) {
                 )}
                 {(st?.submissions || []).map((s) => (
                   <div key={s.id} style={row}>
-                    <div style={rowIcon}>{s.kind === "clip" ? "🎬" : "📝"}</div>
+                    <div style={rowIcon}>{s.kind === "task" ? "🎯" : s.kind === "clip" ? "🎬" : "📝"}</div>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#e8ebf0" }}>{s.kind === "clip" ? "Clip submitted" : "X post submitted"}</div>
-                      <div style={{ fontSize: 11.5, color: "#8a93a6", fontFamily: fm, marginTop: 2 }}>{s.status} · {ago(s.createdAt)} ago</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#e8ebf0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {s.kind === "task" ? (s.taskTitle || "Quest") : s.kind === "clip" ? "Clip submitted" : "X post submitted"}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: s.status === "approved" ? "#8a93a6" : s.status === "pending" ? "#f5a623" : "#ff5247", fontFamily: fm, marginTop: 2 }}>
+                        {s.kind === "task" ? "Quest · " : ""}{s.status} · {ago(s.createdAt)} ago
+                      </div>
                     </div>
                     {s.status === "approved" && <span style={{ fontSize: 13, fontWeight: 800, color: GREEN, fontFamily: fm }}>+{s.points} points</span>}
                   </div>
