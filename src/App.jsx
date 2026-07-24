@@ -54,6 +54,16 @@ export default function App() {
   // surface: same backend + same accounts, WC-only leaderboard, inert until EVENT_ENABLED.
   const isWorldCup = typeof window !== "undefined" && window.location.pathname.startsWith("/worldcup");
 
+  // Referral capture: ?ref=<username> → localStorage, which register() sends as referredBy
+  // (backend recordReferral resolves it as a username). This was the missing leg of the loop —
+  // the Rewards page shares app.parabolic.gg/?ref=<username> links.
+  useEffect(() => {
+    try {
+      const ref = new URLSearchParams(window.location.search).get("ref");
+      if (ref && /^[A-Za-z0-9_.-]{1,40}$/.test(ref)) localStorage.setItem("parabolic_ref", ref);
+    } catch { /* storage blocked */ }
+  }, []);
+
   // Post-logout: ProfilePage stamps a one-shot flag before its reload so the boot lands on the
   // sign-in/sign-up screen instead of a fresh guest terminal. (WorldCupPage reads it too.)
   const [postLogoutAuth] = useState(() => {

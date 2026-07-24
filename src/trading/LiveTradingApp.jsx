@@ -1364,10 +1364,10 @@ export function LiveTradingApp({ game: initGame, onBack, liveGames = [], onNavTo
               <Share2 size={16} color='#9aa0a8'/>
             </button>}
             {!worldcup && <BellButton userId={userId} variant="live"/>}
-            {!worldcup && <a data-ungated="1" href="https://app.parabolic.gg/rewards" target="_blank" rel="noopener noreferrer" title="Rewards" aria-label="Rewards"
-              style={{width:34,height:34,borderRadius:'50%',border:'1px solid #2b2413',background:'#171307',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            {!worldcup && <button onClick={()=>onNavTo?onNavTo('rewards'):window.open('https://app.parabolic.gg/rewards','_blank','noopener,noreferrer')} title="Rewards" aria-label="Rewards"
+              style={{width:34,height:34,borderRadius:'50%',border:'1px solid #2b2413',background:'#171307',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
               <Gift size={16} color='#eab308'/>
-            </a>}
+            </button>}
           </div>}
           {!isMobile&&<span style={{display:'flex',alignItems:'center',gap:6,fontSize:11,fontWeight:700,color:B.green,padding:'4px 10px',background:B.green+'12',borderRadius:8,fontFamily:fm,letterSpacing:'0.06em'}}>
             <span style={{width:5,height:5,borderRadius:'50%',background:B.green,animation:'pulse 1.5s infinite'}}/>

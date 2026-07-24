@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ChevronRight, Gift } from "lucide-react";
 import { BellButton } from "../components/BellButton.jsx";
+import { RewardsPage } from "../components/RewardsPage.jsx";
 import { B, fb, fm } from "../lib/theme.js";
 import { API_URL, ESPN_SOURCES, LIVE_STATUS } from "../lib/constants.js";
 import { LOGO_NAV, LOGO_WORDMARK } from "../lib/logos.js";
@@ -134,7 +135,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
           </div>
         ) : (
           <div style={{justifySelf:"start",marginLeft:20,fontSize:13.5,fontWeight:700,color:"#e6e9ee",fontFamily:fb}}>
-            {terminalPage==="home"?"Overview":terminalPage==="bets"?"Active Bets":terminalPage==="news"?"News":terminalPage==="bookmarks"?"Bookmarks":terminalPage==="leaderboard"?"Leaderboard":""}
+            {terminalPage==="home"?"Overview":terminalPage==="bets"?"Active Bets":terminalPage==="news"?"News":terminalPage==="bookmarks"?"Bookmarks":terminalPage==="leaderboard"?"Leaderboard":terminalPage==="rewards"?"Rewards":""}
           </div>
         )}
 
@@ -149,10 +150,10 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
             </div>
           )}
           <BellButton userId={userId}/>
-          <a data-ungated="1" href="https://app.parabolic.gg/rewards" target="_blank" rel="noopener noreferrer" title="Rewards" aria-label="Rewards"
-            style={{width:34,height:34,borderRadius:"50%",border:"1px solid #2b2413",background:"#171307",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <button onClick={()=>setTerminalPage("rewards")} title="Rewards" aria-label="Rewards"
+            style={{width:34,height:34,borderRadius:"50%",border:"1px solid #2b2413",background:terminalPage==="rewards"?"#241d0b":"#171307",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
             <Gift size={16} color="#eab308"/>
-          </a>
+          </button>
           <div onClick={()=>setShowProfile(true)} title="Profile" style={{width:34,height:34,borderRadius:"50%",background:"#222",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden"}}>
             {cardAvatar ? <AvatarCircle avatar={cardAvatar} size={34}/> : <span style={{fontSize:14,color:"#888"}}>👤</span>}
           </div>
@@ -166,6 +167,7 @@ export function TradingApp({ onBack, onChangeGame, liveGames = [], onTrade, init
         {terminalPage==="bets"?<ActiveBetsPage liveGames={liveGames} onTrade={onTrade}/>
         :terminalPage==="news"?<NewsPage/>
         :terminalPage==="bookmarks"?<BookmarksPage liveGames={liveGames} onTrade={onTrade}/>
+        :terminalPage==="rewards"?<RewardsPage userId={userId}/>
         :terminalPage==="leaderboard"?<LeaderboardPage userId={userId}/>
         :<HomePage liveGames={liveGames} onTrade={onTrade} initialCategory={homeCat} onOpenDeposit={()=>setShowDeposit(true)}/>}
       </div>
